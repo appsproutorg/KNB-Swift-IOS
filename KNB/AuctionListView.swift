@@ -11,7 +11,6 @@ struct AuctionListView: View {
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
     @ObservedObject var authManager: AuthenticationManager
-    @State private var showingProfile = false
     @State private var selectedHonor: Honor?
     
     var totalPledged: Double {
@@ -62,24 +61,12 @@ struct AuctionListView: View {
             }
             .navigationTitle("KNB Bidding")
             .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingProfile = true }) {
-                        Image(systemName: "person.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.blue)
-                    }
-                }
-            }
             .sheet(item: $selectedHonor) { honor in
                 HonorDetailView(
                     honor: honor,
                     currentUser: $currentUser,
                     firestoreManager: firestoreManager
                 )
-            }
-            .sheet(isPresented: $showingProfile) {
-                ProfileView(user: $currentUser, authManager: authManager)
             }
         }
     }

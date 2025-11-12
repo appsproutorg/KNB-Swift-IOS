@@ -25,7 +25,7 @@ struct ContentView: View {
         } else {
             Group {
                 if authManager.isAuthenticated {
-                    AuctionListView(
+                    MainTabView(
                         firestoreManager: firestoreManager,
                         currentUser: $authManager.user,
                         authManager: authManager
@@ -35,6 +35,14 @@ struct ContentView: View {
                             hasInitialized = true
                             Task {
                                 await firestoreManager.initializeHonorsInFirestore()
+                                
+                                // Fix any malformed dates in Firestore (one-time)
+                                print("🔧 Fixing malformed sponsorship dates...")
+                                await firestoreManager.fixMalformedDates()
+                                
+                                // Debug: List all sponsorships to verify
+                                print("🔍 Debugging sponsorships in Firestore...")
+                                await firestoreManager.debugListAllSponsorships()
                             }
                         }
                         firestoreManager.startListening()

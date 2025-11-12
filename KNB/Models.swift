@@ -69,3 +69,50 @@ struct User: Codable, Equatable {
     var totalPledged: Double
 }
 
+// MARK: - Kiddush Sponsorship Model
+struct KiddushSponsorship: Identifiable, Codable, Equatable {
+    let id: UUID
+    var date: Date  // Shabbat date
+    var sponsorName: String
+    var sponsorEmail: String
+    var occasion: String
+    var isAnonymous: Bool
+    var timestamp: Date  // When sponsorship was made
+    var isPaid: Bool
+    
+    init(
+        id: UUID = UUID(),
+        date: Date,
+        sponsorName: String,
+        sponsorEmail: String,
+        occasion: String,
+        isAnonymous: Bool = false,
+        timestamp: Date = Date(),
+        isPaid: Bool = false
+    ) {
+        self.id = id
+        self.date = date
+        self.sponsorName = sponsorName
+        self.sponsorEmail = sponsorEmail
+        self.occasion = occasion
+        self.isAnonymous = isAnonymous
+        self.timestamp = timestamp
+        self.isPaid = isPaid
+    }
+}
+
+// MARK: - Shabbat Time Model
+struct ShabbatTime: Codable, Equatable {
+    var date: Date
+    var candleLighting: Date
+    var havdalah: Date
+    var parsha: String?
+    
+    init(date: Date, candleLighting: Date, havdalah: Date, parsha: String? = nil) {
+        self.date = date
+        self.candleLighting = candleLighting
+        self.havdalah = havdalah
+        self.parsha = parsha
+    }
+}
+
