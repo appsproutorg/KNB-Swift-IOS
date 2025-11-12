@@ -67,6 +67,12 @@ struct User: Codable, Equatable {
     var name: String
     var email: String
     var totalPledged: Double
+    var isAdmin: Bool = false
+    
+    // Helper to check if user is admin
+    var hasAdminAccess: Bool {
+        return isAdmin
+    }
 }
 
 // MARK: - Kiddush Sponsorship Model

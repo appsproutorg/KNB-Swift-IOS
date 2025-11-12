@@ -15,43 +15,55 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     
+    // Show debug menu for testing - change to: currentUser?.hasAdminAccess == true for production
+    private var showDebugMenu: Bool {
+        return true // TODO: Change to: currentUser?.hasAdminAccess == true
+    }
+    
     var body: some View {
-        TabView(selection: $selectedTab) {
-            // Auction Tab
-            AuctionListView(
-                firestoreManager: firestoreManager,
-                currentUser: $currentUser,
-                authManager: authManager
-            )
-            .tabItem {
-                Label("Auction", systemImage: "book.closed")
+        ZStack {
+            TabView(selection: $selectedTab) {
+                // Auction Tab
+                AuctionListView(
+                    firestoreManager: firestoreManager,
+                    currentUser: $currentUser,
+                    authManager: authManager
+                )
+                .tabItem {
+                    Label("Auction", systemImage: "book.closed")
+                }
+                .tag(0)
+                
+                // Sponsorship Tab
+                CalendarView(
+                    firestoreManager: firestoreManager,
+                    currentUser: $currentUser
+                )
+                .tabItem {
+                    Label("Sponsorship", systemImage: "calendar")
+                }
+                .tag(1)
+                
+                // Profile Tab
+                ProfileTabView(
+                    user: $currentUser,
+                    authManager: authManager,
+                    firestoreManager: firestoreManager
+                )
+                .tabItem {
+                    Label("Profile", systemImage: "person.crop.circle")
+                }
+                .tag(2)
             }
-            .tag(0)
+            .tint(.blue)
+            .onAppear {
+                setupLiquidGlassTabBar()
+            }
             
-            // Sponsorship Tab
-            CalendarView(
-                firestoreManager: firestoreManager,
-                currentUser: $currentUser
-            )
-            .tabItem {
-                Label("Sponsorship", systemImage: "calendar")
+            // Debug Menu Overlay
+            if showDebugMenu {
+                DebugMenuView(firestoreManager: firestoreManager)
             }
-            .tag(1)
-            
-            // Profile Tab
-            ProfileTabView(
-                user: $currentUser,
-                authManager: authManager,
-                firestoreManager: firestoreManager
-            )
-            .tabItem {
-                Label("Profile", systemImage: "person.crop.circle")
-            }
-            .tag(2)
-        }
-        .tint(.blue)
-        .onAppear {
-            setupLiquidGlassTabBar()
         }
     }
     

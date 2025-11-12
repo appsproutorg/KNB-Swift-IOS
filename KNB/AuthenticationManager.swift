@@ -44,7 +44,8 @@ class AuthenticationManager: ObservableObject {
             user = User(
                 name: name,
                 email: email,
-                totalPledged: 0
+                totalPledged: 0,
+                isAdmin: isAdminEmail(email)
             )
             
             isAuthenticated = true
@@ -83,12 +84,24 @@ class AuthenticationManager: ObservableObject {
     
     // MARK: - Helper Methods
     private func loadUserData(from firebaseUser: FirebaseAuth.User) {
+        let email = firebaseUser.email ?? ""
         user = User(
             name: firebaseUser.displayName ?? "Member",
-            email: firebaseUser.email ?? "",
-            totalPledged: 0 // TODO: Load from Firestore when you add it
+            email: email,
+            totalPledged: 0, // TODO: Load from Firestore when you add it
+            isAdmin: isAdminEmail(email)
         )
         isAuthenticated = true
+    }
+    
+    // Check if email is an admin email
+    // TODO: Move this to Firestore for better security and flexibility
+    private func isAdminEmail(_ email: String) -> Bool {
+        let adminEmails = [
+            "appsproutorg@gmail.com", // Add admin emails here
+            "admin@knb.com"
+        ]
+        return adminEmails.contains(email.lowercased())
     }
 }
 

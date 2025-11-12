@@ -628,6 +628,79 @@ class FirestoreManager: ObservableObject {
             print("❌ Error fixing dates: \(error.localizedDescription)")
         }
     }
+    
+    // MARK: - Admin/Debug Functions
+    
+    // Reset all bids (clear all bids, reset currentBid to 0, mark as not sold)
+    func resetAllBids() async -> Bool {
+        do {
+            let snapshot = try await db.collection("honors").getDocuments()
+            print("🔄 Resetting bids for \(snapshot.documents.count) honors...")
+            
+            for doc in snapshot.documents {
+                try await doc.reference.updateData([
+                    "bids": [],
+                    "currentBid": 0,
+                    "currentWinner": NSNull(),
+                    "isSold": false
+                ])
+                print("   ✅ Reset bids for: \(doc.documentID)")
+            }
+            
+            print("🎉 All bids reset successfully!")
+            return true
+        } catch {
+            print("❌ Error resetting bids: \(error.localizedDescription)")
+            errorMessage = "Failed to reset bids: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // Reset all honors to initial state (completely re-initialize)
+    func resetAllHonors() async -> Bool {
+        do {
+            // First, delete all existing honors
+            let snapshot = try await db.collection("honors").getDocuments()
+            print("🗑️ Deleting \(snapshot.documents.count) existing honors...")
+            
+            for doc in snapshot.documents {
+                try await doc.reference.delete()
+            }
+            
+            print("✅ All honors deleted")
+            
+            // Now re-initialize with default honors
+            print("🔄 Re-initializing honors...")
+            await initializeHonorsInFirestore()
+            
+            print("🎉 All honors reset to initial state!")
+            return true
+        } catch {
+            print("❌ Error resetting honors: \(error.localizedDescription)")
+            errorMessage = "Failed to reset honors: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // Delete all honors (use with extreme caution!)
+    func deleteAllHonors() async -> Bool {
+        do {
+            let snapshot = try await db.collection("honors").getDocuments()
+            print("🗑️ Deleting \(snapshot.documents.count) honors...")
+            
+            for doc in snapshot.documents {
+                try await doc.reference.delete()
+                print("   ✅ Deleted: \(doc.documentID)")
+            }
+            
+            print("✅ All honors deleted")
+            return true
+        } catch {
+            print("❌ Error deleting honors: \(error.localizedDescription)")
+            errorMessage = "Failed to delete honors: \(error.localizedDescription)"
+            return false
+        }
+    }
 }
 
 
