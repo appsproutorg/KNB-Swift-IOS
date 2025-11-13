@@ -415,25 +415,24 @@ struct CalendarDayCell: View {
             // Hebrew Date - show on all dates if in current month, more prominent on Shabbat
             if let hebrewDate = hebrewDate, isCurrentMonth {
                 Text(hebrewDate)
-                    .font(.system(size: isShabbat ? 12 : 7, weight: isShabbat ? .semibold : .regular, design: .rounded))
+                    .font(.system(size: isShabbat ? 11 : 7, weight: isShabbat ? .medium : .regular, design: .rounded))
                     .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : (isShabbat ? .primary : .secondary))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.7)
                     .padding(.horizontal, isShabbat ? 4 : 2)
                     .padding(.top, 2)
             }
             
             // Shabbat-specific details
             if isShabbat, isCurrentMonth {
-                // Parsha name - consistent size, natural bubble shape
+                // Parsha name - consistent size with Hebrew date for harmony
                 if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
                     Text(parsha)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
                         .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue)
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
                         .background(
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(isPastDate ? Color.clear : Color.blue.opacity(0.12))
