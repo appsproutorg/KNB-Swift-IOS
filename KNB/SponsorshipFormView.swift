@@ -68,6 +68,14 @@ struct SponsorshipFormView: View {
                 
                 ScrollView {
                     VStack(spacing: 25) {
+                        // Invisible tap area to dismiss keyboard
+                        Color.clear
+                            .frame(height: 0)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                hideKeyboard()
+                            }
+                        
                         // Header
                         VStack(spacing: 12) {
                             Image(systemName: "calendar.badge.plus")
@@ -292,33 +300,46 @@ struct SponsorshipFormView: View {
                 loadHebrewDate()
                 checkExistingSponsorship()
             }
+            .onTapGesture {
+                hideKeyboard()
+            }
         }
+    }
+    
+    private func hideKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     
     func loadHebrewDate() {
         Task {
             let service = HebrewCalendarService()
             hebrewDate = await service.fetchHebrewDate(for: shabbatDate)
-            print("🔍 SponsorshipForm - Hebrew date loaded: '\(hebrewDate ?? "none")'")
-            print("🔍 SponsorshipForm - Parsha: '\(shabbatTime?.parsha ?? "none")'")
         }
     }
     
     func checkExistingSponsorship() {
         existingSponsorship = firestoreManager.getSponsorship(for: shabbatDate)
-        if let existing = existingSponsorship {
-            print("⚠️ Date already sponsored by: \(existing.sponsorEmail)")
-        } else {
-            print("✅ Date is available for sponsorship")
-        }
     }
     
     var isFormValid: Bool {
-        !name.isEmpty && !email.isEmpty && email.contains("@") && !occasion.isEmpty
+        !name.isEmpty && isValidEmail(email) && !occasion.isEmpty
+    }
+    
+    func isValidEmail(_ email: String) -> Bool {
+        let emailRegex = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        return emailPredicate.evaluate(with: email)
     }
     
     func submitSponsorship() {
         guard isFormValid else { return }
+        
+        // Dismiss keyboard
+        hideKeyboard()
+        
+        // Haptic feedback
+        let impact = UIImpactFeedbackGenerator(style: .medium)
+        impact.impactOccurred()
         
         isSubmitting = true
         errorMessage = nil
@@ -336,9 +357,14 @@ struct SponsorshipFormView: View {
                 let success = await firestoreManager.sponsorKiddush(sponsorship)
                 
                 if success {
+                    // Success haptic
+                    let notification = UINotificationFeedbackGenerator()
+                    notification.notificationOccurred(.success)
                     showingConfirmation = true
-                    // TODO: Send confirmation email via backend
                 } else {
+                    // Error haptic
+                    let notification = UINotificationFeedbackGenerator()
+                    notification.notificationOccurred(.error)
                     errorMessage = "This Shabbat has already been sponsored. Please choose another date."
                 }
             }
