@@ -16,6 +16,8 @@ struct DebugMenuView: View {
     @State private var isProcessing = false
     @State private var showingSuccessAlert = false
     @State private var successMessage = ""
+    @State private var position = CGSize.zero
+    @State private var isDragging = false
     
     var body: some View {
         VStack {
@@ -120,14 +122,14 @@ struct DebugMenuView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
-                // Toggle button (always visible)
+                // Toggle button (always visible) - now draggable!
                 Button(action: {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                         isExpanded.toggle()
                     }
                 }) {
                     HStack {
-                        Image(systemName: isExpanded ? "chevron.down.circle.fill" : "wrench.and.screwdriver.fill")
+                        Image(systemName: isDragging ? "hand.raised.fill" : (isExpanded ? "chevron.down.circle.fill" : "wrench.and.screwdriver.fill"))
                             .font(.system(size: 20))
                         
                         Text(isExpanded ? "Hide Debug Menu" : "Debug Menu")
@@ -138,16 +140,29 @@ struct DebugMenuView: View {
                     .padding(.vertical, 12)
                     .background(
                         LinearGradient(
-                            colors: [Color.blue, Color.purple],
+                            colors: isDragging ? [Color.green, Color.blue] : [Color.blue, Color.purple],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
                     )
                     .cornerRadius(25)
-                    .shadow(color: .blue.opacity(0.4), radius: 10, x: 0, y: 5)
+                    .shadow(color: isDragging ? .green.opacity(0.4) : .blue.opacity(0.4), radius: 10, x: 0, y: 5)
+                    .scaleEffect(isDragging ? 1.05 : 1.0)
                 }
                 .padding(.bottom, 20)
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            isDragging = true
+                            position = value.translation
+                        }
+                        .onEnded { _ in
+                            isDragging = false
+                        }
+                )
             }
+            .offset(x: position.width, y: position.height)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isDragging)
         }
         .ignoresSafeArea(edges: .bottom)
         .alert("Reset All Bids?", isPresented: $showingResetBidsConfirmation) {
