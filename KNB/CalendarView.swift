@@ -108,7 +108,7 @@ struct CalendarView: View {
                             ],
                             spacing: 8
                         ) {
-                            ForEach(getDaysInMonth(), id: \.self) { date in
+                            ForEach(Array(getDaysInMonth().enumerated()), id: \.offset) { index, date in
                                 if let date = date {
                                     let shabbatTime = hebrewCalendarService.getShabbatTime(for: date)
                                     let sponsorship = firestoreManager.getSponsorship(for: date)
@@ -141,7 +141,7 @@ struct CalendarView: View {
                                     }
                                 } else {
                                     Color.clear
-                                        .aspectRatio(1, contentMode: .fit)
+                                        .frame(height: 65)
                                 }
                             }
                         }
