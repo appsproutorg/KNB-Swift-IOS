@@ -38,35 +38,44 @@ struct CalendarView: View {
                 
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Month Navigation
-                        HStack {
+                        // Month Navigation - Clean and modern
+                        HStack(spacing: 16) {
                             Button(action: previousMonth) {
                                 Image(systemName: "chevron.left")
-                                    .font(.title2)
-                                    .foregroundStyle(.blue)
-                                    .padding()
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(Circle())
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 44, height: 44)
+                                    .background(
+                                        Circle()
+                                            .fill(.ultraThinMaterial)
+                                            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                                    )
                             }
                             
                             Spacer()
                             
-                            Text(dateFormatter.string(from: currentMonth))
-                                .font(.system(size: 24, weight: .bold, design: .rounded))
+                            VStack(spacing: 4) {
+                                Text(dateFormatter.string(from: currentMonth))
+                                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.primary)
+                            }
                             
                             Spacer()
                             
                             Button(action: nextMonth) {
                                 Image(systemName: "chevron.right")
-                                    .font(.title2)
-                                    .foregroundStyle(.blue)
-                                    .padding()
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(Circle())
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                                    .frame(width: 44, height: 44)
+                                    .background(
+                                        Circle()
+                                            .fill(.ultraThinMaterial)
+                                            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
+                                    )
                             }
                         }
-                        .padding(.horizontal)
-                        .padding(.top, 10)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
                         
                         // Weekday Headers
                         HStack(spacing: 0) {
@@ -79,8 +88,8 @@ struct CalendarView: View {
                         }
                         .padding(.horizontal)
                         
-                        // Calendar Grid
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 7), spacing: 8) {
+                        // Calendar Grid with better spacing
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 7), spacing: 10) {
                             ForEach(getDaysInMonth(), id: \.self) { date in
                                 if let date = date {
                                     let shabbatTime = hebrewCalendarService.getShabbatTime(for: date)
@@ -95,10 +104,10 @@ struct CalendarView: View {
                                         isShabbat: isShabbat,
                                         isCurrentMonth: calendar.isDate(date, equalTo: currentMonth, toGranularity: .month),
                                         currentUserEmail: currentUser?.email,
-                                        isPastDate: date < Date()
+                                        isPastDate: calendar.startOfDay(for: date) < calendar.startOfDay(for: Date())
                                     )
                                     .onTapGesture {
-                                        let isPastDate = date < Date()
+                                        let isPastDate = calendar.startOfDay(for: date) < calendar.startOfDay(for: Date())
                                         if isShabbat && !isPastDate {
                                             let startOfDay = calendar.startOfDay(for: date)
                                             print("🔍 Tapped date: \(date)")
@@ -121,56 +130,49 @@ struct CalendarView: View {
                         .padding(.horizontal)
                         .id(refreshTrigger)  // Force grid refresh when sponsorships change
                         
-                        // Legend with modern glassy design
-                        VStack(spacing: 12) {
-                            Text("Legend")
-                                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        // Clear, easy-to-understand legend
+                        VStack(spacing: 16) {
+                            Text("How it works")
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             
-                            VStack(spacing: 10) {
-                                LegendItem(
-                                    color: .blue.opacity(0.2),
-                                    text: "Available Shabbat",
-                                    icon: "calendar.badge.plus"
+                            VStack(spacing: 12) {
+                                SimpleLegendRow(
+                                    color: .blue,
+                                    label: "Available",
+                                    description: "Tap to sponsor this Shabbat"
                                 )
                                 
-                                LegendItem(
-                                    color: .red.opacity(0.6),
-                                    text: "Already Sponsored",
-                                    icon: "checkmark.seal.fill"
+                                SimpleLegendRow(
+                                    color: .green,
+                                    label: "Sponsored",
+                                    description: "Already taken"
                                 )
                                 
-                                LegendItem(
-                                    color: .gray.opacity(0.4),
-                                    text: "Past Date (Unavailable)",
-                                    icon: "lock.fill"
+                                SimpleLegendRow(
+                                    color: .gray,
+                                    label: "Past",
+                                    description: "Cannot be booked"
                                 )
                             }
-                            .frame(maxWidth: .infinity)
-                            
-                            Text("Tap any available Shabbat to sponsor. Past dates cannot be booked.")
-                                .font(.system(size: 12, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top, 4)
                         }
-                        .padding(20)
+                        .padding(24)
                         .background(
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 20)
-                                    .fill(.ultraThinMaterial)
-                                RoundedRectangle(cornerRadius: 20)
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [.blue.opacity(0.3), .purple.opacity(0.2)],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1
-                                    )
-                            }
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(.ultraThinMaterial)
+                                .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
                         )
-                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .strokeBorder(
+                                    LinearGradient(
+                                        colors: [Color.secondary.opacity(0.15), Color.secondary.opacity(0.05)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
                         .padding(.horizontal)
                         
                         Spacer(minLength: 20)
@@ -355,122 +357,148 @@ struct CalendarDayCell: View {
     }
     
     var body: some View {
-        VStack(spacing: 1) {
-            // Gregorian Date
+        VStack(spacing: 3) {
+            // Status badge (top-right corner indicator)
+            HStack {
+                Spacer()
+                if sponsorship != nil {
+                    Circle()
+                        .fill(.green)
+                        .frame(width: 6, height: 6)
+                } else if isPastDate && isShabbat {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: 6))
+                        .foregroundStyle(Color.secondary.opacity(0.5))
+                }
+            }
+            .frame(height: 8)
+            .padding(.horizontal, 4)
+            .padding(.top, 4)
+            
+            // Gregorian Date Number - Large and prominent
             Text("\(dayNumber)")
-                .font(.system(size: 18, weight: isToday ? .bold : .semibold, design: .rounded))
-                .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : (isCurrentMonth ? .primary : Color.secondary.opacity(0.3)))
-                .padding(.top, 2)
+                .font(.system(size: isToday ? 22 : 20, weight: isToday ? .bold : .semibold, design: .rounded))
+                .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : (isCurrentMonth ? .primary : Color.secondary.opacity(0.4)))
+                .padding(.top, isShabbat ? 0 : 4)
                 .onAppear {
                     if isShabbat && isCurrentMonth {
                         print("🔍 Cell \(dayNumber): Shabbat=\(isShabbat), ShabbatTime=\(shabbatTime != nil), Parsha='\(shabbatTime?.parsha ?? "none")', Sponsored=\(sponsorship != nil)")
                     }
                 }
             
-            // Hebrew Date (full date without year)
-            if let hebrewDate = hebrewDate, isCurrentMonth {
-                Text(hebrewDate)
-                    .font(.system(size: 8, design: .rounded))
-                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.3) : .secondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.5)
-                    .frame(height: 16)
-            }
-            
-            // Parsha name for Shabbat
+            // Shabbat indicator - only for Shabbat dates
             if isShabbat, isCurrentMonth {
-                if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
-                    Text(parsha)
-                        .font(.system(size: 7, weight: .bold, design: .rounded))
-                        .foregroundStyle(isPastDate ? Color.secondary.opacity(0.3) : .blue)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.4)
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 2)
-                } else {
-                    // Debug: Show if we're missing parsha data
-                    Text("No Parsha")
-                        .font(.system(size: 6, design: .rounded))
-                        .foregroundStyle(.red.opacity(0.3))
-                }
+                Text("Shabbat")
+                    .font(.system(size: 8, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .blue)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(isPastDate ? Color.secondary.opacity(0.1) : Color.blue.opacity(0.15))
+                    )
             }
             
-            // Candle lighting time
+            // Parsha name - cleaner display
+            if isShabbat, isCurrentMonth, let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
+                Text(parsha)
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue.opacity(0.8))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, 4)
+            }
+            
+            Spacer(minLength: 2)
+            
+            // Candle lighting time - bottom of cell
             if let shabbatTime = shabbatTime, isCurrentMonth {
-                Text(formatTime(shabbatTime.candleLighting))
-                    .font(.system(size: 7, design: .rounded))
-                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.3) : .orange)
+                HStack(spacing: 2) {
+                    Image(systemName: "light.max")
+                        .font(.system(size: 7))
+                    Text(formatTime(shabbatTime.candleLighting))
+                        .font(.system(size: 8, weight: .medium, design: .rounded))
+                }
+                .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .orange)
+                .padding(.bottom, 4)
             }
-            
-            // Past date indicator
-            if isPastDate && isShabbat && isCurrentMonth {
-                Image(systemName: "lock.fill")
-                    .font(.system(size: 8))
-                    .foregroundStyle(Color.secondary.opacity(0.3))
-            }
-            
-            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
+        .frame(height: 85)
         .background(cellBackgroundMaterial)
         .overlay(cellOverlay)
-        .opacity(isCurrentMonth ? (isPastDate ? 0.4 : 1.0) : 0.3)
-        .animation(.easeInOut(duration: 0.2), value: isPastDate)
+        .opacity(isCurrentMonth ? (isPastDate ? 0.5 : 1.0) : 0.25)
+        .scaleEffect(isToday ? 1.02 : 1.0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isToday)
     }
     
-    // Modern glassy background with smooth transitions
+    // Clean, modern background with clear status indication
     @ViewBuilder
     var cellBackgroundMaterial: some View {
-        if let _ = sponsorship {
-            // Sponsored dates get a red glassy effect
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.red.opacity(0.15))
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.8)
+        ZStack {
+            // Base background
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.ultraThinMaterial)
+            
+            // Status-based color overlay
+            if let _ = sponsorship {
+                // Sponsored - green tint (already taken)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [.green.opacity(0.25), .green.opacity(0.15)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            } else if isShabbat && isCurrentMonth && !isPastDate {
+                // Available Shabbat - blue tint (can book)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.15), .blue.opacity(0.08)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            } else if isPastDate && isShabbat {
+                // Past Shabbat - gray tint (locked)
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(.gray.opacity(0.08))
             }
-        } else if isShabbat && isCurrentMonth && !isPastDate {
-            // Available Shabbat dates get a blue glassy effect
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.blue.opacity(0.08))
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
-                    .opacity(0.6)
-            }
-        } else if isPastDate && isShabbat {
-            // Past dates get a muted gray glassy effect
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.gray.opacity(0.05))
-        } else {
-            RoundedRectangle(cornerRadius: 12)
-                .fill(.clear)
         }
     }
     
-    // Glassy border overlay with glow effect
+    // Clean border overlay with clear visual hierarchy
     @ViewBuilder
     var cellOverlay: some View {
         if isToday {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(
+            // Today gets a prominent blue glow
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(
                     LinearGradient(
-                        colors: [.blue, .blue.opacity(0.5)],
+                        colors: [.blue, .blue.opacity(0.6)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 2.5
+                    lineWidth: 3
                 )
-                .shadow(color: .blue.opacity(0.4), radius: 4, x: 0, y: 2)
+                .shadow(color: .blue.opacity(0.5), radius: 6, x: 0, y: 2)
+        } else if sponsorship != nil {
+            // Sponsored dates get green border
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(.green.opacity(0.4), lineWidth: 1.5)
         } else if isShabbat && isAvailableForSponsorship && isCurrentMonth {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.blue.opacity(0.2), lineWidth: 1)
+            // Available Shabbats get subtle blue border
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(.blue.opacity(0.25), lineWidth: 1.5)
+        } else if isCurrentMonth {
+            // Regular dates get very subtle border
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 0.5)
         } else {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.clear, lineWidth: 0)
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(.clear, lineWidth: 0)
         }
     }
     
@@ -488,28 +516,43 @@ struct CalendarDayCell: View {
     )
 }
 
-// MARK: - Legend Item Component
-struct LegendItem: View {
+// MARK: - Simple Legend Row Component
+struct SimpleLegendRow: View {
     let color: Color
-    let text: String
-    let icon: String
+    let label: String
+    let description: String
     
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(color)
-                    .frame(width: 16, height: 16)
-                Image(systemName: icon)
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundStyle(.white)
-            }
+        HStack(spacing: 14) {
+            // Color indicator circle
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [color, color.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 14, height: 14)
+                .shadow(color: color.opacity(0.3), radius: 2, x: 0, y: 1)
             
-            Text(text)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
+                
+                Text(description)
+                    .font(.system(size: 13, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
             
             Spacer()
         }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(color.opacity(0.08))
+        )
     }
 }
 
