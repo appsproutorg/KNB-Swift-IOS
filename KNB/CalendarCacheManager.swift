@@ -30,7 +30,7 @@ class CalendarCacheManager {
             return false
         }
         
-        let daysSinceCached = Calendar.current.dateComponents([.day], from: cacheDate, to: Date()).day ?? 0
+        let daysSinceCached = Calendar.chicago.dateComponents([.day], from: cacheDate, to: Date()).day ?? 0
         return daysSinceCached < cacheExpirationDays
     }
     
@@ -64,7 +64,7 @@ class CalendarCacheManager {
     
     func cacheShabbatTime(_ shabbatTime: ShabbatTime, for date: Date) {
         var shabbatTimes = getShabbatTimesCache()
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let startOfDay = calendar.startOfDay(for: date)
         let key = dateKey(for: startOfDay)
         shabbatTimes[key] = shabbatTime
@@ -78,7 +78,7 @@ class CalendarCacheManager {
     
     func getShabbatTime(for date: Date) -> ShabbatTime? {
         let shabbatTimes = getShabbatTimesCache()
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let startOfDay = calendar.startOfDay(for: date)
         let key = dateKey(for: startOfDay)
         return shabbatTimes[key]
@@ -108,7 +108,7 @@ class CalendarCacheManager {
     
     func cacheShabbatTimes(_ times: [Date: ShabbatTime]) {
         var shabbatTimes = getShabbatTimesCache()
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         
         for (date, shabbatTime) in times {
             let startOfDay = calendar.startOfDay(for: date)
@@ -153,12 +153,14 @@ class CalendarCacheManager {
     private func dateKey(for date: Date) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate]
+        formatter.timeZone = TimeZone(identifier: "America/Chicago")!
         return formatter.string(from: date)
     }
     
     private func dateFromKey(_ key: String) -> Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate]
+        formatter.timeZone = TimeZone(identifier: "America/Chicago")!
         return formatter.date(from: key)
     }
     
@@ -166,7 +168,7 @@ class CalendarCacheManager {
     
     func get90DayRange() -> [Date] {
         var dates: [Date] = []
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let today = calendar.startOfDay(for: Date())
         
         for dayOffset in 0..<90 {

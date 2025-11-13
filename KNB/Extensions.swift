@@ -7,6 +7,17 @@
 
 import Foundation
 
+// MARK: - Chicago Timezone Calendar
+extension Calendar {
+    /// Shared calendar configured to Chicago timezone (America/Chicago)
+    /// This ensures all users see the same Shabbat dates regardless of their device timezone
+    static var chicago: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+        return calendar
+    }
+}
+
 // MARK: - Safe Double to Int Conversion
 extension Double {
     func toSafeInt() -> Int {

@@ -18,7 +18,7 @@ struct CalendarView: View {
     @State private var hebrewDatesCache: [Date: String] = [:]
     @State private var refreshTrigger = UUID()  // Force refresh when needed
     
-    let calendar = Calendar.current
+    let calendar = Calendar.chicago
     let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
@@ -200,13 +200,13 @@ struct CalendarView: View {
             }
             .navigationBarHidden(true)
             .onAppear {
-                // Clear old cache to get fresh Parsha data with improved parsing
+                // Clear old cache to get fresh data with correct date matching
                 let cacheVersion = UserDefaults.standard.integer(forKey: "hebrew_cache_version")
-                if cacheVersion < 4 {
-                    print("🔄 Clearing cache for improved Parsha parsing...")
+                if cacheVersion < 6 {
+                    print("🔄 Clearing cache for Shabbat date fix (candles Friday -> Shabbat Saturday)...")
                     CalendarCacheManager.shared.clearCache()
                     hebrewCalendarService.clearCache()
-                    UserDefaults.standard.set(4, forKey: "hebrew_cache_version")
+                    UserDefaults.standard.set(6, forKey: "hebrew_cache_version")
                 }
                 
                 // Preload 90 days of data
@@ -352,7 +352,7 @@ struct CalendarDayCell: View {
     let currentUserEmail: String?
     let isPastDate: Bool
     
-    let calendar = Calendar.current
+    let calendar = Calendar.chicago
     
     var isToday: Bool {
         calendar.isDateInToday(date)

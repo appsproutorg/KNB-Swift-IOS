@@ -353,7 +353,7 @@ class FirestoreManager: ObservableObject {
     func sponsorKiddush(_ sponsorship: KiddushSponsorship) async -> Bool {
         do {
             // CRITICAL: Always use startOfDay for consistent date comparison
-            let calendar = Calendar.current
+            let calendar = Calendar.chicago
             let startOfDay = calendar.startOfDay(for: sponsorship.date)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
             
@@ -402,7 +402,7 @@ class FirestoreManager: ObservableObject {
     // Check if a date is available for sponsorship
     func isDateAvailable(_ date: Date) async -> Bool {
         do {
-            let calendar = Calendar.current
+            let calendar = Calendar.chicago
             let startOfDay = calendar.startOfDay(for: date)
             
             let snapshot = try await db.collection("kiddush_sponsorships")
@@ -419,7 +419,7 @@ class FirestoreManager: ObservableObject {
     
     // Get sponsorship for a specific date
     func getSponsorship(for date: Date) -> KiddushSponsorship? {
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let startOfDay = calendar.startOfDay(for: date)
         
         let found = kiddushSponsorships.first { sponsorship in
@@ -463,7 +463,7 @@ class FirestoreManager: ObservableObject {
     // Generate default available dates (all Saturdays for next 12 months)
     private func generateDefaultAvailableDates() -> [Date] {
         var dates: [Date] = []
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let today = Date()
         
         for week in 0..<52 {
@@ -545,7 +545,7 @@ class FirestoreManager: ObservableObject {
                 let data = doc.data()
                 if let timestamp = data["date"] as? Timestamp {
                     let date = timestamp.dateValue()
-                    let calendar = Calendar.current
+                    let calendar = Calendar.chicago
                     let startOfDay = calendar.startOfDay(for: date)
                     
                     print("   📅 ID: \(doc.documentID)")
@@ -579,7 +579,7 @@ class FirestoreManager: ObservableObject {
     // Delete a specific sponsorship by date
     func deleteSponsorshipByDate(_ date: Date) async {
         do {
-            let calendar = Calendar.current
+            let calendar = Calendar.chicago
             let startOfDay = calendar.startOfDay(for: date)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
             
@@ -605,7 +605,7 @@ class FirestoreManager: ObservableObject {
             let snapshot = try await db.collection("kiddush_sponsorships").getDocuments()
             print("🔧 Fixing \(snapshot.documents.count) sponsorships...")
             
-            let calendar = Calendar.current
+            let calendar = Calendar.chicago
             
             for doc in snapshot.documents {
                 let data = doc.data()

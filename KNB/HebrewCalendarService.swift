@@ -49,7 +49,7 @@ class HebrewCalendarService: ObservableObject {
         }
         
         // Fetch Shabbat times for next 3 months
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let today = Date()
         for monthOffset in 0..<3 {
             if let targetMonth = calendar.date(byAdding: .month, value: monthOffset, to: today) {
@@ -160,18 +160,24 @@ class HebrewCalendarService: ObservableObject {
                     }
                 } else if item.category == "havdalah" {
                     if let candles = currentCandles, let date = currentDate {
-                        // CRITICAL: Use startOfDay as key for consistent matching
-                        let calendar = Calendar.current
-                        let startOfDay = calendar.startOfDay(for: date)
+                        // CRITICAL: Candles are Friday evening, but Shabbat is Saturday
+                        // We need to store this under Saturday's date, not Friday's!
+                        let calendar = Calendar.chicago
+                        let candlesDay = calendar.startOfDay(for: date)
+                        // Add 1 day to get Saturday (the actual Shabbat day)
+                        guard let shabbatDay = calendar.date(byAdding: .day, value: 1, to: candlesDay) else {
+                            print("      ⚠️ Failed to calculate Shabbat day!")
+                            return
+                        }
                         
                         let shabbatTime = ShabbatTime(
-                            date: startOfDay,
+                            date: shabbatDay,
                             candleLighting: candles,
                             havdalah: item.date,
                             parsha: currentParsha
                         )
-                        monthTimes[startOfDay] = shabbatTime
-                        print("      ✅ Created ShabbatTime with parsha: '\(currentParsha ?? "NONE")' for \(startOfDay)")
+                        monthTimes[shabbatDay] = shabbatTime
+                        print("      ✅ Created ShabbatTime with parsha: '\(currentParsha ?? "NONE")' for Saturday \(shabbatDay)")
                     } else {
                         print("      ⚠️ Havdalah found but missing candles/date!")
                     }
@@ -212,7 +218,7 @@ class HebrewCalendarService: ObservableObject {
     }
     
     private func fetchHebrewDateFromAPI(for gregorianDate: Date) async -> String? {
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let dateComponents = calendar.dateComponents([.year, .month, .day], from: gregorianDate)
         
         guard let year = dateComponents.year,
@@ -266,14 +272,14 @@ class HebrewCalendarService: ObservableObject {
     
     // MARK: - Get Shabbat for Date
     func getShabbatTime(for date: Date) -> ShabbatTime? {
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let startOfDay = calendar.startOfDay(for: date)
         return shabbatTimes[startOfDay]
     }
     
     // MARK: - Check if Date is Shabbat
     func isShabbat(_ date: Date) -> Bool {
-        let calendar = Calendar.current
+        let calendar = Calendar.chicago
         let weekday = calendar.component(.weekday, from: date)
         return weekday == 7  // Saturday
     }
@@ -332,6 +338,7 @@ struct HebcalItem: Codable {
         
         // Try ISO8601 first
         let iso8601Formatter = ISO8601DateFormatter()
+        iso8601Formatter.timeZone = TimeZone(identifier: "America/Chicago")
         if let parsedDate = iso8601Formatter.date(from: dateString) {
             date = parsedDate
         } else {
