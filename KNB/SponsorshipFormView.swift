@@ -25,6 +25,10 @@ struct SponsorshipFormView: View {
     @State private var hebrewDate: String?
     @State private var existingSponsorship: KiddushSponsorship?
     
+    var isPastDate: Bool {
+        shabbatDate < Date()
+    }
+    
     init(shabbatDate: Date, shabbatTime: ShabbatTime?, currentUser: User?, firestoreManager: FirestoreManager) {
         self.shabbatDate = shabbatDate
         self.shabbatTime = shabbatTime
@@ -58,24 +62,47 @@ struct SponsorshipFormView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                // Background gradient
-                LinearGradient(
-                    colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                // Modern glassy background with mesh gradient effect
+                ZStack {
+                    LinearGradient(
+                        colors: [
+                            Color.blue.opacity(0.15),
+                            Color.purple.opacity(0.12),
+                            Color.pink.opacity(0.08)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    
+                    // Subtle overlay circles for depth
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [.blue.opacity(0.15), .clear],
+                                center: .topLeading,
+                                startRadius: 0,
+                                endRadius: 400
+                            )
+                        )
+                        .blur(radius: 60)
+                        .offset(x: -100, y: -100)
+                    
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [.purple.opacity(0.12), .clear],
+                                center: .bottomTrailing,
+                                startRadius: 0,
+                                endRadius: 300
+                            )
+                        )
+                        .blur(radius: 50)
+                        .offset(x: 100, y: 100)
+                }
                 .ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 25) {
-                        // Invisible tap area to dismiss keyboard
-                        Color.clear
-                            .frame(height: 0)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                hideKeyboard()
-                            }
-                        
                         // Header
                         VStack(spacing: 12) {
                             Image(systemName: "calendar.badge.plus")
@@ -117,12 +144,49 @@ struct SponsorshipFormView: View {
                         }
                         .padding(.bottom, 10)
                         
-                        // Already Sponsored Banner
+                        // Past Date Warning Banner
+                        if isPastDate {
+                            VStack(spacing: 10) {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 28))
+                                        .foregroundStyle(.orange)
+                                    
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        Text("Past Date")
+                                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                                            .foregroundStyle(.orange)
+                                        
+                                        Text("This date has passed and cannot be sponsored.")
+                                            .font(.system(size: 14, design: .rounded))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                }
+                                .padding(16)
+                                .background(
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(.orange.opacity(0.1))
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(.ultraThinMaterial)
+                                            .opacity(0.8)
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(.orange.opacity(0.3), lineWidth: 1.5)
+                                    }
+                                )
+                                .shadow(color: .orange.opacity(0.2), radius: 8, x: 0, y: 4)
+                            }
+                            .padding(.horizontal)
+                        }
+                        
+                        // Already Sponsored Banner with glassy design
                         if let sponsorship = existingSponsorship {
                             VStack(spacing: 10) {
                                 HStack {
                                     Image(systemName: "checkmark.seal.fill")
-                                        .font(.system(size: 30))
+                                        .font(.system(size: 28))
                                         .foregroundStyle(.green)
                                     
                                     VStack(alignment: .leading, spacing: 5) {
@@ -147,14 +211,24 @@ struct SponsorshipFormView: View {
                                     
                                     Spacer()
                                 }
-                                .padding()
-                                .background(.green.opacity(0.1))
-                                .cornerRadius(15)
+                                .padding(16)
+                                .background(
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(.green.opacity(0.1))
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .fill(.ultraThinMaterial)
+                                            .opacity(0.8)
+                                        RoundedRectangle(cornerRadius: 16)
+                                            .stroke(.green.opacity(0.3), lineWidth: 1.5)
+                                    }
+                                )
+                                .shadow(color: .green.opacity(0.2), radius: 8, x: 0, y: 4)
                             }
                             .padding(.horizontal)
                         }
                         
-                        // Price Card
+                        // Price Card with modern glassy design
                         VStack(spacing: 8) {
                             Text("Sponsorship Amount")
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
@@ -162,7 +236,13 @@ struct SponsorshipFormView: View {
                             
                             Text("$500")
                                 .font(.system(size: 48, weight: .bold, design: .rounded))
-                                .foregroundStyle(.green)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.green, .green.opacity(0.7)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                             
                             Text("Payment details will be sent via email")
                                 .font(.system(size: 13, design: .rounded))
@@ -170,13 +250,29 @@ struct SponsorshipFormView: View {
                                 .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(20)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(20)
+                        .padding(24)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 22)
+                                    .fill(.green.opacity(0.05))
+                                RoundedRectangle(cornerRadius: 22)
+                                    .fill(.ultraThinMaterial)
+                                RoundedRectangle(cornerRadius: 22)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [.green.opacity(0.3), .green.opacity(0.1)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1.5
+                                    )
+                            }
+                        )
+                        .shadow(color: .green.opacity(0.1), radius: 15, x: 0, y: 8)
                         .padding(.horizontal)
                         
-                        // Form Fields (only show if not already sponsored by someone else)
-                        if existingSponsorship == nil || isSponsoredByCurrentUser {
+                        // Form Fields (only show if not already sponsored and not past date)
+                        if (existingSponsorship == nil || isSponsoredByCurrentUser) && !isPastDate {
                         VStack(spacing: 20) {
                             // Name Field
                             VStack(alignment: .leading, spacing: 8) {
@@ -241,8 +337,8 @@ struct SponsorshipFormView: View {
                         .padding(.horizontal)
                         }
                         
-                        // Submit Button (only show if not already sponsored)
-                        if existingSponsorship == nil {
+                        // Submit Button (only show if not already sponsored and not past date)
+                        if existingSponsorship == nil && !isPastDate {
                         Button(action: submitSponsorship) {
                             HStack {
                                 if isSubmitting {
@@ -300,46 +396,33 @@ struct SponsorshipFormView: View {
                 loadHebrewDate()
                 checkExistingSponsorship()
             }
-            .onTapGesture {
-                hideKeyboard()
-            }
         }
-    }
-    
-    private func hideKeyboard() {
-        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
     
     func loadHebrewDate() {
         Task {
             let service = HebrewCalendarService()
             hebrewDate = await service.fetchHebrewDate(for: shabbatDate)
+            print("🔍 SponsorshipForm - Hebrew date loaded: '\(hebrewDate ?? "none")'")
+            print("🔍 SponsorshipForm - Parsha: '\(shabbatTime?.parsha ?? "none")'")
         }
     }
     
     func checkExistingSponsorship() {
         existingSponsorship = firestoreManager.getSponsorship(for: shabbatDate)
+        if let existing = existingSponsorship {
+            print("⚠️ Date already sponsored by: \(existing.sponsorEmail)")
+        } else {
+            print("✅ Date is available for sponsorship")
+        }
     }
     
     var isFormValid: Bool {
-        !name.isEmpty && isValidEmail(email) && !occasion.isEmpty
-    }
-    
-    func isValidEmail(_ email: String) -> Bool {
-        let emailRegex = "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$"
-        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
-        return emailPredicate.evaluate(with: email)
+        !name.isEmpty && !email.isEmpty && email.contains("@") && !occasion.isEmpty
     }
     
     func submitSponsorship() {
         guard isFormValid else { return }
-        
-        // Dismiss keyboard
-        hideKeyboard()
-        
-        // Haptic feedback
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
         
         isSubmitting = true
         errorMessage = nil
@@ -357,14 +440,9 @@ struct SponsorshipFormView: View {
                 let success = await firestoreManager.sponsorKiddush(sponsorship)
                 
                 if success {
-                    // Success haptic
-                    let notification = UINotificationFeedbackGenerator()
-                    notification.notificationOccurred(.success)
                     showingConfirmation = true
+                    // TODO: Send confirmation email via backend
                 } else {
-                    // Error haptic
-                    let notification = UINotificationFeedbackGenerator()
-                    notification.notificationOccurred(.error)
                     errorMessage = "This Shabbat has already been sponsored. Please choose another date."
                 }
             }

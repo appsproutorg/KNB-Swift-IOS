@@ -17,7 +17,6 @@ struct CalendarView: View {
     @State private var showingSponsorshipForm = false
     @State private var hebrewDatesCache: [Date: String] = [:]
     @State private var refreshTrigger = UUID()  // Force refresh when needed
-    @State private var isRefreshing = false
     
     let calendar = Calendar.current
     let dateFormatter: DateFormatter = {
@@ -37,31 +36,8 @@ struct CalendarView: View {
                 )
                 .ignoresSafeArea()
                 
-                // Loading overlay
-                if hebrewCalendarService.isLoading && !isRefreshing {
-                    VStack {
-                        Spacer()
-                        ProgressView("Loading calendar data...")
-                            .padding()
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(15)
-                        Spacer()
-                    }
-                    .zIndex(1)
-                }
-                
                 ScrollView {
                     VStack(spacing: 20) {
-                        // Pull to Refresh Indicator
-                        if isRefreshing {
-                            HStack {
-                                Spacer()
-                                ProgressView()
-                                    .padding(.top, 10)
-                                Spacer()
-                            }
-                        }
-                        
                         // Month Navigation
                         HStack {
                             Button(action: previousMonth) {
@@ -75,23 +51,8 @@ struct CalendarView: View {
                             
                             Spacer()
                             
-                            VStack(spacing: 4) {
-                                Text(dateFormatter.string(from: currentMonth))
-                                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                                
-                                // "Today" button if not viewing current month
-                                if !calendar.isDate(currentMonth, equalTo: Date(), toGranularity: .month) {
-                                    Button(action: goToToday) {
-                                        Text("Today")
-                                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.blue)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 4)
-                                            .background(.blue.opacity(0.1))
-                                            .cornerRadius(12)
-                                    }
-                                }
-                            }
+                            Text(dateFormatter.string(from: currentMonth))
+                                .font(.system(size: 24, weight: .bold, design: .rounded))
                             
                             Spacer()
                             
@@ -134,21 +95,21 @@ struct CalendarView: View {
                                         isShabbat: isShabbat,
                                         isCurrentMonth: calendar.isDate(date, equalTo: currentMonth, toGranularity: .month),
                                         currentUserEmail: currentUser?.email,
-                                        isPast: date < calendar.startOfDay(for: Date())
+                                        isPastDate: date < Date()
                                     )
                                     .onTapGesture {
-                                        // Only allow tapping future Shabbat dates
-                                        if isShabbat && date >= calendar.startOfDay(for: Date()) {
-                                            // Haptic feedback
-                                            let impact = UIImpactFeedbackGenerator(style: .medium)
-                                            impact.impactOccurred()
+                                        let isPastDate = date < Date()
+                                        if isShabbat && !isPastDate {
+                                            let startOfDay = calendar.startOfDay(for: date)
+                                            print("🔍 Tapped date: \(date)")
+                                            print("   StartOfDay: \(startOfDay)")
+                                            print("   Is Shabbat: \(isShabbat)")
+                                            print("   ShabbatTime: \(shabbatTime != nil ? "exists" : "nil")")
+                                            print("   Parsha: '\(shabbatTime?.parsha ?? "none")'")
+                                            print("   Sponsorship: \(sponsorship != nil ? "exists" : "nil")")
                                             
                                             selectedDate = date
                                             showingSponsorshipForm = true
-                                        } else if isShabbat && date < calendar.startOfDay(for: Date()) {
-                                            // Light haptic for invalid tap
-                                            let notification = UINotificationFeedbackGenerator()
-                                            notification.notificationOccurred(.warning)
                                         }
                                     }
                                 } else {
@@ -160,70 +121,59 @@ struct CalendarView: View {
                         .padding(.horizontal)
                         .id(refreshTrigger)  // Force grid refresh when sponsorships change
                         
-                        // Legend
+                        // Legend with modern glassy design
                         VStack(spacing: 12) {
                             Text("Legend")
                                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             
-                            VStack(spacing: 8) {
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(Color.blue.opacity(0.2))
-                                        .frame(width: 12, height: 12)
-                                    Text("Future Shabbat (available)")
-                                        .font(.system(size: 14, design: .rounded))
-                                    Spacer()
-                                }
+                            VStack(spacing: 10) {
+                                LegendItem(
+                                    color: .blue.opacity(0.2),
+                                    text: "Available Shabbat",
+                                    icon: "calendar.badge.plus"
+                                )
                                 
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(Color.yellow.opacity(0.4))
-                                        .frame(width: 12, height: 12)
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "star.fill")
-                                            .font(.system(size: 10))
-                                            .foregroundStyle(.yellow)
-                                        Text("Your sponsorship")
-                                            .font(.system(size: 14, design: .rounded))
-                                    }
-                                    Spacer()
-                                }
+                                LegendItem(
+                                    color: .red.opacity(0.6),
+                                    text: "Already Sponsored",
+                                    icon: "checkmark.seal.fill"
+                                )
                                 
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(Color.red.opacity(0.6))
-                                        .frame(width: 12, height: 12)
-                                    Text("Sponsored by others")
-                                        .font(.system(size: 14, design: .rounded))
-                                    Spacer()
-                                }
-                                
-                                HStack(spacing: 8) {
-                                    Circle()
-                                        .fill(Color.gray.opacity(0.3))
-                                        .frame(width: 12, height: 12)
-                                    Text("Past dates (unavailable)")
-                                        .font(.system(size: 14, design: .rounded))
-                                    Spacer()
-                                }
+                                LegendItem(
+                                    color: .gray.opacity(0.4),
+                                    text: "Past Date (Unavailable)",
+                                    icon: "lock.fill"
+                                )
                             }
                             .frame(maxWidth: .infinity)
                             
-                            Text("Tap any future Shabbat to sponsor or view details")
+                            Text("Tap any available Shabbat to sponsor. Past dates cannot be booked.")
                                 .font(.system(size: 12, design: .rounded))
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.top, 4)
                         }
-                        .padding()
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(15)
+                        .padding(20)
+                        .background(
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .fill(.ultraThinMaterial)
+                                RoundedRectangle(cornerRadius: 20)
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [.blue.opacity(0.3), .purple.opacity(0.2)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        ),
+                                        lineWidth: 1
+                                    )
+                            }
+                        )
+                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
                         .padding(.horizontal)
                         
                         Spacer(minLength: 20)
-                    }
-                    .refreshable {
-                        await refreshCalendarData()
                     }
                 }
             }
@@ -233,6 +183,7 @@ struct CalendarView: View {
                 // Clear old cache to get fresh Parsha data with new parsing
                 let cacheVersion = UserDefaults.standard.integer(forKey: "hebrew_cache_version")
                 if cacheVersion < 3 {
+                    print("🔄 Clearing cache for updated Parsha parsing...")
                     CalendarCacheManager.shared.clearCache()
                     hebrewCalendarService.clearCache()
                     UserDefaults.standard.set(3, forKey: "hebrew_cache_version")
@@ -244,6 +195,8 @@ struct CalendarView: View {
                 }
                 loadCalendarData()
                 firestoreManager.startListeningToSponsorships()
+                
+                print("📊 Current sponsorships count: \(firestoreManager.kiddushSponsorships.count)")
             }
             .onDisappear {
                 firestoreManager.stopListeningToSponsorships()
@@ -251,12 +204,14 @@ struct CalendarView: View {
             .onChange(of: currentMonth) { _, _ in
                 loadCalendarData()
             }
-            .onChange(of: firestoreManager.kiddushSponsorships) { _, _ in
+            .onChange(of: firestoreManager.kiddushSponsorships) { _, newSponsorships in
                 // Force UI refresh when sponsorships change
-                refreshTrigger = UUID()
+                print("🔄 Sponsorships updated! Count: \(newSponsorships.count)")
+                refreshTrigger = UUID()  // This triggers a re-render
             }
             .sheet(isPresented: $showingSponsorshipForm, onDismiss: {
                 // Force refresh when form is dismissed
+                print("🔄 Form dismissed, forcing calendar refresh")
                 refreshTrigger = UUID()
             }) {
                 if let date = selectedDate {
@@ -318,9 +273,22 @@ struct CalendarView: View {
         let components = calendar.dateComponents([.year, .month], from: currentMonth)
         guard let year = components.year, let month = components.month else { return }
         
+        print("📅 Loading calendar data for \(year)-\(month)")
+        
         Task {
             // Fetch Shabbat times for this month
             await hebrewCalendarService.fetchShabbatTimes(for: year, month: month)
+            
+            print("🔍 Checking what shabbatTimes we have:")
+            for (date, time) in hebrewCalendarService.shabbatTimes {
+                print("   📅 \(date): parsha='\(time.parsha ?? "NONE")'")
+            }
+            
+            print("🔍 Checking sponsorships:")
+            for sponsorship in firestoreManager.kiddushSponsorships {
+                let startOfDay = calendar.startOfDay(for: sponsorship.date)
+                print("   💰 \(startOfDay) - \(sponsorship.sponsorEmail)")
+            }
             
             // Fetch Hebrew dates for visible days
             for date in getDaysInMonth().compactMap({ $0 }) {
@@ -330,53 +298,21 @@ struct CalendarView: View {
                     }
                 }
             }
+            
+            print("✅ Calendar data loaded. ShabbatTimes count: \(hebrewCalendarService.shabbatTimes.count)")
         }
     }
     
     func previousMonth() {
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
-        
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             currentMonth = calendar.date(byAdding: .month, value: -1, to: currentMonth) ?? currentMonth
         }
     }
     
     func nextMonth() {
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
-        
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
             currentMonth = calendar.date(byAdding: .month, value: 1, to: currentMonth) ?? currentMonth
         }
-    }
-    
-    func goToToday() {
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
-        
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            currentMonth = Date()
-        }
-    }
-    
-    func refreshCalendarData() async {
-        isRefreshing = true
-        
-        // Clear cache and reload
-        hebrewCalendarService.clearCache()
-        CalendarCacheManager.shared.clearCache()
-        
-        // Preload 90 days
-        await hebrewCalendarService.preload90Days()
-        
-        // Reload current month data
-        loadCalendarData()
-        
-        // Force UI refresh
-        refreshTrigger = UUID()
-        
-        isRefreshing = false
     }
 }
 
@@ -389,7 +325,7 @@ struct CalendarDayCell: View {
     let isShabbat: Bool
     let isCurrentMonth: Bool
     let currentUserEmail: String?
-    let isPast: Bool
+    let isPastDate: Bool
     
     let calendar = Calendar.current
     
@@ -414,30 +350,28 @@ struct CalendarDayCell: View {
         return sponsorship.sponsorName
     }
     
+    var isAvailableForSponsorship: Bool {
+        return !isPastDate && sponsorship == nil
+    }
+    
     var body: some View {
         VStack(spacing: 1) {
-            // User sponsorship badge
-            if isSponsoredByCurrentUser {
-                HStack {
-                    Spacer()
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(.yellow)
-                        .padding(2)
-                }
-            }
-            
             // Gregorian Date
             Text("\(dayNumber)")
                 .font(.system(size: 18, weight: isToday ? .bold : .semibold, design: .rounded))
-                .foregroundStyle(isCurrentMonth ? .primary : Color.secondary.opacity(0.3))
-                .padding(.top, isSponsoredByCurrentUser ? 0 : 2)
+                .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : (isCurrentMonth ? .primary : Color.secondary.opacity(0.3)))
+                .padding(.top, 2)
+                .onAppear {
+                    if isShabbat && isCurrentMonth {
+                        print("🔍 Cell \(dayNumber): Shabbat=\(isShabbat), ShabbatTime=\(shabbatTime != nil), Parsha='\(shabbatTime?.parsha ?? "none")', Sponsored=\(sponsorship != nil)")
+                    }
+                }
             
             // Hebrew Date (full date without year)
             if let hebrewDate = hebrewDate, isCurrentMonth {
                 Text(hebrewDate)
                     .font(.system(size: 8, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(isPastDate ? .secondary.opacity(0.3) : .secondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.5)
@@ -445,56 +379,99 @@ struct CalendarDayCell: View {
             }
             
             // Parsha name for Shabbat
-            if isShabbat, isCurrentMonth, let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
-                Text(parsha)
-                    .font(.system(size: 7, weight: .bold, design: .rounded))
-                    .foregroundStyle(.blue)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.4)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 2)
+            if isShabbat, isCurrentMonth {
+                if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
+                    Text(parsha)
+                        .font(.system(size: 7, weight: .bold, design: .rounded))
+                        .foregroundStyle(isPastDate ? .secondary.opacity(0.3) : .blue)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.4)
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 2)
+                } else {
+                    // Debug: Show if we're missing parsha data
+                    Text("No Parsha")
+                        .font(.system(size: 6, design: .rounded))
+                        .foregroundStyle(.red.opacity(0.3))
+                }
             }
             
             // Candle lighting time
             if let shabbatTime = shabbatTime, isCurrentMonth {
                 Text(formatTime(shabbatTime.candleLighting))
                     .font(.system(size: 7, design: .rounded))
-                    .foregroundStyle(.orange)
+                    .foregroundStyle(isPastDate ? .secondary.opacity(0.3) : .orange)
+            }
+            
+            // Past date indicator
+            if isPastDate && isShabbat && isCurrentMonth {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.secondary.opacity(0.3))
             }
             
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(cellBackgroundColor)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isToday ? Color.blue : Color.clear, lineWidth: 2)
-        )
-        .opacity(isCurrentMonth ? (isPast ? 0.5 : 1.0) : 0.3)
+        .background(cellBackgroundMaterial)
+        .overlay(cellOverlay)
+        .opacity(isCurrentMonth ? (isPastDate ? 0.4 : 1.0) : 0.3)
+        .animation(.easeInOut(duration: 0.2), value: isPastDate)
     }
     
-    var cellBackgroundColor: Color {
-        // User's own sponsorships get gold/yellow tint
-        if isSponsoredByCurrentUser {
-            return .yellow.opacity(0.3)
-        }
-        // Other sponsored dates get red tint
-        else if let _ = sponsorship {
-            return .red.opacity(0.25)
-        }
-        // Shabbat dates
-        else if isShabbat && isCurrentMonth {
-            // Past dates are grayed out
-            if isPast {
-                return .gray.opacity(0.15)
+    // Modern glassy background with smooth transitions
+    @ViewBuilder
+    var cellBackgroundMaterial: some View {
+        if let _ = sponsorship {
+            // Sponsored dates get a red glassy effect
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.red.opacity(0.15))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.8)
             }
-            return .blue.opacity(0.1)
+        } else if isShabbat && isCurrentMonth && !isPastDate {
+            // Available Shabbat dates get a blue glassy effect
+            ZStack {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.blue.opacity(0.08))
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.6)
+            }
+        } else if isPastDate && isShabbat {
+            // Past dates get a muted gray glassy effect
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.gray.opacity(0.05))
+        } else {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.clear)
         }
-        return .clear
+    }
+    
+    // Glassy border overlay with glow effect
+    @ViewBuilder
+    var cellOverlay: some View {
+        if isToday {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(
+                    LinearGradient(
+                        colors: [.blue, .blue.opacity(0.5)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2.5
+                )
+                .shadow(color: .blue.opacity(0.4), radius: 4, x: 0, y: 2)
+        } else if isShabbat && isAvailableForSponsorship && isCurrentMonth {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.blue.opacity(0.2), lineWidth: 1)
+        } else {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.clear, lineWidth: 0)
+        }
     }
     
     func formatTime(_ date: Date) -> String {
@@ -509,5 +486,39 @@ struct CalendarDayCell: View {
         firestoreManager: FirestoreManager(),
         currentUser: .constant(User(name: "John Doe", email: "john@example.com", totalPledged: 0))
     )
+}
+
+// MARK: - Legend Item Component
+struct LegendItem: View {
+    let color: Color
+    let text: String
+    let icon: String
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(color)
+                    .frame(width: 16, height: 16)
+                Image(systemName: icon)
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(.white)
+            }
+            
+            Text(text)
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+            
+            Spacer()
+        }
+    }
+}
+
+// MARK: - Additional Calendar Enhancements
+extension CalendarView {
+    // Add subtle haptic feedback for interactions
+    private func provideFeedback() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+    }
 }
 
