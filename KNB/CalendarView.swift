@@ -425,20 +425,18 @@ struct CalendarDayCell: View {
             
             // Shabbat-specific details
             if isShabbat, isCurrentMonth {
-                // Parsha name - consistent size across all Shabbat dates
+                // Parsha name - consistent size, natural bubble shape
                 if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
                     Text(parsha)
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue)
                         .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.center)
-                        .frame(height: 36)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(
-                            Capsule()
-                                .fill(isPastDate ? Color.clear : Color.blue.opacity(0.15))
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(isPastDate ? Color.clear : Color.blue.opacity(0.12))
                         )
                 }
             }
