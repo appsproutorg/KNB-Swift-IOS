@@ -371,7 +371,7 @@ struct CalendarDayCell: View {
             if let hebrewDate = hebrewDate, isCurrentMonth {
                 Text(hebrewDate)
                     .font(.system(size: 8, design: .rounded))
-                    .foregroundStyle(isPastDate ? .secondary.opacity(0.3) : .secondary)
+                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.3) : .secondary)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.5)
@@ -383,7 +383,7 @@ struct CalendarDayCell: View {
                 if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
                     Text(parsha)
                         .font(.system(size: 7, weight: .bold, design: .rounded))
-                        .foregroundStyle(isPastDate ? .secondary.opacity(0.3) : .blue)
+                        .foregroundStyle(isPastDate ? Color.secondary.opacity(0.3) : .blue)
                         .lineLimit(1)
                         .minimumScaleFactor(0.4)
                         .frame(maxWidth: .infinity)
@@ -400,14 +400,14 @@ struct CalendarDayCell: View {
             if let shabbatTime = shabbatTime, isCurrentMonth {
                 Text(formatTime(shabbatTime.candleLighting))
                     .font(.system(size: 7, design: .rounded))
-                    .foregroundStyle(isPastDate ? .secondary.opacity(0.3) : .orange)
+                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.3) : .orange)
             }
             
             // Past date indicator
             if isPastDate && isShabbat && isCurrentMonth {
                 Image(systemName: "lock.fill")
                     .font(.system(size: 8))
-                    .foregroundStyle(.secondary.opacity(0.3))
+                    .foregroundStyle(Color.secondary.opacity(0.3))
             }
             
             Spacer(minLength: 0)
