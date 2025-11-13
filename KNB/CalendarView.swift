@@ -77,19 +77,31 @@ struct CalendarView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
                         
-                        // Weekday Headers
-                        HStack(spacing: 0) {
-                            ForEach(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], id: \.self) { day in
+                        // Weekday Headers with wider Saturday
+                        HStack(spacing: 8) {
+                            ForEach(Array(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].enumerated()), id: \.offset) { index, day in
                                 Text(day)
-                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                                    .font(.system(size: index == 6 ? 15 : 13, weight: index == 6 ? .bold : .semibold, design: .rounded))
+                                    .foregroundStyle(index == 6 ? .blue : .secondary)
                                     .frame(maxWidth: .infinity)
+                                    .frame(minWidth: index == 6 ? 100 : nil)
                             }
                         }
                         .padding(.horizontal)
                         
-                        // Calendar Grid with better spacing
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 7), spacing: 10) {
+                        // Calendar Grid with wider Shabbat columns
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 8),  // Sun
+                                GridItem(.flexible(), spacing: 8),  // Mon
+                                GridItem(.flexible(), spacing: 8),  // Tue
+                                GridItem(.flexible(), spacing: 8),  // Wed
+                                GridItem(.flexible(), spacing: 8),  // Thu
+                                GridItem(.flexible(), spacing: 8),  // Fri
+                                GridItem(.flexible(minimum: 100, maximum: 120), spacing: 8)  // Sat (wider)
+                            ],
+                            spacing: 10
+                        ) {
                             ForEach(getDaysInMonth(), id: \.self) { date in
                                 if let date = date {
                                     let shabbatTime = hebrewCalendarService.getShabbatTime(for: date)
@@ -144,9 +156,9 @@ struct CalendarView: View {
                                 )
                                 
                                 SimpleLegendRow(
-                                    color: .green,
-                                    label: "Sponsored",
-                                    description: "Already taken"
+                                    color: .yellow,
+                                    label: "Booked",
+                                    description: "Already sponsored"
                                 )
                                 
                                 SimpleLegendRow(
@@ -357,74 +369,72 @@ struct CalendarDayCell: View {
     }
     
     var body: some View {
-        VStack(spacing: 3) {
-            // Status badge (top-right corner indicator)
-            HStack {
-                Spacer()
-                if sponsorship != nil {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 6, height: 6)
-                } else if isPastDate && isShabbat {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 6))
-                        .foregroundStyle(Color.secondary.opacity(0.5))
+        VStack(spacing: isShabbat ? 4 : 2) {
+            // Status badge (top-right for Shabbat, center for regular days)
+            if sponsorship != nil || (isPastDate && isShabbat) {
+                HStack {
+                    Spacer()
+                    if sponsorship != nil {
+                        Circle()
+                            .fill(.yellow)
+                            .frame(width: 7, height: 7)
+                            .overlay(
+                                Circle()
+                                    .stroke(.yellow.opacity(0.5), lineWidth: 2)
+                            )
+                    } else if isPastDate && isShabbat {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 7))
+                            .foregroundStyle(Color.secondary.opacity(0.5))
+                    }
                 }
+                .frame(height: 10)
+                .padding(.horizontal, 6)
+                .padding(.top, 6)
+            } else {
+                Spacer()
+                    .frame(height: 16)
             }
-            .frame(height: 8)
-            .padding(.horizontal, 4)
-            .padding(.top, 4)
             
             // Gregorian Date Number - Large and prominent
             Text("\(dayNumber)")
-                .font(.system(size: isToday ? 22 : 20, weight: isToday ? .bold : .semibold, design: .rounded))
+                .font(.system(size: isShabbat ? 24 : 18, weight: isToday ? .bold : .semibold, design: .rounded))
                 .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : (isCurrentMonth ? .primary : Color.secondary.opacity(0.4)))
-                .padding(.top, isShabbat ? 0 : 4)
                 .onAppear {
                     if isShabbat && isCurrentMonth {
                         print("🔍 Cell \(dayNumber): Shabbat=\(isShabbat), ShabbatTime=\(shabbatTime != nil), Parsha='\(shabbatTime?.parsha ?? "none")', Sponsored=\(sponsorship != nil)")
                     }
                 }
             
-            // Shabbat indicator - only for Shabbat dates
+            // Shabbat-specific details
             if isShabbat, isCurrentMonth {
-                Text("Shabbat")
-                    .font(.system(size: 8, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .blue)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(isPastDate ? Color.secondary.opacity(0.1) : Color.blue.opacity(0.15))
-                    )
-            }
-            
-            // Parsha name - cleaner display
-            if isShabbat, isCurrentMonth, let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
-                Text(parsha)
-                    .font(.system(size: 9, weight: .medium, design: .rounded))
-                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue.opacity(0.8))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.horizontal, 4)
+                // Parsha name
+                if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
+                    Text(parsha)
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .padding(.horizontal, 6)
+                }
+                
+                // Candle lighting time
+                if let shabbatTime = shabbatTime {
+                    HStack(spacing: 3) {
+                        Image(systemName: "light.max")
+                            .font(.system(size: 8))
+                        Text(formatTime(shabbatTime.candleLighting))
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                    }
+                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .orange)
+                    .padding(.top, 2)
+                }
             }
             
             Spacer(minLength: 2)
-            
-            // Candle lighting time - bottom of cell
-            if let shabbatTime = shabbatTime, isCurrentMonth {
-                HStack(spacing: 2) {
-                    Image(systemName: "light.max")
-                        .font(.system(size: 7))
-                    Text(formatTime(shabbatTime.candleLighting))
-                        .font(.system(size: 8, weight: .medium, design: .rounded))
-                }
-                .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .orange)
-                .padding(.bottom, 4)
-            }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 85)
+        .frame(height: isShabbat ? 90 : 70)
         .background(cellBackgroundMaterial)
         .overlay(cellOverlay)
         .opacity(isCurrentMonth ? (isPastDate ? 0.5 : 1.0) : 0.25)
@@ -432,72 +442,52 @@ struct CalendarDayCell: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isToday)
     }
     
-    // Clean, modern background with clear status indication
+    // Simple box backgrounds with status colors
     @ViewBuilder
     var cellBackgroundMaterial: some View {
         ZStack {
-            // Base background
-            RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
+            // Base background - simple box
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color(.systemBackground))
             
             // Status-based color overlay
             if let _ = sponsorship {
-                // Sponsored - green tint (already taken)
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [.green.opacity(0.25), .green.opacity(0.15)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                // Sponsored - yellow/amber (already booked)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.yellow.opacity(0.25))
             } else if isShabbat && isCurrentMonth && !isPastDate {
-                // Available Shabbat - blue tint (can book)
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: [.blue.opacity(0.15), .blue.opacity(0.08)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                // Available Shabbat - light blue (can book)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(.blue.opacity(0.08))
             } else if isPastDate && isShabbat {
-                // Past Shabbat - gray tint (locked)
-                RoundedRectangle(cornerRadius: 14)
+                // Past Shabbat - gray (locked)
+                RoundedRectangle(cornerRadius: 10)
                     .fill(.gray.opacity(0.08))
             }
         }
     }
     
-    // Clean border overlay with clear visual hierarchy
+    // Simple box borders
     @ViewBuilder
     var cellOverlay: some View {
         if isToday {
-            // Today gets a prominent blue glow
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(
-                    LinearGradient(
-                        colors: [.blue, .blue.opacity(0.6)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 3
-                )
-                .shadow(color: .blue.opacity(0.5), radius: 6, x: 0, y: 2)
+            // Today gets a prominent blue border
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.blue, lineWidth: 2.5)
         } else if sponsorship != nil {
-            // Sponsored dates get green border
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(.green.opacity(0.4), lineWidth: 1.5)
+            // Sponsored dates get yellow border
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.yellow.opacity(0.6), lineWidth: 2)
         } else if isShabbat && isAvailableForSponsorship && isCurrentMonth {
-            // Available Shabbats get subtle blue border
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(.blue.opacity(0.25), lineWidth: 1.5)
+            // Available Shabbats get blue border
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.blue.opacity(0.3), lineWidth: 2)
         } else if isCurrentMonth {
-            // Regular dates get very subtle border
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.secondary.opacity(0.1), lineWidth: 0.5)
+            // Regular dates get light border
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
         } else {
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 10)
                 .strokeBorder(.clear, lineWidth: 0)
         }
     }
