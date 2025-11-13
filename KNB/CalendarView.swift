@@ -36,46 +36,58 @@ struct CalendarView: View {
                 )
                 .ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Month Navigation - Clean and modern
-                        HStack(spacing: 16) {
+                VStack(spacing: 0) {
+                    // Custom Animated Header
+                    VStack(spacing: 8) {
+                        // Title with gradient
+                        Text("Kiddush Sponsorship")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .blue.opacity(0.7)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .shadow(color: .blue.opacity(0.15), radius: 4, x: 0, y: 2)
+                        
+                        // Month/Year with navigation - now more compact
+                        HStack(spacing: 12) {
                             Button(action: previousMonth) {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.primary)
-                                    .frame(width: 44, height: 44)
-                                    .background(
-                                        Circle()
-                                            .fill(.ultraThinMaterial)
-                                            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-                                    )
+                                Image(systemName: "chevron.left.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(.blue.opacity(0.8))
+                                    .symbolEffect(.bounce, value: currentMonth)
                             }
                             
-                            Spacer()
-                            
-                            VStack(spacing: 4) {
-                                Text(dateFormatter.string(from: currentMonth))
-                                    .font(.system(size: 26, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.primary)
-                            }
-                            
-                            Spacer()
+                            Text(dateFormatter.string(from: currentMonth))
+                                .font(.system(size: 20, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .contentTransition(.numericText())
+                                .animation(.spring(response: 0.4, dampingFraction: 0.7), value: currentMonth)
                             
                             Button(action: nextMonth) {
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 18, weight: .semibold))
-                                    .foregroundStyle(.primary)
-                                    .frame(width: 44, height: 44)
-                                    .background(
-                                        Circle()
-                                            .fill(.ultraThinMaterial)
-                                            .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 2)
-                                    )
+                                Image(systemName: "chevron.right.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(.blue.opacity(0.8))
+                                    .symbolEffect(.bounce, value: currentMonth)
                             }
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
+                        .padding(.horizontal, 16)
+                    }
+                    .padding(.top, 16)
+                    .padding(.bottom, 12)
+                    .background(
+                        Rectangle()
+                            .fill(.ultraThinMaterial)
+                            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
+                    )
+                    
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            Spacer(minLength: 12)
                         
                         // Weekday Headers with wider Saturday
                         HStack(spacing: 4) {
@@ -189,9 +201,9 @@ struct CalendarView: View {
                         Spacer(minLength: 20)
                     }
                 }
+                }
             }
-            .navigationTitle("Kiddush Sponsorship")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarHidden(true)
             .onAppear {
                 // Clear old cache to get fresh Parsha data with new parsing
                 let cacheVersion = UserDefaults.standard.integer(forKey: "hebrew_cache_version")
