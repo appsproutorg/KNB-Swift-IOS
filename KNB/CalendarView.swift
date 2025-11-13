@@ -412,6 +412,17 @@ struct CalendarDayCell: View {
                     }
                 }
             
+            // Hebrew Date - show on all dates if in current month, more prominent on Shabbat
+            if let hebrewDate = hebrewDate, isCurrentMonth {
+                Text(hebrewDate)
+                    .font(.system(size: isShabbat ? 8 : 7, design: .rounded))
+                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .padding(.horizontal, 2)
+                    .padding(.top, isShabbat ? 1 : 0)
+            }
+            
             // Shabbat-specific details
             if isShabbat, isCurrentMonth {
                 // Parsha name
