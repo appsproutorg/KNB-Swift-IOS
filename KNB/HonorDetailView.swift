@@ -17,7 +17,6 @@ struct HonorDetailView: View {
     @State private var comment: String = ""
     @State private var showingBidConfirmation = false
     @State private var showingBuyNowConfirmation = false
-    @State private var enableAutoBid = false
     @State private var showingBidHistory = false
     @State private var showingInvalidBidAlert = false
     @State private var invalidBidMessage = ""
@@ -53,7 +52,6 @@ struct HonorDetailView: View {
                             BidSection(
                                 bidAmount: $bidAmount,
                                 comment: $comment,
-                                enableAutoBid: $enableAutoBid,
                                 onPlaceBid: placeBid,
                                 onBuyNow: buyNow,
                                 onShowHistory: { showingBidHistory = true },
@@ -167,6 +165,11 @@ struct HonorDetailView: View {
                 
                 // Update user's total pledged (you can later sync this to Firestore too)
                 currentUser?.totalPledged += amount
+                
+                // Dismiss after successful bid
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    dismiss()
+                }
             }
         }
     }
@@ -195,10 +198,9 @@ struct HonorDetailView: View {
                 // Update user's total pledged
                 currentUser?.totalPledged += honor.buyNowPrice
                 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        dismiss()
-                    }
+                // Dismiss after successful purchase
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    dismiss()
                 }
             }
         }
@@ -278,7 +280,6 @@ struct CurrentBidInfo: View {
 struct BidSection: View {
     @Binding var bidAmount: String
     @Binding var comment: String
-    @Binding var enableAutoBid: Bool
     let onPlaceBid: () -> Void
     let onBuyNow: () -> Void
     let onShowHistory: () -> Void
@@ -325,19 +326,6 @@ struct BidSection: View {
                     .background(.ultraThinMaterial)
                     .cornerRadius(12)
             }
-            
-            // Auto bid toggle
-            Toggle(isOn: $enableAutoBid) {
-                HStack {
-                    Image(systemName: "bolt.fill")
-                        .foregroundStyle(.yellow)
-                    Text("Set automatic bidding")
-                        .font(.system(size: 16, weight: .medium, design: .rounded))
-                }
-            }
-            .padding()
-            .background(.ultraThinMaterial)
-            .cornerRadius(12)
             
             // Action buttons
             VStack(spacing: 15) {

@@ -12,7 +12,6 @@ struct AuctionListView: View {
     @Binding var currentUser: User?
     @ObservedObject var authManager: AuthenticationManager
     @State private var selectedHonor: Honor?
-    @State private var showingProfile = false
     @State private var searchText = ""
     
     var totalPledged: Double {
@@ -89,27 +88,12 @@ struct AuctionListView: View {
             .navigationTitle("Torah Honors")
             .navigationBarTitleDisplayMode(.large)
             .searchable(text: $searchText, prompt: "Search honors...")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingProfile = true
-                    } label: {
-                        Image(systemName: "person.crop.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.blue)
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                }
-            }
             .sheet(item: $selectedHonor) { honor in
                 HonorDetailView(
                     honor: honor,
                     currentUser: $currentUser,
                     firestoreManager: firestoreManager
                 )
-            }
-            .sheet(isPresented: $showingProfile) {
-                ProfileView(user: $currentUser, authManager: authManager)
             }
         }
     }
