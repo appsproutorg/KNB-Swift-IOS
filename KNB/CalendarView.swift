@@ -232,7 +232,12 @@ struct CalendarView: View {
             .sheet(isPresented: $showingSponsorshipForm, onDismiss: {
                 // Force refresh when form is dismissed
                 print("🔄 Form dismissed, forcing calendar refresh")
-                refreshTrigger = UUID()
+                Task {
+                    // Reload sponsorships from Firestore
+                    await firestoreManager.fetchKiddushSponsorships()
+                    // Force UI refresh
+                    refreshTrigger = UUID()
+                }
             }) {
                 if let date = selectedDate {
                     SponsorshipFormView(

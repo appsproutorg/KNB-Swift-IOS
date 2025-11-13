@@ -472,26 +472,31 @@ struct SponsorshipFormView: View {
         errorMessage = nil
         
         Task {
-            do {
-                let sponsorship = KiddushSponsorship(
-                    date: shabbatDate,
-                    sponsorName: name,
-                    sponsorEmail: email,
-                    occasion: occasion,
-                    isAnonymous: isAnonymous
-                )
+            let sponsorship = KiddushSponsorship(
+                date: shabbatDate,
+                sponsorName: name,
+                sponsorEmail: email,
+                occasion: occasion,
+                isAnonymous: isAnonymous
+            )
+            
+            let success = await firestoreManager.sponsorKiddush(sponsorship)
+            
+            if success {
+                // Give Firestore listener a moment to update
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                 
-                let success = await firestoreManager.sponsorKiddush(sponsorship)
-                
-                if success {
+                await MainActor.run {
+                    isSubmitting = false
                     showingConfirmation = true
-                    // TODO: Send confirmation email via backend
-                } else {
+                }
+                // TODO: Send confirmation email via backend
+            } else {
+                await MainActor.run {
+                    isSubmitting = false
                     errorMessage = "This Shabbat has already been sponsored. Please choose another date."
                 }
             }
-            
-            isSubmitting = false
         }
     }
     
