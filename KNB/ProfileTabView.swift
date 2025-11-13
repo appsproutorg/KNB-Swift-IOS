@@ -43,7 +43,13 @@ struct ProfileTabView: View {
                         VStack(spacing: 15) {
                             Image(systemName: "person.crop.circle.fill")
                                 .font(.system(size: 100))
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [.blue, .blue.opacity(0.7)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                                 .padding(.top, 30)
                             
                             Text(user?.name ?? "Member")
@@ -52,6 +58,22 @@ struct ProfileTabView: View {
                             Text(user?.email ?? "")
                                 .font(.system(size: 16, design: .rounded))
                                 .foregroundStyle(.secondary)
+                            
+                            // Member Since Badge
+                            HStack(spacing: 6) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.yellow)
+                                Text("Active Member")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.primary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(.yellow.opacity(0.15))
+                            )
                         }
                         .padding(.bottom, 10)
                         
