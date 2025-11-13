@@ -85,8 +85,26 @@ struct AuctionListView: View {
                 }
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("Torah Honors")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("Torah Honors")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.purple, .blue],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        
+                        Text("Live Auction")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
             .searchable(text: $searchText, prompt: "Search honors...")
             .sheet(item: $selectedHonor) { honor in
                 HonorDetailView(

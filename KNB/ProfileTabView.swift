@@ -39,47 +39,103 @@ struct ProfileTabView: View {
                 
                 ScrollView {
                     VStack(spacing: 25) {
-                        // User Info Section
-                        VStack(spacing: 15) {
-                            Image(systemName: "person.crop.circle.fill")
-                                .font(.system(size: 100))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.blue, .blue.opacity(0.7)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+                        // User Info Section with enhanced design
+                        VStack(spacing: 20) {
+                            // Avatar with clean border
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.88, green: 0.93, blue: 0.98),
+                                                Color(red: 0.90, green: 0.94, blue: 0.99)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
                                     )
-                                )
-                                .padding(.top, 30)
+                                    .frame(width: 130, height: 130)
+                                    .shadow(color: Color(red: 0.3, green: 0.5, blue: 0.9).opacity(0.15), radius: 15, x: 0, y: 8)
+                                
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 120, height: 120)
+                                
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.25, green: 0.5, blue: 0.92),
+                                                Color(red: 0.3, green: 0.55, blue: 0.96)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+                            .padding(.top, 20)
                             
-                            Text(user?.name ?? "Member")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                            VStack(spacing: 8) {
+                                Text(user?.name ?? "Member")
+                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.primary, .primary.opacity(0.8)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                
+                                Text(user?.email ?? "")
+                                    .font(.system(size: 15, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                            }
                             
-                            Text(user?.email ?? "")
-                                .font(.system(size: 16, design: .rounded))
-                                .foregroundStyle(.secondary)
-                            
-                            // Member Since Badge
-                            HStack(spacing: 6) {
-                                Image(systemName: "star.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.yellow)
+                            // Enhanced Member Badge
+                            HStack(spacing: 8) {
+                                Image(systemName: "star.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.yellow, .orange],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
                                 Text("Active Member")
-                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .font(.system(size: 15, weight: .semibold, design: .rounded))
                                     .foregroundStyle(.primary)
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
                             .background(
                                 Capsule()
-                                    .fill(.yellow.opacity(0.15))
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.yellow.opacity(0.2), .orange.opacity(0.2)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                            )
+                            .overlay(
+                                Capsule()
+                                    .stroke(
+                                        LinearGradient(
+                                            colors: [.yellow.opacity(0.5), .orange.opacity(0.5)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        ),
+                                        lineWidth: 1
+                                    )
                             )
                         }
                         .padding(.bottom, 10)
                         
-                        // Statistics Card
-                        VStack(spacing: 20) {
-                            ProfileStatRow(
+                        // Enhanced Statistics Card
+                        VStack(spacing: 16) {
+                            EnhancedStatRow(
                                 icon: "dollarsign.circle.fill",
                                 title: "Total Auction Pledges",
                                 value: "$\((user?.totalPledged ?? 0).toSafeInt())",
@@ -87,8 +143,9 @@ struct ProfileTabView: View {
                             )
                             
                             Divider()
+                                .padding(.horizontal, 8)
                             
-                            ProfileStatRow(
+                            EnhancedStatRow(
                                 icon: "calendar.badge.checkmark",
                                 title: "Kiddush Sponsorships",
                                 value: "\(userSponsorshipsCount)",
@@ -96,18 +153,32 @@ struct ProfileTabView: View {
                             )
                             
                             Divider()
+                                .padding(.horizontal, 8)
                             
-                            ProfileStatRow(
+                            EnhancedStatRow(
                                 icon: "hammer.fill",
                                 title: "Auction Honors",
                                 value: "\(userHonors.count)",
                                 color: .orange
                             )
                         }
-                        .padding(20)
-                        .background(.ultraThinMaterial)
-                        .cornerRadius(20)
-                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+                        .padding(24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                                .shadow(color: .black.opacity(0.08), radius: 20, x: 0, y: 10)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.3), .clear],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        )
                         .padding(.horizontal)
                         
                         // Auction Honors Section
@@ -262,20 +333,28 @@ struct ProfileTabView: View {
                         }
                         .padding(.top, 10)
                         
-                        // Sign Out Button
+                        // Enhanced Sign Out Button
                         Button(action: {
                             authManager.signOut()
                         }) {
-                            HStack {
+                            HStack(spacing: 10) {
                                 Image(systemName: "arrow.right.square.fill")
+                                    .font(.system(size: 18))
                                 Text("Sign Out")
-                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                    .font(.system(size: 17, weight: .semibold, design: .rounded))
                             }
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.red)
-                            .cornerRadius(15)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: [.red, .red.opacity(0.8)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(16)
+                            .shadow(color: .red.opacity(0.3), radius: 10, x: 0, y: 5)
                         }
                         .padding(.horizontal)
                         .padding(.top, 20)
@@ -284,8 +363,26 @@ struct ProfileTabView: View {
                     }
                 }
             }
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.large)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("Profile")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        
+                        Text("My Activity")
+                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
             .onAppear {
                 loadUserSponsorships()
                 // Start listening to real-time updates
@@ -507,6 +604,58 @@ struct ProfileStatRow: View {
             Text(value)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(color)
+        }
+    }
+}
+
+// MARK: - Enhanced Stat Row
+struct EnhancedStatRow: View {
+    let icon: String
+    let title: String
+    let value: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0.2), color.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 50, height: 50)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 22))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [color, color.opacity(0.7)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+                
+                Text(value)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [color, color.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+            
+            Spacer()
         }
     }
 }

@@ -15,13 +15,36 @@ struct ContentView: View {
     
     var body: some View {
         if showSplash {
-            SplashScreenView(onComplete: {
-                // Check auth state after Firebase is fully initialized
-                authManager.checkAuthState()
-                withAnimation {
-                    showSplash = false
+            SplashScreenView(
+                onComplete: {
+                    withAnimation {
+                        showSplash = false
+                    }
+                },
+                preloadData: {
+                    // Check auth state first
+                    await MainActor.run {
+                        authManager.checkAuthState()
+                    }
+                    
+                    // If user is authenticated, preload data
+                    if authManager.isAuthenticated {
+                        print("✨ Preloading data for authenticated user...")
+                        
+                        // Preload Firestore data
+                        await firestoreManager.initializeHonorsInFirestore()
+                        await firestoreManager.fetchKiddushSponsorships()
+                        
+                        // Preload calendar data (90 days)
+                        let hebrewCalendarService = HebrewCalendarService()
+                        await hebrewCalendarService.preload90Days()
+                        
+                        print("✅ Data preloading complete!")
+                        
+                        hasInitialized = true
+                    }
                 }
-            })
+            )
         } else {
             Group {
                 if authManager.isAuthenticated {
@@ -31,20 +54,7 @@ struct ContentView: View {
                         authManager: authManager
                     )
                     .onAppear {
-                        if !hasInitialized {
-                            hasInitialized = true
-                            Task {
-                                await firestoreManager.initializeHonorsInFirestore()
-                                
-                                // Fix any malformed dates in Firestore (one-time)
-                                print("🔧 Fixing malformed sponsorship dates...")
-                                await firestoreManager.fixMalformedDates()
-                                
-                                // Debug: List all sponsorships to verify
-                                print("🔍 Debugging sponsorships in Firestore...")
-                                await firestoreManager.debugListAllSponsorships()
-                            }
-                        }
+                        // Start real-time listeners (data already preloaded)
                         firestoreManager.startListening()
                     }
                     .onDisappear {

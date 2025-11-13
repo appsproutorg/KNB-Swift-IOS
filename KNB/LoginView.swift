@@ -14,121 +14,227 @@ struct LoginView: View {
     @State private var name = ""
     @State private var isLoading = false
     @State private var showError = false
+    @State private var backgroundOffset: CGFloat = 0
     
     @ObservedObject var authManager: AuthenticationManager
     
     var body: some View {
         ZStack {
-            // Gradient background
+            // Modern blue gradient
             LinearGradient(
-                colors: [Color.blue.opacity(0.6), Color.purple.opacity(0.6)],
+                colors: [
+                    Color(red: 0.88, green: 0.93, blue: 0.98),
+                    Color(red: 0.90, green: 0.94, blue: 0.99),
+                    Color(red: 0.92, green: 0.95, blue: 0.99)
+                ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
             
-            VStack(spacing: 30) {
-                Spacer()
-                
-                // Logo and title
-                VStack(spacing: 15) {
-                    Image(systemName: "book.pages.fill")
-                        .font(.system(size: 80))
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+            ScrollView {
+                VStack(spacing: 30) {
+                    Spacer(minLength: 40)
                     
-                    Text("KNB")
-                        .font(.system(size: 48, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                    
-                    Text("Torah Honors Auction")
-                        .font(.system(size: 18, weight: .medium, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.9))
-                }
-                .padding(.bottom, 20)
-                
-                // Login form
-                VStack(spacing: 20) {
-                    if isSignUp {
-                        CustomTextField(
-                            icon: "person.fill",
-                            placeholder: "Full Name",
-                            text: $name
-                        )
-                    }
-                    
-                    CustomTextField(
-                        icon: "envelope.fill",
-                        placeholder: "Email",
-                        text: $email
-                    )
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                    
-                    CustomTextField(
-                        icon: "lock.fill",
-                        placeholder: "Password",
-                        text: $password,
-                        isSecure: true
-                    )
-                    
-                    // Error message
-                    if let errorMessage = authManager.errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
-                            .foregroundStyle(.red)
-                            .padding(.horizontal)
-                            .multilineTextAlignment(.center)
-                    }
-                    
-                    // Login/Sign Up button
-                    Button(action: handleAuth) {
-                        HStack {
-                            if isLoading {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Text(isSignUp ? "Create Account" : "Sign In")
-                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                            }
+                    // Modern logo section
+                    VStack(spacing: 20) {
+                        // Icon in modern style
+                        ZStack {
+                            Circle()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.15),
+                                            Color(red: 0.35, green: 0.55, blue: 0.98).opacity(0.08)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .frame(width: 90, height: 90)
+                                .blur(radius: 10)
+                            
+                            Circle()
+                                .fill(.white)
+                                .frame(width: 80, height: 80)
+                                .shadow(color: Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), radius: 20, x: 0, y: 10)
+                            
+                            Image(systemName: "book.pages.fill")
+                                .font(.system(size: 38, weight: .regular))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.25, green: 0.5, blue: 0.92),
+                                            Color(red: 0.3, green: 0.55, blue: 0.96)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                         }
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(
-                            LinearGradient(
-                                colors: [Color.blue, Color.purple],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .cornerRadius(15)
-                        .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                        
+                        VStack(spacing: 8) {
+                            Text("KNB")
+                                .font(.system(size: 36, weight: .bold, design: .rounded))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.25, green: 0.5, blue: 0.92),
+                                            Color(red: 0.3, green: 0.55, blue: 0.96)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                            
+                            Text(isSignUp ? "Create your account" : "Welcome back")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6))
+                        }
                     }
-                    .disabled(isLoading)
-                    .padding(.top, 10)
                     
-                    // Toggle sign up
-                    Button(action: { 
-                        withAnimation(.spring(response: 0.3)) { 
-                            isSignUp.toggle()
-                            authManager.errorMessage = nil
-                        } 
-                    }) {
-                        Text(isSignUp ? "Already have an account? Sign In" : "Don't have an account? Sign Up")
-                            .font(.system(size: 14, weight: .medium, design: .rounded))
+                    // Modern form card
+                    VStack(spacing: 18) {
+                        if isSignUp {
+                            ModernInput(
+                                icon: "person.fill",
+                                placeholder: "Full Name",
+                                text: $name
+                            )
+                            .transition(.asymmetric(
+                                insertion: .move(edge: .top).combined(with: .opacity),
+                                removal: .move(edge: .top).combined(with: .opacity)
+                            ))
+                        }
+                        
+                        ModernInput(
+                            icon: "envelope.fill",
+                            placeholder: "Email",
+                            text: $email
+                        )
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.emailAddress)
+                        
+                        ModernInput(
+                            icon: "lock.fill",
+                            placeholder: isSignUp ? "Password (min. 8 characters)" : "Password",
+                            text: $password,
+                            isSecure: true
+                        )
+                        
+                        // Modern error display
+                        if let errorMessage = authManager.errorMessage {
+                            HStack(spacing: 10) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 14))
+                                
+                                Text(errorMessage)
+                                    .font(.system(size: 14, weight: .medium))
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                             .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(14)
+                            .background(
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.95, green: 0.35, blue: 0.35),
+                                                Color(red: 0.92, green: 0.3, blue: 0.4)
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                            )
+                            .shadow(color: Color(red: 0.9, green: 0.3, blue: 0.3).opacity(0.25), radius: 10, x: 0, y: 4)
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                        
+                        // Modern action button
+                        Button(action: handleAuth) {
+                            HStack(spacing: 12) {
+                                if isLoading {
+                                    ProgressView()
+                                        .tint(.white)
+                                } else {
+                                    Text(isSignUp ? "Create Account" : "Sign In")
+                                        .font(.system(size: 17, weight: .semibold))
+                                    
+                                    Image(systemName: "arrow.right.circle.fill")
+                                        .font(.system(size: 20))
+                                }
+                            }
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: [
+                                        Color(red: 0.25, green: 0.5, blue: 0.92),
+                                        Color(red: 0.3, green: 0.55, blue: 0.96)
+                                    ],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .cornerRadius(14)
+                            .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.35), radius: 15, x: 0, y: 8)
+                        }
+                        .disabled(isLoading)
+                        .padding(.top, 4)
+                        
+                        // Toggle link
+                        Button(action: { 
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { 
+                                isSignUp.toggle()
+                                authManager.errorMessage = nil
+                            } 
+                        }) {
+                            HStack(spacing: 4) {
+                                Text(isSignUp ? "Already have an account?" : "Don't have an account?")
+                                    .foregroundStyle(Color(red: 0.45, green: 0.5, blue: 0.65))
+                                Text(isSignUp ? "Sign In" : "Sign Up")
+                                    .foregroundStyle(Color(red: 0.25, green: 0.5, blue: 0.92))
+                                    .fontWeight(.semibold)
+                            }
+                            .font(.system(size: 15))
+                        }
+                        .disabled(isLoading)
+                        .padding(.top, 4)
                     }
-                    .disabled(isLoading)
+                    .padding(30)
+                    .background(
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 24)
+                                .fill(.white)
+                                .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.12), radius: 25, x: 0, y: 12)
+                            
+                            RoundedRectangle(cornerRadius: 24)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.15),
+                                            Color(red: 0.35, green: 0.55, blue: 0.98).opacity(0.08)
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1
+                                )
+                        }
+                    )
+                    .padding(.horizontal, 24)
+                    
+                    Spacer(minLength: 40)
                 }
-                .padding(.horizontal, 30)
-                .padding(.vertical, 40)
-                .background(.ultraThinMaterial)
-                .cornerRadius(25)
-                .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 10)
-                .padding(.horizontal, 30)
-                
-                Spacer()
+            }
+        }
+        .onAppear {
+            // Subtle background animation
+            withAnimation(.linear(duration: 20).repeatForever(autoreverses: true)) {
+                backgroundOffset = 0.3
             }
         }
     }
@@ -145,8 +251,8 @@ struct LoginView: View {
             return
         }
         
-        if password.count < 6 {
-            authManager.errorMessage = "Password must be at least 6 characters"
+        if password.count < 8 {
+            authManager.errorMessage = "Password must be at least 8 characters long"
             return
         }
         
@@ -172,29 +278,96 @@ struct LoginView: View {
     }
 }
 
-// MARK: - Custom TextField
-struct CustomTextField: View {
+// MARK: - Modern Input Field
+struct ModernInput: View {
     let icon: String
     let placeholder: String
     @Binding var text: String
     var isSecure: Bool = false
     
+    @FocusState private var isFocused: Bool
+    
     var body: some View {
-        HStack(spacing: 15) {
-            Image(systemName: icon)
-                .foregroundStyle(.white.opacity(0.7))
-                .frame(width: 20)
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(
+                    isFocused ?
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.15),
+                            Color(red: 0.3, green: 0.55, blue: 0.96).opacity(0.1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ) :
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.9, green: 0.91, blue: 0.95),
+                                Color(red: 0.92, green: 0.93, blue: 0.96)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 42, height: 42)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 17))
+                    .foregroundStyle(
+                        isFocused ?
+                        Color(red: 0.25, green: 0.5, blue: 0.92) :
+                        Color(red: 0.5, green: 0.55, blue: 0.7)
+                    )
+            }
             
             if isSecure {
                 SecureField(placeholder, text: $text)
-                    .foregroundStyle(.white)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 0.2, green: 0.25, blue: 0.4))
+                    .tint(Color(red: 0.25, green: 0.5, blue: 0.92))
+                    .focused($isFocused)
             } else {
                 TextField(placeholder, text: $text)
-                    .foregroundStyle(.white)
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color(red: 0.2, green: 0.25, blue: 0.4))
+                    .tint(Color(red: 0.25, green: 0.5, blue: 0.92))
+                    .focused($isFocused)
             }
         }
-        .padding()
-        .background(.white.opacity(0.2))
-        .cornerRadius(12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    isFocused ?
+                    Color(red: 0.96, green: 0.97, blue: 0.99) :
+                    Color(red: 0.95, green: 0.96, blue: 0.98)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    isFocused ?
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.25, green: 0.5, blue: 0.92),
+                            Color(red: 0.3, green: 0.55, blue: 0.96)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ) :
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.85, green: 0.87, blue: 0.92).opacity(0.5),
+                            Color(red: 0.88, green: 0.89, blue: 0.94).opacity(0.5)
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    lineWidth: isFocused ? 2 : 1
+                )
+        )
+        .animation(.easeOut(duration: 0.2), value: isFocused)
     }
 }
