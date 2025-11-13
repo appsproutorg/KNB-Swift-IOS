@@ -148,7 +148,7 @@ class HebrewCalendarService: ObservableObject {
                           item.title.contains("Parashat") ||
                           item.category.lowercased().contains("torah") {
                     // Store parsha - check multiple patterns for better compatibility
-                    var parshaName = item.title
+                    let parshaName = item.title
                         .replacingOccurrences(of: "Parashat ", with: "")
                         .replacingOccurrences(of: "Parashat", with: "")
                         .trimmingCharacters(in: .whitespaces)
