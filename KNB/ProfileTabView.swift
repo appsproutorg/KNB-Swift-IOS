@@ -181,6 +181,76 @@ struct ProfileTabView: View {
                             }
                         }
                         
+                        // Debug Menu Section
+                        VStack(alignment: .leading, spacing: 15) {
+                            HStack {
+                                Image(systemName: "wrench.and.screwdriver.fill")
+                                    .foregroundStyle(.purple)
+                                Text("Debug Tools")
+                                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal)
+                            
+                            VStack(spacing: 12) {
+                                DebugActionButton(
+                                    title: "Reset All Bids",
+                                    icon: "arrow.counterclockwise.circle.fill",
+                                    color: .orange
+                                ) {
+                                    Task {
+                                        await firestoreManager.resetAllBids()
+                                    }
+                                }
+                                
+                                DebugActionButton(
+                                    title: "Reset All Honors",
+                                    icon: "trash.circle.fill",
+                                    color: .red
+                                ) {
+                                    Task {
+                                        await firestoreManager.resetAllHonors()
+                                    }
+                                }
+                                
+                                DebugActionButton(
+                                    title: "Delete All Sponsorships",
+                                    icon: "calendar.badge.minus",
+                                    color: .purple
+                                ) {
+                                    Task {
+                                        await firestoreManager.deleteAllSponsorships()
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                            
+                            // Debug Info
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Text("Total Honors:")
+                                        .font(.system(size: 14, design: .rounded))
+                                    Spacer()
+                                    Text("\(firestoreManager.honors.count)")
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.blue)
+                                }
+                                
+                                HStack {
+                                    Text("Total Sponsorships:")
+                                        .font(.system(size: 14, design: .rounded))
+                                    Spacer()
+                                    Text("\(firestoreManager.kiddushSponsorships.count)")
+                                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.blue)
+                                }
+                            }
+                            .padding()
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        }
+                        .padding(.top, 10)
+                        
                         // Sign Out Button
                         Button(action: {
                             authManager.signOut()
@@ -426,6 +496,33 @@ struct ProfileStatRow: View {
             Text(value)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundStyle(color)
+        }
+    }
+}
+
+// MARK: - Debug Action Button
+struct DebugActionButton: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                
+                Spacer()
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(color)
+            .cornerRadius(12)
         }
     }
 }

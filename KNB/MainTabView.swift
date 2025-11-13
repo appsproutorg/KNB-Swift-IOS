@@ -15,14 +15,8 @@ struct MainTabView: View {
     @State private var selectedTab = 0
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     
-    // Show debug menu for testing - change to: currentUser?.hasAdminAccess == true for production
-    private var showDebugMenu: Bool {
-        return true // TODO: Change to: currentUser?.hasAdminAccess == true
-    }
-    
     var body: some View {
-        ZStack {
-            TabView(selection: $selectedTab) {
+        TabView(selection: $selectedTab) {
                 // Auction Tab
                 AuctionListView(
                     firestoreManager: firestoreManager,
@@ -54,16 +48,10 @@ struct MainTabView: View {
                     Label("Profile", systemImage: "person.crop.circle")
                 }
                 .tag(2)
-            }
-            .tint(.blue)
-            .onAppear {
-                setupLiquidGlassTabBar()
-            }
-            
-            // Debug Menu Overlay
-            if showDebugMenu {
-                DebugMenuView(firestoreManager: firestoreManager)
-            }
+        }
+        .tint(.blue)
+        .onAppear {
+            setupLiquidGlassTabBar()
         }
     }
     
