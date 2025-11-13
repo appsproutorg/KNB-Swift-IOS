@@ -141,6 +141,50 @@ struct SponsorshipFormView: View {
                                 .background(.blue.opacity(0.1))
                                 .cornerRadius(12)
                             }
+                            
+                            // Candle Lighting & Havdalah Times
+                            if let shabbatTime = shabbatTime {
+                                HStack(spacing: 20) {
+                                    // Candle Lighting
+                                    VStack(spacing: 4) {
+                                        Image(systemName: "light.max")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(.orange)
+                                        Text("Candle Lighting")
+                                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                                            .foregroundStyle(.secondary)
+                                        Text(formatTime(shabbatTime.candleLighting))
+                                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                                            .foregroundStyle(.orange)
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(.orange.opacity(0.1))
+                                    )
+                                    
+                                    // Havdalah
+                                    VStack(spacing: 4) {
+                                        Image(systemName: "moon.stars.fill")
+                                            .font(.system(size: 20))
+                                            .foregroundStyle(.purple)
+                                        Text("Havdalah")
+                                            .font(.system(size: 12, weight: .medium, design: .rounded))
+                                            .foregroundStyle(.secondary)
+                                        Text(formatTime(shabbatTime.havdalah))
+                                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                                            .foregroundStyle(.purple)
+                                    }
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(.purple.opacity(0.1))
+                                    )
+                                }
+                                .padding(.horizontal)
+                            }
                         }
                         .padding(.bottom, 10)
                         
@@ -449,6 +493,12 @@ struct SponsorshipFormView: View {
             
             isSubmitting = false
         }
+    }
+    
+    func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
     }
 }
 

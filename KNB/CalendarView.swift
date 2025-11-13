@@ -415,41 +415,30 @@ struct CalendarDayCell: View {
             // Hebrew Date - show on all dates if in current month, more prominent on Shabbat
             if let hebrewDate = hebrewDate, isCurrentMonth {
                 Text(hebrewDate)
-                    .font(.system(size: isShabbat ? 10 : 7, weight: isShabbat ? .medium : .regular, design: .rounded))
+                    .font(.system(size: isShabbat ? 12 : 7, weight: isShabbat ? .semibold : .regular, design: .rounded))
                     .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : (isShabbat ? .primary : .secondary))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.horizontal, isShabbat ? 4 : 2)
-                    .padding(.top, 1)
+                    .padding(.top, 2)
             }
             
             // Shabbat-specific details
             if isShabbat, isCurrentMonth {
-                // Parsha name - more prominent
+                // Parsha name - larger and more prominent
                 if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
                     Text(parsha)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.7)
-                        .padding(.horizontal, 4)
-                        .padding(.vertical, 2)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
                         .background(
                             Capsule()
-                                .fill(isPastDate ? Color.clear : Color.blue.opacity(0.12))
+                                .fill(isPastDate ? Color.clear : Color.blue.opacity(0.15))
                         )
-                }
-                
-                // Candle lighting time
-                if let shabbatTime = shabbatTime {
-                    HStack(spacing: 2) {
-                        Image(systemName: "light.max")
-                            .font(.system(size: 7))
-                        Text(formatTime(shabbatTime.candleLighting))
-                            .font(.system(size: 9, weight: .medium, design: .rounded))
-                    }
-                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .orange)
-                    .padding(.top, 1)
                 }
             }
             
