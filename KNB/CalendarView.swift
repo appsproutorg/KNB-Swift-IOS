@@ -79,11 +79,6 @@ struct CalendarView: View {
                     }
                     .padding(.top, 16)
                     .padding(.bottom, 12)
-                    .background(
-                        Rectangle()
-                            .fill(.ultraThinMaterial)
-                            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 2)
-                    )
                     
                     ScrollView {
                         VStack(spacing: 20) {
