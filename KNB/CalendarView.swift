@@ -78,29 +78,28 @@ struct CalendarView: View {
                         .padding(.top, 12)
                         
                         // Weekday Headers with wider Saturday
-                        HStack(spacing: 8) {
+                        HStack(spacing: 4) {
                             ForEach(Array(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].enumerated()), id: \.offset) { index, day in
                                 Text(day)
-                                    .font(.system(size: index == 6 ? 15 : 13, weight: index == 6 ? .bold : .semibold, design: .rounded))
+                                    .font(.system(size: index == 6 ? 14 : 12, weight: index == 6 ? .bold : .semibold, design: .rounded))
                                     .foregroundStyle(index == 6 ? .blue : .secondary)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(minWidth: index == 6 ? 100 : nil)
+                                    .frame(maxWidth: index == 6 ? .infinity : 45)
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 16)
                         
-                        // Calendar Grid with wider Shabbat columns
+                        // Calendar Grid with wider Shabbat columns - using fixed widths to fit screen
                         LazyVGrid(
                             columns: [
-                                GridItem(.flexible(), spacing: 8),  // Sun
-                                GridItem(.flexible(), spacing: 8),  // Mon
-                                GridItem(.flexible(), spacing: 8),  // Tue
-                                GridItem(.flexible(), spacing: 8),  // Wed
-                                GridItem(.flexible(), spacing: 8),  // Thu
-                                GridItem(.flexible(), spacing: 8),  // Fri
-                                GridItem(.flexible(minimum: 100, maximum: 120), spacing: 8)  // Sat (wider)
+                                GridItem(.fixed(45), spacing: 4),  // Sun
+                                GridItem(.fixed(45), spacing: 4),  // Mon
+                                GridItem(.fixed(45), spacing: 4),  // Tue
+                                GridItem(.fixed(45), spacing: 4),  // Wed
+                                GridItem(.fixed(45), spacing: 4),  // Thu
+                                GridItem(.fixed(45), spacing: 4),  // Fri
+                                GridItem(.flexible(), spacing: 4)  // Sat (uses remaining space)
                             ],
-                            spacing: 10
+                            spacing: 8
                         ) {
                             ForEach(getDaysInMonth(), id: \.self) { date in
                                 if let date = date {
@@ -139,8 +138,8 @@ struct CalendarView: View {
                                 }
                             }
                         }
-                        .padding(.horizontal)
-                        .id(refreshTrigger)  // Force grid refresh when sponsorships change
+                                        .padding(.horizontal, 16)
+                                        .id(refreshTrigger)  // Force grid refresh when sponsorships change
                         
                         // Clear, easy-to-understand legend
                         VStack(spacing: 16) {
@@ -396,9 +395,9 @@ struct CalendarDayCell: View {
                     .frame(height: 16)
             }
             
-            // Gregorian Date Number - Large and prominent
+            // Gregorian Date Number - Responsive sizing
             Text("\(dayNumber)")
-                .font(.system(size: isShabbat ? 24 : 18, weight: isToday ? .bold : .semibold, design: .rounded))
+                .font(.system(size: isShabbat ? 22 : 16, weight: isToday ? .bold : .semibold, design: .rounded))
                 .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : (isCurrentMonth ? .primary : Color.secondary.opacity(0.4)))
                 .onAppear {
                     if isShabbat && isCurrentMonth {
@@ -411,30 +410,30 @@ struct CalendarDayCell: View {
                 // Parsha name
                 if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
                     Text(parsha)
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .padding(.horizontal, 6)
+                        .minimumScaleFactor(0.6)
+                        .padding(.horizontal, 4)
                 }
                 
                 // Candle lighting time
                 if let shabbatTime = shabbatTime {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 2) {
                         Image(systemName: "light.max")
-                            .font(.system(size: 8))
+                            .font(.system(size: 7))
                         Text(formatTime(shabbatTime.candleLighting))
-                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .font(.system(size: 9, weight: .medium, design: .rounded))
                     }
                     .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .orange)
-                    .padding(.top, 2)
+                    .padding(.top, 1)
                 }
             }
             
-            Spacer(minLength: 2)
+            Spacer(minLength: 1)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: isShabbat ? 90 : 70)
+        .frame(height: isShabbat ? 85 : 65)
         .background(cellBackgroundMaterial)
         .overlay(cellOverlay)
         .opacity(isCurrentMonth ? (isPastDate ? 0.5 : 1.0) : 0.25)
