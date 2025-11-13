@@ -200,13 +200,13 @@ struct CalendarView: View {
             }
             .navigationBarHidden(true)
             .onAppear {
-                // Clear old cache to get fresh Parsha data with new parsing
+                // Clear old cache to get fresh Parsha data with improved parsing
                 let cacheVersion = UserDefaults.standard.integer(forKey: "hebrew_cache_version")
-                if cacheVersion < 3 {
-                    print("🔄 Clearing cache for updated Parsha parsing...")
+                if cacheVersion < 4 {
+                    print("🔄 Clearing cache for improved Parsha parsing...")
                     CalendarCacheManager.shared.clearCache()
                     hebrewCalendarService.clearCache()
-                    UserDefaults.standard.set(3, forKey: "hebrew_cache_version")
+                    UserDefaults.standard.set(4, forKey: "hebrew_cache_version")
                 }
                 
                 // Preload 90 days of data

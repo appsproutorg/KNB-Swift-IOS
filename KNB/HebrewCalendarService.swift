@@ -143,10 +143,21 @@ class HebrewCalendarService: ObservableObject {
                     currentCandles = item.date
                     currentDate = item.date
                     print("      🕯️ Found candles for \(item.date)")
-                } else if item.category == "parashat" || item.title.starts(with: "Parashat ") {
-                    // Store parsha - check both category and title pattern
-                    currentParsha = item.title.replacingOccurrences(of: "Parashat ", with: "")
-                    print("      📖 Found parsha: '\(currentParsha ?? "")'")
+                } else if item.category == "parashat" || 
+                          item.title.starts(with: "Parashat ") || 
+                          item.title.contains("Parashat") ||
+                          item.category.lowercased().contains("torah") {
+                    // Store parsha - check multiple patterns for better compatibility
+                    var parshaName = item.title
+                        .replacingOccurrences(of: "Parashat ", with: "")
+                        .replacingOccurrences(of: "Parashat", with: "")
+                        .trimmingCharacters(in: .whitespaces)
+                    
+                    // If we got something meaningful, store it
+                    if !parshaName.isEmpty {
+                        currentParsha = parshaName
+                        print("      📖 Found parsha: '\(parshaName)'")
+                    }
                 } else if item.category == "havdalah" {
                     if let candles = currentCandles, let date = currentDate {
                         // CRITICAL: Use startOfDay as key for consistent matching

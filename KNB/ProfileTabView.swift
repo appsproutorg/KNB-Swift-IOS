@@ -98,7 +98,7 @@ struct ProfileTabView: View {
                             Divider()
                             
                             ProfileStatRow(
-                                icon: "gavel.fill",
+                                icon: "hammer.fill",
                                 title: "Auction Honors",
                                 value: "\(userHonors.count)",
                                 color: .orange
@@ -114,7 +114,7 @@ struct ProfileTabView: View {
                         if !userHonors.isEmpty {
                             VStack(alignment: .leading, spacing: 15) {
                                 HStack {
-                                    Image(systemName: "gavel.fill")
+                                    Image(systemName: "hammer.fill")
                                         .foregroundStyle(.orange)
                                     Text("My Auction Bids")
                                         .font(.system(size: 22, weight: .bold, design: .rounded))
@@ -192,6 +192,17 @@ struct ProfileTabView: View {
                             .padding(.horizontal)
                             
                             VStack(spacing: 12) {
+                                DebugActionButton(
+                                    title: "Clear Cache & Refresh Parsha Data",
+                                    icon: "arrow.triangle.2.circlepath",
+                                    color: .blue
+                                ) {
+                                    // Clear all caches and force reload
+                                    CalendarCacheManager.shared.clearCache()
+                                    UserDefaults.standard.set(0, forKey: "hebrew_cache_version")
+                                    print("✅ Cache cleared! Close and reopen app to reload Parsha data.")
+                                }
+                                
                                 DebugActionButton(
                                     title: "Reset All Bids",
                                     icon: "arrow.counterclockwise.circle.fill",
