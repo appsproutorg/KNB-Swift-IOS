@@ -415,24 +415,29 @@ struct CalendarDayCell: View {
             // Hebrew Date - show on all dates if in current month, more prominent on Shabbat
             if let hebrewDate = hebrewDate, isCurrentMonth {
                 Text(hebrewDate)
-                    .font(.system(size: isShabbat ? 8 : 7, design: .rounded))
-                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : .secondary)
+                    .font(.system(size: isShabbat ? 10 : 7, weight: isShabbat ? .medium : .regular, design: .rounded))
+                    .foregroundStyle(isPastDate ? Color.secondary.opacity(0.4) : (isShabbat ? .primary : .secondary))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .padding(.horizontal, 2)
-                    .padding(.top, isShabbat ? 1 : 0)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, isShabbat ? 4 : 2)
+                    .padding(.top, 1)
             }
             
             // Shabbat-specific details
             if isShabbat, isCurrentMonth {
-                // Parsha name
+                // Parsha name - more prominent
                 if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
                     Text(parsha)
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
                         .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.6)
+                        .minimumScaleFactor(0.7)
                         .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule()
+                                .fill(isPastDate ? Color.clear : Color.blue.opacity(0.12))
+                        )
                 }
                 
                 // Candle lighting time
