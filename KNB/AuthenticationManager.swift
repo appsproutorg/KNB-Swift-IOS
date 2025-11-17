@@ -52,7 +52,7 @@ class AuthenticationManager: ObservableObject {
             errorMessage = nil
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = getSignUpErrorMessage(from: error)
             return false
         }
     }
@@ -65,7 +65,19 @@ class AuthenticationManager: ObservableObject {
             errorMessage = nil
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            errorMessage = getSignInErrorMessage(from: error)
+            return false
+        }
+    }
+    
+    // MARK: - Password Reset
+    func resetPassword(email: String) async -> Bool {
+        do {
+            try await Auth.auth().sendPasswordReset(withEmail: email)
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = getPasswordResetErrorMessage(from: error)
             return false
         }
     }
@@ -102,6 +114,73 @@ class AuthenticationManager: ObservableObject {
             "admin@knb.com"
         ]
         return adminEmails.contains(email.lowercased())
+    }
+    
+    // MARK: - Error Message Helpers
+    private func getSignUpErrorMessage(from error: Error) -> String {
+        guard let authError = error as NSError?,
+              let errorCode = AuthErrorCode(_bridgedNSError: authError)?.code else {
+            return "Unable to create account. Please try again."
+        }
+        
+        switch errorCode {
+        case .emailAlreadyInUse:
+            return "This email is already registered. Please sign in instead."
+        case .invalidEmail:
+            return "Please enter a valid email address."
+        case .weakPassword:
+            return "Password is too weak. Please use at least 8 characters."
+        case .networkError:
+            return "Network error. Please check your connection and try again."
+        case .tooManyRequests:
+            return "Too many attempts. Please try again later."
+        default:
+            return "Unable to create account. Please try again."
+        }
+    }
+    
+    private func getSignInErrorMessage(from error: Error) -> String {
+        guard let authError = error as NSError?,
+              let errorCode = AuthErrorCode(_bridgedNSError: authError)?.code else {
+            return "Unable to sign in. Please try again."
+        }
+        
+        switch errorCode {
+        case .userNotFound:
+            return "No account found with this email. Please sign up first."
+        case .wrongPassword:
+            return "Incorrect password. Please try again."
+        case .invalidEmail:
+            return "Please enter a valid email address."
+        case .userDisabled:
+            return "This account has been disabled. Please contact support."
+        case .networkError:
+            return "Network error. Please check your connection and try again."
+        case .tooManyRequests:
+            return "Too many attempts. Please try again later."
+        default:
+            return "Unable to sign in. Please check your email and password."
+        }
+    }
+    
+    private func getPasswordResetErrorMessage(from error: Error) -> String {
+        guard let authError = error as NSError?,
+              let errorCode = AuthErrorCode(_bridgedNSError: authError)?.code else {
+            return "Unable to send password reset email. Please try again."
+        }
+        
+        switch errorCode {
+        case .userNotFound:
+            return "No account found with this email address."
+        case .invalidEmail:
+            return "Please enter a valid email address."
+        case .networkError:
+            return "Network error. Please check your connection and try again."
+        case .tooManyRequests:
+            return "Too many attempts. Please try again later."
+        default:
+            return "Unable to send password reset email. Please try again."
+        }
     }
 }
 
