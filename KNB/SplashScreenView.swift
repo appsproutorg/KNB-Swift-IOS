@@ -19,19 +19,19 @@ struct SplashScreenView: View {
     
     var body: some View {
         ZStack {
-            // Modern blue gradient
-            LinearGradient(
-                colors: [
-                    Color(red: 0.88, green: 0.93, blue: 0.98),
-                    Color(red: 0.90, green: 0.94, blue: 0.99),
-                    Color(red: 0.92, green: 0.95, blue: 0.99)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            // Background image with gray tint overlay
+            ZStack {
+                Image("SplashBackground")
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+                
+                // Gray tint overlay
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+            }
             
-            VStack(spacing: 35) {
+            VStack(spacing: 20) {
                 ZStack {
                     // Soft colorful glow
                     Circle()
@@ -49,42 +49,17 @@ struct SplashScreenView: View {
                         .frame(width: 180, height: 180)
                         .blur(radius: 25)
                     
-                    // Elegant icon container
+                    // Elegant icon container - more translucent like bottom bubble
                     ZStack {
-                        // Soft outer ring
+                        // Main icon circle - translucent white like bottom bubble
                         Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.15),
-                                        Color(red: 0.35, green: 0.55, blue: 0.98).opacity(0.08)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 130, height: 130)
-                            .blur(radius: 6)
-                        
-                        // Main icon circle with subtle material
-                        Circle()
-                            .fill(Color.white)
+                            .fill(Color.white.opacity(0.7))
                             .frame(width: 120, height: 120)
                             .overlay(
                                 Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.25),
-                                                Color(red: 0.35, green: 0.55, blue: 0.98).opacity(0.12)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 2
-                                    )
+                                    .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
                             )
-                            .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.2), radius: 20, x: 0, y: 8)
+                            .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.15), radius: 15, x: 0, y: 5)
                         
                         // Book icon matching login theme
                         Image(systemName: "book.pages.fill")
@@ -106,37 +81,22 @@ struct SplashScreenView: View {
                 }
                 .opacity(opacity)
                 
-                // Clear, readable text
-                VStack(spacing: 14) {
-                    Text("KNB")
-                        .font(.system(size: 52, weight: .semibold, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.25, green: 0.5, blue: 0.92),
-                                    Color(red: 0.3, green: 0.55, blue: 0.96)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                // The KNB App bubble - moved closer
+                Text("The KNB App")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6))
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.7))
+                            .overlay(
+                                Capsule()
+                                    .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
                             )
-                        )
-                    
-                    Text("The KNB App")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(Color.white.opacity(0.7))
-                                .overlay(
-                                    Capsule()
-                                        .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
-                                )
-                        )
-                }
-                .opacity(opacity)
-                .scaleEffect(scale)
+                    )
+                    .opacity(opacity)
+                    .scaleEffect(scale)
             }
         }
         .onAppear {

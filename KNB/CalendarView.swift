@@ -248,6 +248,19 @@ struct CalendarView: View {
                     )
                 }
             }
+            .gesture(
+                DragGesture(minimumDistance: 50)
+                    .onEnded { value in
+                        let horizontalAmount = value.translation.width
+                        if horizontalAmount > 50 {
+                            // Swipe right - previous month
+                            previousMonth()
+                        } else if horizontalAmount < -50 {
+                            // Swipe left - next month
+                            nextMonth()
+                        }
+                    }
+            )
         }
     }
     

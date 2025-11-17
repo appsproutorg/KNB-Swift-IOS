@@ -17,6 +17,26 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
+                // Kiddush Tab
+                CalendarView(
+                    firestoreManager: firestoreManager,
+                    currentUser: $currentUser
+                )
+                .tabItem {
+                    Label("Kiddush", systemImage: "calendar")
+                }
+                .tag(0)
+                
+                // Social Tab
+                SocialFeedView(
+                    firestoreManager: firestoreManager,
+                    currentUser: $currentUser
+                )
+                .tabItem {
+                    Label("Social", systemImage: "bubble.left.and.bubble.right")
+                }
+                .tag(1)
+                
                 // Auction Tab
                 AuctionListView(
                     firestoreManager: firestoreManager,
@@ -26,17 +46,7 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Auction", systemImage: "book.closed")
                 }
-                .tag(0)
-                
-                // Sponsorship Tab
-                CalendarView(
-                    firestoreManager: firestoreManager,
-                    currentUser: $currentUser
-                )
-                .tabItem {
-                    Label("Sponsorship", systemImage: "calendar")
-                }
-                .tag(1)
+                .tag(2)
                 
                 // Profile Tab
                 ProfileTabView(
@@ -47,7 +57,7 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Profile", systemImage: "person.crop.circle")
                 }
-                .tag(2)
+                .tag(3)
         }
         .tint(.blue)
         .onAppear {
@@ -111,9 +121,13 @@ struct MainTabView: View {
         // Enable smooth morphing animations
         UITabBar.appearance().isTranslucent = !reduceTransparency
         
-        // Add subtle corner radius for modern look
-        UITabBar.appearance().layer.cornerRadius = 20
+        // Add subtle corner radius for modern look (reduced to prevent overlap)
+        UITabBar.appearance().layer.cornerRadius = 16
         UITabBar.appearance().layer.masksToBounds = true
+        
+        // Add padding to prevent items from overlapping
+        UITabBar.appearance().itemPositioning = .centered
+        UITabBar.appearance().itemSpacing = 0
     }
 }
 

@@ -303,6 +303,19 @@ struct ProfileTabView: View {
                                         await firestoreManager.deleteAllSponsorships()
                                     }
                                 }
+                                
+                                // Admin only: Delete All Social Posts
+                                if user?.isAdmin == true {
+                                    DebugActionButton(
+                                        title: "Delete All Social Posts",
+                                        icon: "bubble.left.and.bubble.right.fill",
+                                        color: .indigo
+                                    ) {
+                                        Task {
+                                            await firestoreManager.deleteAllSocialPosts()
+                                        }
+                                    }
+                                }
                             }
                             .padding(.horizontal)
                             

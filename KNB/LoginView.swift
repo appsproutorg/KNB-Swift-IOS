@@ -20,17 +20,17 @@ struct LoginView: View {
     
     var body: some View {
         ZStack {
-            // Modern blue gradient
-            LinearGradient(
-                colors: [
-                    Color(red: 0.88, green: 0.93, blue: 0.98),
-                    Color(red: 0.90, green: 0.94, blue: 0.99),
-                    Color(red: 0.92, green: 0.95, blue: 0.99)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            // Background image with gray tint overlay (same as splash screen)
+            ZStack {
+                Image("SplashBackground")
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
+                
+                // Gray tint overlay
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+            }
             
             ScrollView {
                 VStack(spacing: 30) {
@@ -38,26 +38,16 @@ struct LoginView: View {
                     
                     // Modern logo section
                     VStack(spacing: 20) {
-                        // Icon in modern style
+                        // Icon in modern style - translucent like splash screen
                         ZStack {
                             Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.15),
-                                            Color(red: 0.35, green: 0.55, blue: 0.98).opacity(0.08)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 90, height: 90)
-                                .blur(radius: 10)
-                            
-                            Circle()
-                                .fill(.white)
+                                .fill(Color.white.opacity(0.7))
                                 .frame(width: 80, height: 80)
-                                .shadow(color: Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), radius: 20, x: 0, y: 10)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
+                                )
+                                .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.15), radius: 15, x: 0, y: 5)
                             
                             Image(systemName: "book.pages.fill")
                                 .font(.system(size: 38, weight: .regular))
@@ -71,26 +61,23 @@ struct LoginView: View {
                                         endPoint: .bottomTrailing
                                     )
                                 )
+                                .opacity(0.9)
                         }
                         
-                        VStack(spacing: 8) {
-                            Text("KNB")
-                                .font(.system(size: 36, weight: .bold, design: .rounded))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 0.25, green: 0.5, blue: 0.92),
-                                            Color(red: 0.3, green: 0.55, blue: 0.96)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
+                        // The KNB App bubble (like splash screen)
+                        Text("The KNB App")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6))
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.7))
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
                                     )
-                                )
-                            
-                            Text(isSignUp ? "Create your account" : "Welcome back")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6))
-                        }
+                            )
                     }
                     
                     // Modern form card
@@ -208,24 +195,25 @@ struct LoginView: View {
                     .background(
                         ZStack {
                             RoundedRectangle(cornerRadius: 24)
-                                .fill(.white)
-                                .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.12), radius: 25, x: 0, y: 12)
-                            
-                            RoundedRectangle(cornerRadius: 24)
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.15),
-                                            Color(red: 0.35, green: 0.55, blue: 0.98).opacity(0.08)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1
+                                .fill(.ultraThinMaterial)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 24)
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.3),
+                                                    Color.white.opacity(0.1)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1
+                                        )
                                 )
+                                .shadow(color: Color.black.opacity(0.1), radius: 25, x: 0, y: 12)
                         }
                     )
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 40)
                     
                     Spacer(minLength: 40)
                 }

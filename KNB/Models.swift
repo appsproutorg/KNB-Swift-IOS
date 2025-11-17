@@ -122,3 +122,46 @@ struct ShabbatTime: Codable, Equatable {
     }
 }
 
+// MARK: - Social Post Model
+struct SocialPost: Identifiable, Codable, Equatable {
+    let id: String
+    var authorName: String
+    var authorEmail: String
+    var content: String
+    var timestamp: Date
+    var likes: [String]  // Array of user emails who liked
+    var likeCount: Int
+    var replyCount: Int
+    var parentPostId: String?  // null for top-level posts, postId for replies
+    
+    init(
+        id: String = UUID().uuidString,
+        authorName: String,
+        authorEmail: String,
+        content: String,
+        timestamp: Date = Date(),
+        likes: [String] = [],
+        likeCount: Int = 0,
+        replyCount: Int = 0,
+        parentPostId: String? = nil
+    ) {
+        self.id = id
+        self.authorName = authorName
+        self.authorEmail = authorEmail
+        self.content = content
+        self.timestamp = timestamp
+        self.likes = likes
+        self.likeCount = likeCount
+        self.replyCount = replyCount
+        self.parentPostId = parentPostId
+    }
+    
+    var isReply: Bool {
+        return parentPostId != nil
+    }
+    
+    func isLikedBy(_ userEmail: String) -> Bool {
+        return likes.contains(userEmail)
+    }
+}
+
