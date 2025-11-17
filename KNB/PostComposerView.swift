@@ -68,27 +68,24 @@ struct PostComposerView: View {
                     
                     // Text editor - Compact
                     VStack(alignment: .leading, spacing: 12) {
+                        // TextEditor with placeholder as background overlay
                         ZStack(alignment: .topLeading) {
-                            // TextEditor with proper padding compensation
-                            // TextEditor has ~5 points internal padding, we use -4 to get ~1 point visible
-                            TextEditor(text: $postContent)
-                                .font(.system(size: 17))
-                                .focused($isFocused)
-                                .scrollContentBackground(.hidden)
-                                .frame(minHeight: 80, maxHeight: .infinity, alignment: .topLeading)
-                                .padding(.horizontal, -4)
-                                .padding(.vertical, -8)
-                            
-                            // Placeholder - TextEditor's actual text starts at ~5 points from left edge
-                            // After -4 padding, visible padding is ~1 point, so we match with 1 point
+                            // Background placeholder that disappears when typing
                             if postContent.isEmpty {
                                 Text("What's happening?")
                                     .foregroundStyle(.secondary)
                                     .font(.system(size: 17))
                                     .padding(.top, 8)
-                                    .padding(.leading, 1)
+                                    .padding(.leading, 5)
                                     .allowsHitTesting(false)
                             }
+                            
+                            // TextEditor - no padding compensation, let it use natural padding
+                            TextEditor(text: $postContent)
+                                .font(.system(size: 17))
+                                .focused($isFocused)
+                                .scrollContentBackground(.hidden)
+                                .frame(minHeight: 80, maxHeight: .infinity, alignment: .topLeading)
                         }
                         .background(Color.clear)
                         

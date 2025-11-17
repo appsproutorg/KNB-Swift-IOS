@@ -181,12 +181,12 @@ struct LoginView: View {
                         }) {
                             HStack(spacing: 4) {
                                 Text(isSignUp ? "Already have an account?" : "Don't have an account?")
-                                    .foregroundStyle(Color(red: 0.45, green: 0.5, blue: 0.65))
+                                    .foregroundStyle(Color(red: 0.2, green: 0.25, blue: 0.4))
                                 Text(isSignUp ? "Sign In" : "Sign Up")
-                                    .foregroundStyle(Color(red: 0.25, green: 0.5, blue: 0.92))
+                                    .foregroundStyle(Color(red: 0.15, green: 0.4, blue: 0.85))
                                     .fontWeight(.semibold)
                             }
-                            .font(.system(size: 15))
+                            .font(.system(size: 15, weight: .medium))
                         }
                         .disabled(isLoading)
                         .padding(.top, 4)
@@ -216,6 +216,12 @@ struct LoginView: View {
                     .padding(.horizontal, 40)
                     
                     Spacer(minLength: 40)
+                    
+                    // Powered by App Sprout LLC
+                    Text("Powered by App Sprout LLC")
+                        .font(.system(size: 11, weight: .regular))
+                        .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6).opacity(0.6))
+                        .padding(.bottom, 20)
                 }
             }
         }
@@ -329,8 +335,8 @@ struct ModernInput: View {
             RoundedRectangle(cornerRadius: 14)
                 .fill(
                     isFocused ?
-                    Color(red: 0.96, green: 0.97, blue: 0.99) :
-                    Color(red: 0.95, green: 0.96, blue: 0.98)
+                    Color.white.opacity(0.6) :
+                    Color.white.opacity(0.5)
                 )
         )
         .overlay(

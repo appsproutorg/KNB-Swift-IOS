@@ -372,7 +372,12 @@ struct ProfileTabView: View {
                         .padding(.horizontal)
                         .padding(.top, 20)
                         
-                        Spacer(minLength: 20)
+                        // Powered by App Sprout LLC
+                        Text("Powered by App Sprout LLC")
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6).opacity(0.6))
+                            .padding(.top, 20)
+                            .padding(.bottom, 20)
                     }
                 }
             }
