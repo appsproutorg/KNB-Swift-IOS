@@ -13,8 +13,15 @@ struct SocialFeedView: View {
     
     @State private var sortOption: FirestoreManager.SocialPostSortOption = .newest
     @State private var showPostComposer = false
+    @State private var postToEdit: SocialPost?
     @State private var selectedPost: SocialPost?
     @State private var showReplyThread = false
+    
+    private func timeAgoString(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
     
     var body: some View {
         NavigationStack {
@@ -77,12 +84,24 @@ struct SocialFeedView: View {
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
+                        // Last updated timestamp
+                        if let lastUpdated = firestoreManager.lastUpdated {
+                            HStack {
+                                Spacer()
+                                Text("Updated \(timeAgoString(from: lastUpdated))")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal)
+                                    .padding(.top, 8)
+                            }
+                        }
                         ScrollView {
                             LazyVStack(spacing: 12) {
                                 ForEach(firestoreManager.socialPosts) { post in
                                     PostCard(
                                         post: post,
                                         currentUserEmail: currentUser?.email,
+                                        currentUserName: currentUser?.name,
                                         firestoreManager: firestoreManager,
                                         onReply: {
                                             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -94,6 +113,10 @@ struct SocialFeedView: View {
                                             Task {
                                                 await firestoreManager.deleteSocialPost(postId: post.id)
                                             }
+                                        },
+                                        onEdit: {
+                                            postToEdit = post
+                                            showPostComposer = true
                                         }
                                     )
                                     .padding(.horizontal)
@@ -175,11 +198,15 @@ struct SocialFeedView: View {
             .sheet(isPresented: $showPostComposer) {
                 PostComposerView(
                     firestoreManager: firestoreManager,
-                    currentUser: $currentUser
+                    currentUser: $currentUser,
+                    postToEdit: postToEdit
                 )
                 .presentationDetents([.height(280), .medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(.systemBackground))
+                .onDisappear {
+                    postToEdit = nil
+                }
             }
             .sheet(isPresented: $showReplyThread) {
                 if let post = selectedPost {

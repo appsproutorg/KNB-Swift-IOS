@@ -11,6 +11,7 @@ struct MainTabView: View {
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
     @ObservedObject var authManager: AuthenticationManager
+    @EnvironmentObject var appSettings: AppSettings
     
     @State private var selectedTab = 0
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency

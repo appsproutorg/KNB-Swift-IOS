@@ -10,21 +10,25 @@ import SwiftUI
 struct PostCard: View {
     let post: SocialPost
     let currentUserEmail: String?
+    let currentUserName: String?
     @ObservedObject var firestoreManager: FirestoreManager
     var onReply: () -> Void
     var onDelete: () -> Void
+    var onEdit: (() -> Void)?
     
     @State private var isLiked: Bool
     @State private var likeCount: Int
     @State private var heartScale: CGFloat = 1.0
     @State private var showDeleteConfirmation = false
     
-    init(post: SocialPost, currentUserEmail: String?, firestoreManager: FirestoreManager, onReply: @escaping () -> Void, onDelete: @escaping () -> Void) {
+    init(post: SocialPost, currentUserEmail: String?, currentUserName: String? = nil, firestoreManager: FirestoreManager, onReply: @escaping () -> Void, onDelete: @escaping () -> Void, onEdit: (() -> Void)? = nil) {
         self.post = post
         self.currentUserEmail = currentUserEmail
+        self.currentUserName = currentUserName
         self.firestoreManager = firestoreManager
         self.onReply = onReply
         self.onDelete = onDelete
+        self.onEdit = onEdit
         _isLiked = State(initialValue: post.isLikedBy(currentUserEmail ?? ""))
         _likeCount = State(initialValue: post.likeCount)
     }
@@ -85,6 +89,15 @@ struct PostCard: View {
                         Text(relativeTime)
                             .font(.system(size: 14, weight: .regular))
                             .foregroundStyle(.secondary)
+                        
+                        if post.isEdited {
+                            Text("·")
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundStyle(.secondary)
+                            Text("Edited")
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     
                     // Post content - Directly below username for fluid flow
@@ -103,6 +116,13 @@ struct PostCard: View {
                 // Three-dot menu (only for own posts)
                 if isOwnPost {
                     Menu {
+                        Button(action: {
+                            // Edit action will be handled by parent
+                            onEdit?()
+                        }) {
+                            Label("Edit", systemImage: "pencil")
+                        }
+                        
                         Button(role: .destructive, action: {
                             showDeleteConfirmation = true
                         }) {
@@ -192,6 +212,10 @@ struct PostCard: View {
     private func handleLike() {
         guard let userEmail = currentUserEmail else { return }
         
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+        
         // Optimistic update
         let wasLiked = isLiked
         isLiked.toggle()
@@ -210,9 +234,12 @@ struct PostCard: View {
         
         // Update in Firestore
         Task {
+            // Get user name for notification
+            let userName = currentUserName ?? "Someone"
             let success = await firestoreManager.toggleLike(
                 postId: post.id,
-                userEmail: userEmail
+                userEmail: userEmail,
+                userName: userName
             )
             
             if !success {

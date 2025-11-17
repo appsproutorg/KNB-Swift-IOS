@@ -11,9 +11,19 @@ struct ProfileTabView: View {
     @Binding var user: User?
     @ObservedObject var authManager: AuthenticationManager
     @ObservedObject var firestoreManager: FirestoreManager
+    @EnvironmentObject var appSettings: AppSettings
     
     @State private var userSponsorships: [KiddushSponsorship] = []
     @State private var isLoadingSponsorships = false
+    @State private var showNotifications = false
+    @State private var showSettings = false
+    @StateObject private var notificationManager = NotificationManager(currentUserEmail: "")
+    
+    init(user: Binding<User?>, authManager: AuthenticationManager, firestoreManager: FirestoreManager) {
+        self._user = user
+        self.authManager = authManager
+        self.firestoreManager = firestoreManager
+    }
     
     var userHonors: [Honor] {
         guard let userName = user?.name else { return [] }
@@ -400,14 +410,59 @@ struct ProfileTabView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 16) {
+                        // Notification button with badge
+                        Button(action: {
+                            showNotifications = true
+                        }) {
+                            ZStack {
+                                Image(systemName: "bell")
+                                    .font(.system(size: 20))
+                                
+                                if notificationManager.unreadCount > 0 {
+                                    Text("\(notificationManager.unreadCount)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(4)
+                                        .background(Color.red)
+                                        .clipShape(Circle())
+                                        .offset(x: 8, y: -8)
+                                }
+                            }
+                        }
+                        
+                        // Settings button
+                        Button(action: {
+                            showSettings = true
+                        }) {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 20))
+                        }
+                    }
+                }
+            }
+            .sheet(isPresented: $showNotifications) {
+                NotificationView(notificationManager: notificationManager)
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView(appSettings: appSettings)
             }
             .onAppear {
+                // Update notification manager with current user email
+                if let email = user?.email {
+                    notificationManager.currentUserEmail = email
+                    notificationManager.startListening()
+                }
+                firestoreManager.notificationManager = notificationManager
                 loadUserSponsorships()
                 // Start listening to real-time updates
                 firestoreManager.startListeningToSponsorships()
             }
             .onDisappear {
                 firestoreManager.stopListeningToSponsorships()
+                notificationManager.stopListening()
             }
             .refreshable {
                 loadUserSponsorships()
@@ -706,10 +761,14 @@ struct DebugActionButton: View {
 }
 
 #Preview {
-    ProfileTabView(
+    let authManager = AuthenticationManager()
+    let firestoreManager = FirestoreManager()
+    
+    return ProfileTabView(
         user: .constant(User(name: "John Doe", email: "john@example.com", totalPledged: 1800)),
-        authManager: AuthenticationManager(),
-        firestoreManager: FirestoreManager()
+        authManager: authManager,
+        firestoreManager: firestoreManager
     )
+    .environmentObject(AppSettings())
 }
 

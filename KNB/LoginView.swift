@@ -96,6 +96,7 @@ struct LoginView: View {
                                 insertion: .move(edge: .top).combined(with: .opacity),
                                 removal: .move(edge: .top).combined(with: .opacity)
                             ))
+                            .id("nameField")
                         }
                         
                         ModernInput(
@@ -103,8 +104,7 @@ struct LoginView: View {
                             placeholder: "Email",
                             text: $email
                         )
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.emailAddress)
+                        .id("emailField")
                         
                         ModernInput(
                             icon: "lock.fill",
@@ -112,6 +112,7 @@ struct LoginView: View {
                             text: $password,
                             isSecure: true
                         )
+                        .id("passwordField")
                         
                         // Modern error display
                         if let errorMessage = authManager.errorMessage {
@@ -178,14 +179,15 @@ struct LoginView: View {
                         
                         // Toggle link
                         Button(action: { 
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.75)) { 
+                            // Clear error and toggle with smooth animation
+                            authManager.errorMessage = nil
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { 
                                 isSignUp.toggle()
-                                authManager.errorMessage = nil
                             } 
                         }) {
                             HStack(spacing: 4) {
                                 Text(isSignUp ? "Already have an account?" : "Don't have an account?")
-                                    .foregroundStyle(Color(red: 0.2, green: 0.25, blue: 0.4))
+                                    .foregroundStyle(Color.primary.opacity(0.85))
                                 Text(isSignUp ? "Sign In" : "Sign Up")
                                     .foregroundStyle(Color(red: 0.15, green: 0.4, blue: 0.85))
                                     .fontWeight(.semibold)
@@ -354,15 +356,21 @@ struct ModernInput: View {
             if isSecure {
                 SecureField(placeholder, text: $text)
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 0.2, green: 0.25, blue: 0.4))
+                    .foregroundStyle(.primary)
                     .tint(Color(red: 0.25, green: 0.5, blue: 0.92))
                     .focused($isFocused)
+                    .textContentType(.password)
+                    .submitLabel(.next)
             } else {
                 TextField(placeholder, text: $text)
                     .font(.system(size: 16))
-                    .foregroundStyle(Color(red: 0.2, green: 0.25, blue: 0.4))
+                    .foregroundStyle(.primary)
                     .tint(Color(red: 0.25, green: 0.5, blue: 0.92))
                     .focused($isFocused)
+                    .textContentType(placeholder.lowercased().contains("email") ? .emailAddress : .none)
+                    .keyboardType(placeholder.lowercased().contains("email") ? .emailAddress : .default)
+                    .autocapitalization(placeholder.lowercased().contains("name") ? .words : .none)
+                    .submitLabel(.next)
             }
         }
         .padding(.horizontal, 16)
@@ -398,7 +406,14 @@ struct ModernInput: View {
                     lineWidth: isFocused ? 2 : 1
                 )
         )
-        .animation(.easeOut(duration: 0.2), value: isFocused)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isFocused)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Ensure keyboard appears when tapping anywhere on the field
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                isFocused = true
+            }
+        }
     }
 }
 

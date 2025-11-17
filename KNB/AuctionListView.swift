@@ -30,8 +30,13 @@ struct AuctionListView: View {
     
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 20) {
+            ZStack {
+                if firestoreManager.isLoading {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                } else {
+                    ScrollView {
+                        VStack(spacing: 20) {
                     // Header Stats Section
                     VStack(spacing: 14) {
                         TotalPledgedCard(amount: totalPledged)
@@ -82,6 +87,8 @@ struct AuctionListView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.bottom, 24)
+                        }
+                    }
                 }
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())

@@ -31,6 +31,7 @@ struct ReplyThreadView: View {
                         PostCard(
                             post: post,
                             currentUserEmail: currentUser?.email,
+                            currentUserName: currentUser?.name,
                             firestoreManager: firestoreManager,
                             onReply: {
                                 // Auto-focus when reply button is clicked

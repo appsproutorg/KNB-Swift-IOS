@@ -12,11 +12,19 @@ struct PostComposerView: View {
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
     
+    let postToEdit: SocialPost?
+    
     @State private var postContent = ""
     @State private var isPosting = false
     @FocusState private var isFocused: Bool
     
     private let maxCharacters = 140
+    
+    init(firestoreManager: FirestoreManager, currentUser: Binding<User?>, postToEdit: SocialPost? = nil) {
+        self.firestoreManager = firestoreManager
+        self._currentUser = currentUser
+        self.postToEdit = postToEdit
+    }
     
     var characterCount: Int {
         postContent.count
@@ -141,7 +149,7 @@ struct PostComposerView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Color(.systemBackground).ignoresSafeArea())
-            .navigationTitle("New Post")
+            .navigationTitle(postToEdit == nil ? "New Post" : "Edit Post")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -152,6 +160,10 @@ struct PostComposerView: View {
                 }
             }
             .onAppear {
+                // Pre-fill content if editing
+                if let post = postToEdit {
+                    postContent = post.content
+                }
                 // Auto-focus text editor
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     isFocused = true
@@ -163,13 +175,27 @@ struct PostComposerView: View {
     private func handlePost() {
         guard let user = currentUser else { return }
         
+        // Haptic feedback
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
         isPosting = true
         
         Task {
-            let success = await firestoreManager.createSocialPost(
-                content: postContent,
-                author: user
-            )
+            let success: Bool
+            if let post = postToEdit {
+                // Update existing post
+                success = await firestoreManager.updateSocialPost(
+                    postId: post.id,
+                    content: postContent
+                )
+            } else {
+                // Create new post
+                success = await firestoreManager.createSocialPost(
+                    content: postContent,
+                    author: user
+                )
+            }
             
             await MainActor.run {
                 isPosting = false
