@@ -822,14 +822,25 @@ class FirestoreManager: ObservableObject {
             }
             
             // Filter to only top-level posts (no parentPostId)
-            self.socialPosts = allPosts.filter { $0.parentPostId == nil }
+            var filteredPosts = allPosts.filter { $0.parentPostId == nil }
             
-            // Re-sort if needed (since we filtered)
-            switch sortBy {
-            case .newest:
-                self.socialPosts.sort { $0.timestamp > $1.timestamp }
-            case .mostLiked:
-                self.socialPosts.sort {
+            // Only pin admin posts when sorting by newest
+            if sortBy == .newest {
+                // Separate admin posts and regular posts
+                let adminPosts = filteredPosts.filter { $0.isAdminPost }
+                let regularPosts = filteredPosts.filter { !$0.isAdminPost }
+                
+                // Sort admin posts by newest
+                let sortedAdminPosts = adminPosts.sorted { $0.timestamp > $1.timestamp }
+                
+                // Sort regular posts by newest
+                let sortedRegularPosts = regularPosts.sorted { $0.timestamp > $1.timestamp }
+                
+                // Combine: admin posts first, then regular posts
+                self.socialPosts = sortedAdminPosts + sortedRegularPosts
+            } else {
+                // Sort all posts together by most liked
+                self.socialPosts = filteredPosts.sorted {
                     if $0.likeCount != $1.likeCount {
                         return $0.likeCount > $1.likeCount
                     }
@@ -895,14 +906,25 @@ class FirestoreManager: ObservableObject {
             }
             
             // Filter to only top-level posts (no parentPostId)
-            socialPosts = allPosts.filter { $0.parentPostId == nil }
+            var filteredPosts = allPosts.filter { $0.parentPostId == nil }
             
-            // Re-sort if needed
-            switch sortBy {
-            case .newest:
-                socialPosts.sort { $0.timestamp > $1.timestamp }
-            case .mostLiked:
-                socialPosts.sort {
+            // Only pin admin posts when sorting by newest
+            if sortBy == .newest {
+                // Separate admin posts and regular posts
+                let adminPosts = filteredPosts.filter { $0.isAdminPost }
+                let regularPosts = filteredPosts.filter { !$0.isAdminPost }
+                
+                // Sort admin posts by newest
+                let sortedAdminPosts = adminPosts.sorted { $0.timestamp > $1.timestamp }
+                
+                // Sort regular posts by newest
+                let sortedRegularPosts = regularPosts.sorted { $0.timestamp > $1.timestamp }
+                
+                // Combine: admin posts first, then regular posts
+                socialPosts = sortedAdminPosts + sortedRegularPosts
+            } else {
+                // Sort all posts together by most liked
+                socialPosts = filteredPosts.sorted {
                     if $0.likeCount != $1.likeCount {
                         return $0.likeCount > $1.likeCount
                     }

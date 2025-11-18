@@ -82,6 +82,35 @@ struct PostCard: View {
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.primary)
                         
+                        // Verified badge and Admin label for admin posts
+                        if post.isAdminPost {
+                            Image(systemName: "checkmark.seal.fill")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.0, green: 0.84, blue: 0.0), // Gold
+                                            Color(red: 1.0, green: 0.65, blue: 0.0)  // Darker gold
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                            
+                            Text("Admin")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 1.0, green: 0.84, blue: 0.0), // Gold
+                                            Color(red: 1.0, green: 0.65, blue: 0.0)  // Darker gold
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                        }
+                        
                         Text("·")
                             .font(.system(size: 14, weight: .regular))
                             .foregroundStyle(.secondary)

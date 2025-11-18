@@ -170,6 +170,11 @@ struct SocialPost: Identifiable, Codable, Equatable {
     func isLikedBy(_ userEmail: String) -> Bool {
         return likes.contains(userEmail)
     }
+    
+    // Check if post is from admin account
+    var isAdminPost: Bool {
+        return authorEmail.lowercased() == "ethangoizman16@gmail.com"
+    }
 }
 
 // MARK: - Notification Model
