@@ -122,3 +122,90 @@ struct ShabbatTime: Codable, Equatable {
     }
 }
 
+// MARK: - Social Post Model
+struct SocialPost: Identifiable, Codable, Equatable {
+    let id: String
+    var authorName: String
+    var authorEmail: String
+    var content: String
+    var timestamp: Date
+    var likes: [String]  // Array of user emails who liked
+    var likeCount: Int
+    var replyCount: Int
+    var parentPostId: String?  // null for top-level posts, postId for replies
+    var editedAt: Date?  // Timestamp when post was edited
+    
+    init(
+        id: String = UUID().uuidString,
+        authorName: String,
+        authorEmail: String,
+        content: String,
+        timestamp: Date = Date(),
+        likes: [String] = [],
+        likeCount: Int = 0,
+        replyCount: Int = 0,
+        parentPostId: String? = nil,
+        editedAt: Date? = nil
+    ) {
+        self.id = id
+        self.authorName = authorName
+        self.authorEmail = authorEmail
+        self.content = content
+        self.timestamp = timestamp
+        self.likes = likes
+        self.likeCount = likeCount
+        self.replyCount = replyCount
+        self.parentPostId = parentPostId
+        self.editedAt = editedAt
+    }
+    
+    var isReply: Bool {
+        return parentPostId != nil
+    }
+    
+    var isEdited: Bool {
+        return editedAt != nil
+    }
+    
+    func isLikedBy(_ userEmail: String) -> Bool {
+        return likes.contains(userEmail)
+    }
+}
+
+// MARK: - Notification Model
+struct AppNotification: Identifiable, Codable, Equatable {
+    let id: String
+    let type: NotificationType
+    let postId: String?
+    let userId: String  // User who triggered the notification (liker/replier)
+    let userName: String  // Name of user who triggered the notification
+    let message: String
+    let timestamp: Date
+    var isRead: Bool
+    
+    init(
+        id: String = UUID().uuidString,
+        type: NotificationType,
+        postId: String? = nil,
+        userId: String,
+        userName: String,
+        message: String,
+        timestamp: Date = Date(),
+        isRead: Bool = false
+    ) {
+        self.id = id
+        self.type = type
+        self.postId = postId
+        self.userId = userId
+        self.userName = userName
+        self.message = message
+        self.timestamp = timestamp
+        self.isRead = isRead
+    }
+}
+
+enum NotificationType: String, Codable {
+    case like
+    case reply
+}
+

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct SplashScreenView: View {
     @Environment(\.colorScheme) var colorScheme
@@ -40,7 +41,7 @@ struct SplashScreenView: View {
     }
     
     private var circleBackgroundColor: Color {
-        colorScheme == .dark ? Color(red: 0.12, green: 0.15, blue: 0.25) : Color.white
+        colorScheme == .dark ? Color(red: 0.12, green: 0.15, blue: 0.25).opacity(0.7) : Color.white.opacity(0.7)
     }
     
     private var iconGradient: [Color] {
@@ -65,116 +66,127 @@ struct SplashScreenView: View {
         colorScheme == .dark ? Color(red: 0.15, green: 0.18, blue: 0.28).opacity(0.7) : Color.white.opacity(0.7)
     }
     
+    private var overlayOpacity: Double {
+        colorScheme == .dark ? 0.5 : 0.3
+    }
+    
     var body: some View {
         ZStack {
-            // Adaptive gradient background
-            LinearGradient(
-                colors: backgroundGradient,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
-            
-            VStack(spacing: 35) {
-                ZStack {
-                    // Soft colorful glow
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    glowColor.opacity(glowIntensity * (colorScheme == .dark ? 0.3 : 0.2)),
-                                    .clear
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 90
-                            )
-                        )
-                        .frame(width: 180, height: 180)
-                        .blur(radius: 25)
+            // Background image with adaptive tint overlay
+            ZStack {
+                // Try to use background image if available, otherwise use gradient
+                if let _ = UIImage(named: "SplashBackground") {
+                    Image("SplashBackground")
+                        .resizable()
+                        .scaledToFill()
+                        .ignoresSafeArea()
                     
-                    // Elegant icon container
+                    // Adaptive tint overlay
+                    Color.black.opacity(overlayOpacity)
+                        .ignoresSafeArea()
+                } else {
+                    // Fallback to gradient background
+                    LinearGradient(
+                        colors: backgroundGradient,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .ignoresSafeArea()
+                }
+            }
+            
+            VStack {
+                Spacer()
+                
+                // Centered logo section
+                VStack(spacing: 20) {
                     ZStack {
-                        // Soft outer ring
+                        // Soft colorful glow
                         Circle()
                             .fill(
-                                LinearGradient(
+                                RadialGradient(
                                     colors: [
-                                        glowColor.opacity(colorScheme == .dark ? 0.2 : 0.15),
-                                        glowColor.opacity(colorScheme == .dark ? 0.1 : 0.08)
+                                        glowColor.opacity(glowIntensity * (colorScheme == .dark ? 0.3 : 0.2)),
+                                        .clear
                                     ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                                    center: .center,
+                                    startRadius: 0,
+                                    endRadius: 90
                                 )
                             )
-                            .frame(width: 130, height: 130)
-                            .blur(radius: 6)
+                            .frame(width: 180, height: 180)
+                            .blur(radius: 25)
                         
-                        // Main icon circle with subtle material
-                        Circle()
-                            .fill(circleBackgroundColor)
-                            .frame(width: 120, height: 120)
-                            .overlay(
-                                Circle()
-                                    .stroke(
-                                        LinearGradient(
-                                            colors: [
-                                                glowColor.opacity(colorScheme == .dark ? 0.4 : 0.25),
-                                                glowColor.opacity(colorScheme == .dark ? 0.2 : 0.12)
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 2
+                        // Elegant icon container - more translucent like bottom bubble
+                        ZStack {
+                            // Main icon circle - translucent with adaptive color
+                            Circle()
+                                .fill(circleBackgroundColor)
+                                .frame(width: 120, height: 120)
+                                .overlay(
+                                    Circle()
+                                        .stroke(glowColor.opacity(0.2), lineWidth: 1)
+                                )
+                                .shadow(color: glowColor.opacity(colorScheme == .dark ? 0.3 : 0.15), radius: 15, x: 0, y: 5)
+                            
+                            // Book icon matching login theme
+                            Image(systemName: "book.pages.fill")
+                                .font(.system(size: 56, weight: .light))
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: iconGradient,
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
                                     )
-                            )
-                            .shadow(color: glowColor.opacity(colorScheme == .dark ? 0.4 : 0.2), radius: 20, x: 0, y: 8)
-                        
-                        // Book icon matching login theme
-                        Image(systemName: "book.pages.fill")
-                            .font(.system(size: 56, weight: .light))
+                                )
+                                .scaleEffect(iconScale)
+                                .shadow(color: glowColor.opacity(colorScheme == .dark ? 0.4 : 0.25), radius: 8, x: 0, y: 2)
+                        }
+                        .scaleEffect(scale)
+                    }
+                    .opacity(opacity)
+                    
+                    // Clear, readable text
+                    VStack(spacing: 14) {
+                        Text("KNB")
+                            .font(.system(size: 52, weight: .semibold, design: .rounded))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: iconGradient,
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
+                                    startPoint: .leading,
+                                    endPoint: .trailing
                                 )
                             )
-                            .scaleEffect(iconScale)
-                            .shadow(color: glowColor.opacity(colorScheme == .dark ? 0.4 : 0.25), radius: 8, x: 0, y: 2)
+                            .opacity(opacity)
+                            .scaleEffect(scale)
+                        
+                        // The KNB App bubble - moved closer
+                        Text("The KNB App")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(subtitleColor)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(subtitleBackgroundColor)
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(glowColor.opacity(0.2), lineWidth: 1)
+                                    )
+                            )
+                            .opacity(opacity)
+                            .scaleEffect(scale)
                     }
-                    .scaleEffect(scale)
                 }
-                .opacity(opacity)
                 
-                // Clear, readable text
-                VStack(spacing: 14) {
-                    Text("KNB")
-                        .font(.system(size: 52, weight: .semibold, design: .rounded))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: iconGradient,
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                    
-                    Text("The KNB App")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(subtitleColor)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 8)
-                        .background(
-                            Capsule()
-                                .fill(subtitleBackgroundColor)
-                                .overlay(
-                                    Capsule()
-                                        .stroke(glowColor.opacity(0.2), lineWidth: 1)
-                                )
-                        )
-                }
-                .opacity(opacity)
-                .scaleEffect(scale)
+                Spacer()
+                
+                // Powered by App Sprout LLC - at bottom
+                Text("Powered by App Sprout LLC")
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.6) : Color.white.opacity(0.7))
+                    .padding(.bottom, 40)
+                    .opacity(opacity)
             }
         }
         .onAppear {

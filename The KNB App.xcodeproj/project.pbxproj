@@ -50,6 +50,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		68AF3AA02ECBE2440064F9A9 /* The KNB App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "The KNB App.entitlements"; sourceTree = "<group>"; };
 		7BB757BB2EA7D6DA003F8FE5 /* The KNB App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "The KNB App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BB757C82EA7D6DB003F8FE5 /* The KNB AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "The KNB AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		7BB757D22EA7D6DB003F8FE5 /* The KNB AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "The KNB AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -132,6 +133,7 @@
 		7BB757B22EA7D6DA003F8FE5 = {
 			isa = PBXGroup;
 			children = (
+				68AF3AA02ECBE2440064F9A9 /* The KNB App.entitlements */,
 				7BB757F02EA7DF3C003F8FE5 /* The-KNB-App-Info.plist */,
 				7BB757BD2EA7D6DA003F8FE5 /* KNB */,
 				7BB757CB2EA7D6DB003F8FE5 /* KNBTests */,
@@ -480,6 +482,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "The KNB App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P8WQ4HA33H;
@@ -513,6 +516,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "The KNB App.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = P8WQ4HA33H;

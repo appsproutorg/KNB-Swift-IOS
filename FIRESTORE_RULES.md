@@ -1,0 +1,98 @@
+# Firestore Security Rules
+
+Copy and paste these rules into your Firebase Console → Firestore Database → Rules tab.
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user owns the resource
+    function isOwner(userEmail) {
+      return isAuthenticated() && request.auth.token.email == userEmail;
+    }
+    
+    // Honors collection - read for authenticated users, write for authenticated users
+    match /honors/{honorId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+    
+    // Kiddush Sponsorships - authenticated users can read and create
+    match /kiddush_sponsorships/{sponsorshipId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() 
+                    && request.resource.data.sponsorEmail == request.auth.token.email;
+      allow update, delete: if false; // Only allow through admin console
+    }
+    
+    // Available Shabbat Dates - read by all authenticated users
+    match /available_shabbat_dates/{dateId} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Admin only through console
+    }
+    
+    // Social Posts - authenticated users can read, create, update own posts
+    match /social_posts/{postId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() 
+                    && request.resource.data.authorEmail == request.auth.token.email;
+      allow update: if isAuthenticated() 
+                    && (resource.data.authorEmail == request.auth.token.email 
+                        || request.resource.data.authorEmail == request.auth.token.email);
+      allow delete: if isAuthenticated() 
+                    && resource.data.authorEmail == request.auth.token.email;
+    }
+    
+    // Notifications - users can only read their own notifications
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() 
+                  && resource.data.recipientEmail == request.auth.token.email;
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() 
+                    && resource.data.recipientEmail == request.auth.token.email;
+      allow delete: if isAuthenticated() 
+                    && resource.data.recipientEmail == request.auth.token.email;
+    }
+    
+    // Users collection - users can read their own data, create/update their own profile
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() 
+                    && request.resource.data.email == request.auth.token.email;
+      allow update: if isAuthenticated() 
+                    && (resource.data.email == request.auth.token.email 
+                        || request.resource.data.email == request.auth.token.email);
+    }
+    
+    // Push notifications queue - only authenticated users can create
+    // Cloud Functions have admin access, so they can read/write
+    match /push_notifications/{notificationId} {
+      allow create: if isAuthenticated();
+      allow read, write: if false; // Functions use admin SDK
+    }
+  }
+}
+```
+
+## How to Apply These Rules
+
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Select your project
+3. Go to **Firestore Database** → **Rules** tab
+4. Replace the existing rules with the rules above
+5. Click **Publish**
+
+## Important Notes
+
+- These rules require users to be authenticated to access any data
+- Users can only read/update/delete their own notifications
+- Users can create notifications (for the notification system to work)
+- Social posts can be read by all authenticated users, but only the author can update/delete
+- Users can only create sponsorships with their own email
+

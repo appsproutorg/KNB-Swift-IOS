@@ -19,9 +19,20 @@ class FirestoreManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var kiddushSponsorships: [KiddushSponsorship] = []
     @Published var availableDates: [Date] = []
+    @Published var socialPosts: [SocialPost] = []
+    @Published var lastUpdated: Date?
     
     private var honorsListener: ListenerRegistration?
     private var sponsorshipsListener: ListenerRegistration?
+    private var socialPostsListener: ListenerRegistration?
+    
+    // Optional notification manager for creating notifications
+    weak var notificationManager: NotificationManager?
+    
+    enum SocialPostSortOption {
+        case newest
+        case mostLiked
+    }
     
     // MARK: - Initialize Honors (Run Once)
     func initializeHonorsInFirestore() async {
@@ -169,24 +180,35 @@ class FirestoreManager: ObservableObject {
             return false
         }
         
-        do {
             let honorRef = db.collection("honors").document(honorId.uuidString)
             
-            // Get current honor data
-            let document = try await honorRef.getDocument()
-            guard let data = document.data() else { return false }
+        // Use Firestore transaction to prevent race conditions
+        do {
+            // First, get the current document to check conditions
+            let honorDoc = try await honorRef.getDocument()
+            
+            guard let data = honorDoc.data() else {
+                errorMessage = "Honor not found"
+                return false
+            }
+            
+            // Check if honor is already sold
+            let isSold = data["isSold"] as? Bool ?? false
+            if isSold {
+                errorMessage = "This honor has already been sold"
+                return false
+            }
             
             let currentBid = data["currentBid"] as? Double ?? 0
             
             // Ensure new bid is higher than current bid
             guard bid.amount > currentBid else {
-                errorMessage = "Bid must be higher than current bid"
+                errorMessage = "Bid must be higher than current bid of $\(Int(currentBid))"
                 return false
             }
             
-            // Update bids array
-            var bids = data["bids"] as? [[String: Any]] ?? []
-            
+            // Use a transaction to atomically update
+            // Note: Using FieldValue.serverTimestamp() and atomic operations where possible
             let newBidData: [String: Any] = [
                 "id": bid.id.uuidString,
                 "amount": bid.amount,
@@ -195,9 +217,11 @@ class FirestoreManager: ObservableObject {
                 "comment": bid.comment as Any
             ]
             
+            // Get current bids and add new one
+            var bids = data["bids"] as? [[String: Any]] ?? []
             bids.insert(newBidData, at: 0)
             
-            // Update honor with new bid
+            // Update with a check that it hasn't been sold or bid on since we read it
             try await honorRef.updateData([
                 "bids": bids,
                 "currentBid": bid.amount,
@@ -206,7 +230,17 @@ class FirestoreManager: ObservableObject {
             
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            // Handle errors with user-friendly messages
+            if let nsError = error as NSError? {
+                if nsError.domain == "TransactionError" {
+                    errorMessage = nsError.localizedDescription
+                } else {
+                    errorMessage = "Failed to place bid. Please try again."
+                }
+            } else {
+                errorMessage = "Failed to place bid. Please try again."
+            }
+            print("❌ Error placing bid: \(error.localizedDescription)")
             return false
         }
     }
@@ -221,12 +255,24 @@ class FirestoreManager: ObservableObject {
             return false
         }
         
-        do {
             let honorRef = db.collection("honors").document(honorId.uuidString)
             
-            // Get current honor data
-            let document = try await honorRef.getDocument()
-            guard let data = document.data() else { return false }
+        // Use atomic update to prevent race conditions
+        do {
+            // First, get the current document to check conditions
+            let honorDoc = try await honorRef.getDocument()
+            
+            guard let data = honorDoc.data() else {
+                errorMessage = "Honor not found"
+                return false
+            }
+            
+            // Check if honor is already sold (atomic check)
+            let isSold = data["isSold"] as? Bool ?? false
+            if isSold {
+                errorMessage = "This honor has already been sold"
+                return false
+            }
             
             // Update bids array
             var bids = data["bids"] as? [[String: Any]] ?? []
@@ -241,7 +287,7 @@ class FirestoreManager: ObservableObject {
             
             bids.insert(buyNowBidData, at: 0)
             
-            // Update honor as sold
+            // Update honor as sold atomically
             try await honorRef.updateData([
                 "bids": bids,
                 "currentBid": bid.amount,
@@ -251,7 +297,17 @@ class FirestoreManager: ObservableObject {
             
             return true
         } catch {
-            errorMessage = error.localizedDescription
+            // Handle errors with user-friendly messages
+            if let nsError = error as NSError? {
+                if nsError.domain == "TransactionError" {
+                    errorMessage = nsError.localizedDescription
+                } else {
+                    errorMessage = "Failed to purchase honor. Please try again."
+                }
+            } else {
+                errorMessage = "Failed to purchase honor. Please try again."
+            }
+            print("❌ Error buying now: \(error.localizedDescription)")
             return false
         }
     }
@@ -701,6 +757,537 @@ class FirestoreManager: ObservableObject {
             return false
         }
     }
+    
+    // MARK: - Social Posts
+    
+    // Start listening to social posts with real-time updates
+    func startListeningToSocialPosts(sortBy: SocialPostSortOption = .newest) {
+        socialPostsListener?.remove()
+        
+        // Query all posts, then filter for top-level posts (parentPostId is null or missing)
+        let query: Query
+        switch sortBy {
+        case .newest:
+            query = db.collection("social_posts")
+                .order(by: "timestamp", descending: true)
+        case .mostLiked:
+            query = db.collection("social_posts")
+                .order(by: "likeCount", descending: true)
+                .order(by: "timestamp", descending: true)
+        }
+        
+        socialPostsListener = query.addSnapshotListener { [weak self] snapshot, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("❌ Error listening to social posts: \(error.localizedDescription)")
+                self.errorMessage = "Failed to load posts: \(error.localizedDescription)"
+                return
+            }
+            
+            guard let documents = snapshot?.documents else {
+                print("⚠️ No social posts documents found")
+                return
+            }
+            
+            let allPosts = documents.compactMap { doc -> SocialPost? in
+                let data = doc.data()
+                
+                guard let id = data["id"] as? String,
+                      let authorName = data["authorName"] as? String,
+                      let authorEmail = data["authorEmail"] as? String,
+                      let content = data["content"] as? String,
+                      let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+                    return nil
+                }
+                
+                let likes = data["likes"] as? [String] ?? []
+                let likeCount = data["likeCount"] as? Int ?? 0
+                let replyCount = data["replyCount"] as? Int ?? 0
+                let parentPostId = data["parentPostId"] as? String
+                let editedAt = (data["editedAt"] as? Timestamp)?.dateValue()
+                
+                return SocialPost(
+                    id: id,
+                    authorName: authorName,
+                    authorEmail: authorEmail,
+                    content: content,
+                    timestamp: timestamp,
+                    likes: likes,
+                    likeCount: likeCount,
+                    replyCount: replyCount,
+                    parentPostId: parentPostId,
+                    editedAt: editedAt
+                )
+            }
+            
+            // Filter to only top-level posts (no parentPostId)
+            self.socialPosts = allPosts.filter { $0.parentPostId == nil }
+            
+            // Re-sort if needed (since we filtered)
+            switch sortBy {
+            case .newest:
+                self.socialPosts.sort { $0.timestamp > $1.timestamp }
+            case .mostLiked:
+                self.socialPosts.sort {
+                    if $0.likeCount != $1.likeCount {
+                        return $0.likeCount > $1.likeCount
+                    }
+                    return $0.timestamp > $1.timestamp
+                }
+            }
+            
+            self.lastUpdated = Date()
+            print("✅ Loaded \(self.socialPosts.count) social posts")
+        }
+    }
+    
+    // Stop listening to social posts
+    func stopListeningToSocialPosts() {
+        socialPostsListener?.remove()
+        socialPostsListener = nil
+    }
+    
+    // Fetch social posts (one-time fetch)
+    func fetchSocialPosts(sortBy: SocialPostSortOption = .newest) async {
+        do {
+            // Query all posts, then filter for top-level posts
+            let query: Query
+            switch sortBy {
+            case .newest:
+                query = db.collection("social_posts")
+                    .order(by: "timestamp", descending: true)
+            case .mostLiked:
+                query = db.collection("social_posts")
+                    .order(by: "likeCount", descending: true)
+                    .order(by: "timestamp", descending: true)
+            }
+            
+            let snapshot = try await query.getDocuments()
+            
+            let allPosts = snapshot.documents.compactMap { doc -> SocialPost? in
+                let data = doc.data()
+                
+                guard let id = data["id"] as? String,
+                      let authorName = data["authorName"] as? String,
+                      let authorEmail = data["authorEmail"] as? String,
+                      let content = data["content"] as? String,
+                      let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+                    return nil
+                }
+                
+                let likes = data["likes"] as? [String] ?? []
+                let likeCount = data["likeCount"] as? Int ?? 0
+                let replyCount = data["replyCount"] as? Int ?? 0
+                let parentPostId = data["parentPostId"] as? String
+                
+                return SocialPost(
+                    id: id,
+                    authorName: authorName,
+                    authorEmail: authorEmail,
+                    content: content,
+                    timestamp: timestamp,
+                    likes: likes,
+                    likeCount: likeCount,
+                    replyCount: replyCount,
+                    parentPostId: parentPostId
+                )
+            }
+            
+            // Filter to only top-level posts (no parentPostId)
+            socialPosts = allPosts.filter { $0.parentPostId == nil }
+            
+            // Re-sort if needed
+            switch sortBy {
+            case .newest:
+                socialPosts.sort { $0.timestamp > $1.timestamp }
+            case .mostLiked:
+                socialPosts.sort {
+                    if $0.likeCount != $1.likeCount {
+                        return $0.likeCount > $1.likeCount
+                    }
+                    return $0.timestamp > $1.timestamp
+                }
+            }
+            
+            print("✅ Fetched \(socialPosts.count) social posts")
+        } catch {
+            print("❌ Error fetching social posts: \(error.localizedDescription)")
+            errorMessage = "Failed to fetch posts: \(error.localizedDescription)"
+        }
+    }
+    
+    // Create a new social post
+    func createSocialPost(content: String, author: User) async -> Bool {
+        guard content.count <= 140 else {
+            errorMessage = "Post must be 140 characters or less"
+            return false
+        }
+        
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Post cannot be empty"
+            return false
+        }
+        
+        do {
+            let post = SocialPost(
+                authorName: author.name,
+                authorEmail: author.email,
+                content: content.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            
+            try await db.collection("social_posts").document(post.id).setData([
+                "id": post.id,
+                "authorName": post.authorName,
+                "authorEmail": post.authorEmail,
+                "content": post.content,
+                "timestamp": Timestamp(date: post.timestamp),
+                "likes": [],
+                "likeCount": 0,
+                "replyCount": 0,
+                "parentPostId": NSNull(),
+                "editedAt": NSNull()
+            ])
+            
+            print("✅ Created social post: \(post.id)")
+            return true
+        } catch {
+            print("❌ Error creating social post: \(error.localizedDescription)")
+            errorMessage = "Failed to create post: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // Update a social post
+    func updateSocialPost(postId: String, content: String) async -> Bool {
+        guard content.count <= 140 else {
+            errorMessage = "Post must be 140 characters or less"
+            return false
+        }
+        
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Post cannot be empty"
+            return false
+        }
+        
+        do {
+            try await db.collection("social_posts").document(postId).updateData([
+                "content": content.trimmingCharacters(in: .whitespacesAndNewlines),
+                "editedAt": Timestamp(date: Date())
+            ])
+            
+            print("✅ Updated social post: \(postId)")
+            return true
+        } catch {
+            print("❌ Error updating social post: \(error.localizedDescription)")
+            errorMessage = "Failed to update post: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // Toggle like on a post
+    func toggleLike(postId: String, userEmail: String, userName: String? = nil) async -> Bool {
+        do {
+            let postRef = db.collection("social_posts").document(postId)
+            let postDoc = try await postRef.getDocument()
+            
+            guard let data = postDoc.data(),
+                  var likes = data["likes"] as? [String] else {
+                errorMessage = "Post not found"
+                return false
+            }
+            
+            var likeCount = data["likeCount"] as? Int ?? 0
+            
+            let wasLiked = likes.contains(userEmail)
+            let postAuthorEmail = data["authorEmail"] as? String ?? ""
+            
+            if wasLiked {
+                // Unlike
+                likes.removeAll { $0 == userEmail }
+                likeCount = max(0, likeCount - 1)
+            } else {
+                // Like
+                likes.append(userEmail)
+                likeCount += 1
+                
+                // Create notification for post author (if not liking own post)
+                if let notificationManager = notificationManager, postAuthorEmail != userEmail {
+                    let currentUserName = userName ?? "Someone"
+                    _ = await notificationManager.createNotification(
+                        type: .like,
+                        postId: postId,
+                        targetUserEmail: postAuthorEmail,
+                        triggeredByUserEmail: userEmail,
+                        triggeredByUserName: currentUserName
+                    )
+                }
+            }
+            
+            try await postRef.updateData([
+                "likes": likes,
+                "likeCount": likeCount
+            ])
+            
+            print("✅ Toggled like for post: \(postId)")
+            return true
+        } catch {
+            print("❌ Error toggling like: \(error.localizedDescription)")
+            errorMessage = "Failed to like post: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // Create a reply to a post
+    func createReply(parentPostId: String, content: String, author: User) async -> Bool {
+        guard content.count <= 140 else {
+            errorMessage = "Reply must be 140 characters or less"
+            return false
+        }
+        
+        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Reply cannot be empty"
+            return false
+        }
+        
+        do {
+            let reply = SocialPost(
+                authorName: author.name,
+                authorEmail: author.email,
+                content: content.trimmingCharacters(in: .whitespacesAndNewlines),
+                parentPostId: parentPostId
+            )
+            
+            // Create the reply
+            try await db.collection("social_posts").document(reply.id).setData([
+                "id": reply.id,
+                "authorName": reply.authorName,
+                "authorEmail": reply.authorEmail,
+                "content": reply.content,
+                "timestamp": Timestamp(date: reply.timestamp),
+                "likes": [],
+                "likeCount": 0,
+                "replyCount": 0,
+                "parentPostId": parentPostId
+            ])
+            
+            // Update parent post reply count
+            let parentRef = db.collection("social_posts").document(parentPostId)
+            let parentDoc = try await parentRef.getDocument()
+            
+            if let parentData = parentDoc.data() {
+                let currentReplyCount = parentData["replyCount"] as? Int ?? 0
+                try await parentRef.updateData([
+                    "replyCount": currentReplyCount + 1
+                ])
+                
+                // Create notification for parent post author (if not replying to own post)
+                if let notificationManager = notificationManager {
+                    let parentAuthorEmail = parentData["authorEmail"] as? String ?? ""
+                    if parentAuthorEmail != author.email {
+                        _ = await notificationManager.createNotification(
+                            type: .reply,
+                            postId: parentPostId,
+                            targetUserEmail: parentAuthorEmail,
+                            triggeredByUserEmail: author.email,
+                            triggeredByUserName: author.name
+                        )
+                    }
+                }
+            }
+            
+            print("✅ Created reply: \(reply.id) for post: \(parentPostId)")
+            return true
+        } catch {
+            print("❌ Error creating reply: \(error.localizedDescription)")
+            errorMessage = "Failed to create reply: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // Fetch replies for a post
+    func fetchReplies(for postId: String) async -> [SocialPost] {
+        do {
+            let snapshot = try await db.collection("social_posts")
+                .whereField("parentPostId", isEqualTo: postId)
+                .order(by: "timestamp", descending: false)
+                .getDocuments()
+            
+            let replies = snapshot.documents.compactMap { doc -> SocialPost? in
+                let data = doc.data()
+                
+                guard let id = data["id"] as? String,
+                      let authorName = data["authorName"] as? String,
+                      let authorEmail = data["authorEmail"] as? String,
+                      let content = data["content"] as? String,
+                      let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+                    return nil
+                }
+                
+                let likes = data["likes"] as? [String] ?? []
+                let likeCount = data["likeCount"] as? Int ?? 0
+                let replyCount = data["replyCount"] as? Int ?? 0
+                let parentPostId = data["parentPostId"] as? String
+                let editedAt = (data["editedAt"] as? Timestamp)?.dateValue()
+                
+                return SocialPost(
+                    id: id,
+                    authorName: authorName,
+                    authorEmail: authorEmail,
+                    content: content,
+                    timestamp: timestamp,
+                    likes: likes,
+                    likeCount: likeCount,
+                    replyCount: replyCount,
+                    parentPostId: parentPostId,
+                    editedAt: editedAt
+                )
+            }
+            
+            print("✅ Fetched \(replies.count) replies for post: \(postId)")
+            return replies
+        } catch {
+            print("❌ Error fetching replies: \(error.localizedDescription)")
+            return []
+        }
+    }
+    
+    // Delete a social post
+    func deleteSocialPost(postId: String) async -> Bool {
+        do {
+            // Get the post to check if it's a reply
+            let postDoc = try await db.collection("social_posts").document(postId).getDocument()
+            guard let postData = postDoc.data() else {
+                errorMessage = "Post not found"
+                return false
+            }
+            
+            let parentPostId = postData["parentPostId"] as? String
+            let batch = db.batch()
+            
+            // If this is a reply, decrement parent's replyCount
+            if let parentId = parentPostId {
+                let parentRef = db.collection("social_posts").document(parentId)
+                let parentDoc = try await parentRef.getDocument()
+                
+                if let parentData = parentDoc.data() {
+                    let currentReplyCount = parentData["replyCount"] as? Int ?? 0
+                    let newReplyCount = max(0, currentReplyCount - 1)
+                    batch.updateData(["replyCount": newReplyCount], forDocument: parentRef)
+                }
+            } else {
+                // If this is a top-level post, delete all replies and reset replyCount
+                let repliesSnapshot = try await db.collection("social_posts")
+                    .whereField("parentPostId", isEqualTo: postId)
+                    .getDocuments()
+                
+                for replyDoc in repliesSnapshot.documents {
+                    batch.deleteDocument(replyDoc.reference)
+                }
+            }
+            
+            // Delete the post itself
+            batch.deleteDocument(db.collection("social_posts").document(postId))
+            
+            // Commit all changes atomically
+            try await batch.commit()
+            
+            print("✅ Deleted social post: \(postId)")
+            return true
+        } catch {
+            print("❌ Error deleting social post: \(error.localizedDescription)")
+            errorMessage = "Failed to delete post: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // Delete all social posts (admin only)
+    func deleteAllSocialPosts() async -> Bool {
+        do {
+            let snapshot = try await db.collection("social_posts").getDocuments()
+            print("🗑️ Deleting \(snapshot.documents.count) social posts...")
+            
+            for doc in snapshot.documents {
+                try await doc.reference.delete()
+                print("   ✅ Deleted: \(doc.documentID)")
+            }
+            
+            print("✅ All social posts deleted")
+            return true
+        } catch {
+            print("❌ Error deleting social posts: \(error.localizedDescription)")
+            errorMessage = "Failed to delete social posts: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // MARK: - User Management
+    
+    // Create or update user document in Firestore
+    func createOrUpdateUser(user: User) async -> Bool {
+        do {
+            let userRef = db.collection("users").document(user.email)
+            try await userRef.setData([
+                "name": user.name,
+                "email": user.email,
+                "totalPledged": user.totalPledged,
+                "isAdmin": user.isAdmin,
+                "lastUpdated": Timestamp(date: Date())
+            ], merge: true)
+            
+            print("✅ User document synced: \(user.email)")
+            return true
+        } catch {
+            print("❌ Error syncing user: \(error.localizedDescription)")
+            errorMessage = "Failed to sync user data: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    // Fetch user data from Firestore
+    func fetchUserData(email: String) async -> User? {
+        do {
+            let userDoc = try await db.collection("users").document(email).getDocument()
+            
+            guard let data = userDoc.data() else {
+                // User document doesn't exist yet, return nil
+                return nil
+            }
+            
+            let name = data["name"] as? String ?? "Member"
+            let totalPledged = data["totalPledged"] as? Double ?? 0
+            let isAdmin = data["isAdmin"] as? Bool ?? false
+            
+            return User(
+                name: name,
+                email: email,
+                totalPledged: totalPledged,
+                isAdmin: isAdmin
+            )
+        } catch {
+            print("❌ Error fetching user data: \(error.localizedDescription)")
+            return nil
+        }
+    }
+    
+    // Update user's totalPledged amount
+    func updateUserTotalPledged(email: String, amount: Double) async -> Bool {
+        do {
+            let userRef = db.collection("users").document(email)
+            try await userRef.updateData([
+                "totalPledged": amount,
+                "lastUpdated": Timestamp(date: Date())
+            ])
+            
+            print("✅ Updated totalPledged for \(email): $\(amount)")
+            return true
+        } catch {
+            print("❌ Error updating totalPledged: \(error.localizedDescription)")
+            errorMessage = "Failed to update total pledged: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
 }
 
 

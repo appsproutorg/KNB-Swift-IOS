@@ -104,6 +104,13 @@ struct HonorDetailView: View {
     }
     
     private func placeBid() {
+        // Check if honor is already sold
+        guard !honor.isSold else {
+            invalidBidMessage = "This honor has already been sold"
+            showingInvalidBidAlert = true
+            return
+        }
+        
         // Validate bid amount is a valid number
         guard let amount = Double(bidAmount) else {
             invalidBidMessage = "Please enter a valid bid amount"
@@ -153,18 +160,27 @@ struct HonorDetailView: View {
         )
         
         Task {
+            // Haptic feedback on start
+            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+            impactFeedback.impactOccurred()
+            
             let success = await firestoreManager.placeBid(honorId: honor.id, bid: newBid)
             
             if success {
                 // Success feedback
-                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                impactFeedback.impactOccurred()
+                let notificationFeedback = UINotificationFeedbackGenerator()
+                notificationFeedback.notificationOccurred(.success)
                 
                 bidAmount = ""
                 comment = ""
                 
-                // Update user's total pledged (you can later sync this to Firestore too)
+                // Update user's total pledged locally
                 currentUser?.totalPledged += amount
+                
+                // Sync totalPledged to Firestore
+                if let userEmail = currentUser?.email {
+                    _ = await firestoreManager.updateUserTotalPledged(email: userEmail, amount: currentUser?.totalPledged ?? 0)
+                }
                 
                 // Dismiss after successful bid
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -188,6 +204,10 @@ struct HonorDetailView: View {
         )
         
         Task {
+            // Haptic feedback on start
+            let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+            impactFeedback.impactOccurred()
+            
             let success = await firestoreManager.buyNow(honorId: honor.id, bid: buyNowBid)
             
             if success {
@@ -195,8 +215,13 @@ struct HonorDetailView: View {
                 let notificationFeedback = UINotificationFeedbackGenerator()
                 notificationFeedback.notificationOccurred(.success)
                 
-                // Update user's total pledged
+                // Update user's total pledged locally
                 currentUser?.totalPledged += honor.buyNowPrice
+                
+                // Sync totalPledged to Firestore
+                if let userEmail = currentUser?.email {
+                    _ = await firestoreManager.updateUserTotalPledged(email: userEmail, amount: currentUser?.totalPledged ?? 0)
+                }
                 
                 // Dismiss after successful purchase
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -429,54 +454,6 @@ struct SoldBanner: View {
         .padding(30)
         .background(.green.opacity(0.1))
         .cornerRadius(20)
-    }
-}
-
-// MARK: - Bid History View
-struct BidHistoryView: View {
-    let bids: [Bid]
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            List {
-                ForEach(bids) { bid in
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text(bid.bidderName)
-                                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            
-                            Spacer()
-                            
-                            Text("$\(bid.amount.toSafeInt())")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundStyle(.green)
-                        }
-                        
-                        Text(bid.timestamp, style: .relative)
-                            .font(.system(size: 12, design: .rounded))
-                            .foregroundStyle(.secondary)
-                        
-                        if let comment = bid.comment {
-                            Text(comment)
-                                .font(.system(size: 14, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .padding(.top, 5)
-                        }
-                    }
-                    .padding(.vertical, 5)
-                }
-            }
-            .navigationTitle("Bid History")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
     }
 }
 
