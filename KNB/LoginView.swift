@@ -23,69 +23,76 @@ struct LoginView: View {
     @ObservedObject var authManager: AuthenticationManager
     
     var body: some View {
-        ZStack {
-            // Background image with gray tint overlay (same as splash screen)
-            ZStack {
-                Image("SplashBackground")
-                    .resizable()
-                    .scaledToFill()
-                    .ignoresSafeArea()
-                
-                // Gray tint overlay
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-            }
+        GeometryReader { geometry in
+            let isIPad = UIDevice.current.userInterfaceIdiom == .pad
+            let isLandscape = geometry.size.width > geometry.size.height
+            let maxCardWidth: CGFloat = isIPad ? 500 : geometry.size.width - 80
             
-            ScrollView {
-                VStack(spacing: 30) {
-                    Spacer(minLength: 40)
+            ZStack {
+                // Background image with gray tint overlay (same as splash screen)
+                ZStack {
+                    Image("SplashBackground")
+                        .resizable()
+                        .scaledToFill()
+                        .ignoresSafeArea()
                     
-                    // Modern logo section
-                    VStack(spacing: 20) {
-                        // Icon in modern style - translucent like splash screen
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.7))
-                                .frame(width: 80, height: 80)
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
-                                )
-                                .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.15), radius: 15, x: 0, y: 5)
-                            
-                            Image(systemName: "book.pages.fill")
-                                .font(.system(size: 38, weight: .regular))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 0.25, green: 0.5, blue: 0.92),
-                                            Color(red: 0.3, green: 0.55, blue: 0.96)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .opacity(0.9)
+                    // Gray tint overlay
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                }
+                
+                ScrollView {
+                    VStack(spacing: isIPad && isLandscape ? 20 : 30) {
+                        if !isIPad || !isLandscape {
+                            Spacer(minLength: isIPad ? 60 : 40)
                         }
                         
-                        // The KNB App bubble (like splash screen)
-                        Text("The KNB App")
-                            .font(.system(size: 17, weight: .medium))
-                            .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6))
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 8)
-                            .background(
-                                Capsule()
+                        // Modern logo section
+                        VStack(spacing: 20) {
+                            // Icon in modern style - translucent like splash screen
+                            ZStack {
+                                Circle()
                                     .fill(Color.white.opacity(0.7))
+                                    .frame(width: isIPad ? 100 : 80, height: isIPad ? 100 : 80)
                                     .overlay(
-                                        Capsule()
+                                        Circle()
                                             .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
                                     )
-                            )
-                    }
-                    
-                    // Modern form card
-                    VStack(spacing: 18) {
+                                    .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.15), radius: 15, x: 0, y: 5)
+                                
+                                Image(systemName: "book.pages.fill")
+                                    .font(.system(size: isIPad ? 48 : 38, weight: .regular))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.25, green: 0.5, blue: 0.92),
+                                                Color(red: 0.3, green: 0.55, blue: 0.96)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .opacity(0.9)
+                            }
+                            
+                            // The KNB App bubble (like splash screen)
+                            Text("The KNB App")
+                                .font(.system(size: isIPad ? 19 : 17, weight: .medium))
+                                .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6))
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.7))
+                                        .overlay(
+                                            Capsule()
+                                                .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
+                                        )
+                                )
+                        }
+                        
+                        // Modern form card
+                        VStack(spacing: 18) {
                         if isSignUp {
                             ModernInput(
                                 icon: "person.fill",
@@ -211,7 +218,7 @@ struct LoginView: View {
                             .padding(.top, 10)
                         }
                     }
-                    .padding(30)
+                    .padding(isIPad ? 36 : 30)
                     .background(
                         ZStack {
                             RoundedRectangle(cornerRadius: 24)
@@ -233,39 +240,45 @@ struct LoginView: View {
                                 .shadow(color: Color.black.opacity(0.1), radius: 25, x: 0, y: 12)
                         }
                     )
-                    .padding(.horizontal, 40)
+                    .frame(maxWidth: maxCardWidth)
+                    .padding(.horizontal, isIPad ? (isLandscape ? 60 : 40) : 40)
                     
-                    Spacer(minLength: 40)
+                    if !isIPad || !isLandscape {
+                        Spacer(minLength: isIPad ? 60 : 40)
+                    }
                     
                     // Powered by App Sprout LLC
                     Text("Powered by App Sprout LLC")
                         .font(.system(size: 13, weight: .regular))
                         .foregroundStyle(Color.white.opacity(0.7))
-                        .padding(.bottom, 20)
+                        .padding(.bottom, isIPad && isLandscape ? 10 : 20)
+                }
+                .frame(minHeight: geometry.size.height)
+                }
+                
+                // Forgot Password Overlay
+                if showForgotPassword {
+                    ForgotPasswordOverlay(
+                        email: $forgotPasswordEmail,
+                        isSending: $isSendingReset,
+                        emailSent: $resetEmailSent,
+                        authManager: authManager,
+                        onDismiss: {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                showForgotPassword = false
+                                forgotPasswordEmail = ""
+                                resetEmailSent = false
+                            }
+                        }
+                    )
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
             }
-            // Forgot Password Overlay
-            if showForgotPassword {
-                ForgotPasswordOverlay(
-                    email: $forgotPasswordEmail,
-                    isSending: $isSendingReset,
-                    emailSent: $resetEmailSent,
-                    authManager: authManager,
-                    onDismiss: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showForgotPassword = false
-                            forgotPasswordEmail = ""
-                            resetEmailSent = false
-                        }
-                    }
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-            }
-        }
-        .onAppear {
-            // Subtle background animation
-            withAnimation(.linear(duration: 20).repeatForever(autoreverses: true)) {
-                backgroundOffset = 0.3
+            .onAppear {
+                // Subtle background animation
+                withAnimation(.linear(duration: 20).repeatForever(autoreverses: true)) {
+                    backgroundOffset = 0.3
+                }
             }
         }
     }
