@@ -209,29 +209,3 @@ enum NotificationType: String, Codable {
     case reply
 }
 
-// MARK: - Announcement Model
-struct Announcement: Identifiable, Codable, Equatable {
-    let id: String
-    var authorName: String
-    var authorEmail: String
-    var message: String
-    var timestamp: Date
-    var isImportant: Bool  // For highlighting important announcements
-    
-    init(
-        id: String = UUID().uuidString,
-        authorName: String,
-        authorEmail: String,
-        message: String,
-        timestamp: Date = Date(),
-        isImportant: Bool = false
-    ) {
-        self.id = id
-        self.authorName = authorName
-        self.authorEmail = authorEmail
-        self.message = message
-        self.timestamp = timestamp
-        self.isImportant = isImportant
-    }
-}
-

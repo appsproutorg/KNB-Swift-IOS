@@ -21,12 +21,10 @@ class FirestoreManager: ObservableObject {
     @Published var availableDates: [Date] = []
     @Published var socialPosts: [SocialPost] = []
     @Published var lastUpdated: Date?
-    @Published var announcements: [Announcement] = []
     
     private var honorsListener: ListenerRegistration?
     private var sponsorshipsListener: ListenerRegistration?
     private var socialPostsListener: ListenerRegistration?
-    private var announcementsListener: ListenerRegistration?
     
     // Optional notification manager for creating notifications
     weak var notificationManager: NotificationManager?
@@ -1286,99 +1284,6 @@ class FirestoreManager: ObservableObject {
         } catch {
             print("❌ Error updating totalPledged: \(error.localizedDescription)")
             errorMessage = "Failed to update total pledged: \(error.localizedDescription)"
-            return false
-        }
-    }
-    
-    // MARK: - Announcements Methods
-    
-    // Start listening to announcements in real-time
-    func startListeningToAnnouncements() {
-        announcementsListener?.remove()
-        
-        announcementsListener = db.collection("announcements")
-            .order(by: "timestamp", descending: true)
-            .limit(to: 100)
-            .addSnapshotListener { [weak self] snapshot, error in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    print("❌ Error listening to announcements: \(error.localizedDescription)")
-                    self.errorMessage = error.localizedDescription
-                    return
-                }
-                
-                guard let documents = snapshot?.documents else { return }
-                
-                self.announcements = documents.compactMap { doc -> Announcement? in
-                    let data = doc.data()
-                    
-                    guard let id = data["id"] as? String,
-                          let authorName = data["authorName"] as? String,
-                          let authorEmail = data["authorEmail"] as? String,
-                          let message = data["message"] as? String,
-                          let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
-                        return nil
-                    }
-                    
-                    let isImportant = data["isImportant"] as? Bool ?? false
-                    
-                    return Announcement(
-                        id: id,
-                        authorName: authorName,
-                        authorEmail: authorEmail,
-                        message: message,
-                        timestamp: timestamp,
-                        isImportant: isImportant
-                    )
-                }
-                
-                print("✅ Loaded \(self.announcements.count) announcements")
-            }
-    }
-    
-    // Stop listening to announcements
-    func stopListeningToAnnouncements() {
-        announcementsListener?.remove()
-    }
-    
-    // Post a new announcement (admin only)
-    func postAnnouncement(authorName: String, authorEmail: String, message: String, isImportant: Bool = false) async -> Bool {
-        let announcement = Announcement(
-            authorName: authorName,
-            authorEmail: authorEmail,
-            message: message,
-            isImportant: isImportant
-        )
-        
-        do {
-            try await db.collection("announcements").document(announcement.id).setData([
-                "id": announcement.id,
-                "authorName": announcement.authorName,
-                "authorEmail": announcement.authorEmail,
-                "message": announcement.message,
-                "timestamp": Timestamp(date: announcement.timestamp),
-                "isImportant": announcement.isImportant
-            ])
-            
-            print("✅ Posted announcement")
-            return true
-        } catch {
-            print("❌ Error posting announcement: \(error.localizedDescription)")
-            errorMessage = error.localizedDescription
-            return false
-        }
-    }
-    
-    // Delete an announcement (admin only)
-    func deleteAnnouncement(announcementId: String) async -> Bool {
-        do {
-            try await db.collection("announcements").document(announcementId).delete()
-            print("✅ Deleted announcement")
-            return true
-        } catch {
-            print("❌ Error deleting announcement: \(error.localizedDescription)")
-            errorMessage = error.localizedDescription
             return false
         }
     }

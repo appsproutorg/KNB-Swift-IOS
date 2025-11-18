@@ -38,16 +38,6 @@ struct MainTabView: View {
                 }
                 .tag(1)
                 
-                // Announcements Tab
-                AnnouncementsView(
-                    firestoreManager: firestoreManager,
-                    currentUser: $currentUser
-                )
-                .tabItem {
-                    Label("Announcements", systemImage: "megaphone.fill")
-                }
-                .tag(2)
-                
                 // Auction Tab
                 AuctionListView(
                     firestoreManager: firestoreManager,
@@ -57,7 +47,7 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Auction", systemImage: "book.closed")
                 }
-                .tag(3)
+                .tag(2)
                 
                 // Profile Tab
                 ProfileTabView(
@@ -68,7 +58,7 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Profile", systemImage: "person.crop.circle")
                 }
-                .tag(4)
+                .tag(3)
         }
         .tint(.blue)
         .onAppear {
