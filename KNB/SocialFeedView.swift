@@ -16,6 +16,9 @@ struct SocialFeedView: View {
     @State private var postToEdit: SocialPost?
     @State private var selectedPost: SocialPost?
     @State private var showReplyThread = false
+    @State private var fabButtonScale: CGFloat = 1.0
+    @State private var emptyStateScale: CGFloat = 0.8
+    @State private var emptyStateOpacity: Double = 0
     
     private func timeAgoString(from date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
@@ -44,45 +47,99 @@ struct SocialFeedView: View {
                     
                     // Feed content
                     if firestoreManager.socialPosts.isEmpty {
-                        // Empty state
-                        VStack(spacing: 20) {
-                            Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.system(size: 60))
-                                .foregroundStyle(.secondary)
-                            
-                            Text("No posts yet")
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(.primary)
-                            
-                            Text("Be the first to share something with the community!")
-                                .font(.system(size: 16))
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
-                            
-                            Button(action: {
-                                showPostComposer = true
-                            }) {
-                                Text("Create First Post")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        LinearGradient(
+                        // Animated empty state
+                        VStack(spacing: 24) {
+                            ZStack {
+                                // Animated glow
+                                Circle()
+                                    .fill(
+                                        RadialGradient(
                                             colors: [
-                                                Color(red: 0.25, green: 0.5, blue: 0.92),
-                                                Color(red: 0.3, green: 0.55, blue: 0.96)
+                                                Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.2),
+                                                .clear
                                             ],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
+                                            center: .center,
+                                            startRadius: 0,
+                                            endRadius: 80
                                         )
                                     )
-                                    .cornerRadius(20)
+                                    .frame(width: 140, height: 140)
+                                    .blur(radius: 20)
+                                
+                                // Bubbly icon
+                                Image(systemName: "bubble.left.and.bubble.right.fill")
+                                    .font(.system(size: 70, weight: .light))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.4, green: 0.6, blue: 1.0),
+                                                Color(red: 0.5, green: 0.7, blue: 1.0)
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                                    .symbolRenderingMode(.hierarchical)
                             }
-                            .padding(.top, 8)
+                            .scaleEffect(emptyStateScale)
+                            .opacity(emptyStateOpacity)
+                            
+                            VStack(spacing: 10) {
+                                Text("No posts yet")
+                                    .font(.system(size: 26, weight: .bold, design: .rounded))
+                                    .foregroundStyle(.primary)
+                                
+                                Text("Be the first to share something with the community!")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 40)
+                            }
+                            .opacity(emptyStateOpacity)
+                            
+                            Button(action: {
+                                let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                                impactFeedback.impactOccurred()
+                                showPostComposer = true
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 18, weight: .semibold))
+                                    Text("Create First Post")
+                                        .font(.system(size: 17, weight: .semibold))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 28)
+                                .padding(.vertical, 14)
+                                .background(
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(red: 0.25, green: 0.5, blue: 0.92),
+                                                    Color(red: 0.35, green: 0.6, blue: 0.98)
+                                                ],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
+                                        )
+                                        .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.4), radius: 15, x: 0, y: 8)
+                                )
+                            }
+                            .padding(.top, 12)
+                            .opacity(emptyStateOpacity)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .onAppear {
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.7).delay(0.1)) {
+                                emptyStateScale = 1.0
+                                emptyStateOpacity = 1.0
+                            }
+                            
+                            withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                                emptyStateScale = 1.05
+                            }
+                        }
                     } else {
                         // Last updated timestamp
                         if let lastUpdated = firestoreManager.lastUpdated {
@@ -134,41 +191,85 @@ struct SocialFeedView: View {
                     }
                 }
                 
-                // Floating Post button
+                // Floating Post button with bubbly effect
                 VStack {
                     Spacer()
                     HStack {
                         Spacer()
                         
                         Button(action: {
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                 showPostComposer = true
                             }
                         }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "pencil")
-                                    .font(.system(size: 16, weight: .semibold))
-                                Text("Post")
-                                    .font(.system(size: 16, weight: .semibold))
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.25, green: 0.5, blue: 0.92),
-                                        Color(red: 0.3, green: 0.55, blue: 0.96)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                            ZStack {
+                                // Pulsing glow effect
+                                Capsule()
+                                    .fill(
+                                        RadialGradient(
+                                            colors: [
+                                                Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.3),
+                                                .clear
+                                            ],
+                                            center: .center,
+                                            startRadius: 0,
+                                            endRadius: 40
+                                        )
+                                    )
+                                    .frame(width: 120, height: 60)
+                                    .blur(radius: 15)
+                                    .scaleEffect(fabButtonScale)
+                                
+                                HStack(spacing: 10) {
+                                    Image(systemName: "plus.circle.fill")
+                                        .font(.system(size: 20, weight: .semibold))
+                                    Text("Post")
+                                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 14)
+                                .background(
+                                    Capsule()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(red: 0.25, green: 0.5, blue: 0.92),
+                                                    Color(red: 0.35, green: 0.6, blue: 0.98)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.5), radius: 20, x: 0, y: 10)
                                 )
-                            )
-                            .cornerRadius(30)
-                            .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.4), radius: 15, x: 0, y: 8)
+                                .overlay(
+                                    Capsule()
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.3),
+                                                    Color.white.opacity(0.1)
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 2
+                                        )
+                                )
+                                .scaleEffect(fabButtonScale)
+                            }
                         }
                         .padding(.trailing, 20)
                         .padding(.bottom, 24)
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                                fabButtonScale = 1.05
+                            }
+                        }
                     }
                 }
             }
