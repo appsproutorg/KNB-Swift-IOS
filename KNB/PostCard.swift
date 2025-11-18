@@ -20,8 +20,6 @@ struct PostCard: View {
     @State private var likeCount: Int
     @State private var heartScale: CGFloat = 1.0
     @State private var showDeleteConfirmation = false
-    @State private var isPressed = false
-    @State private var avatarScale: CGFloat = 1.0
     
     init(post: SocialPost, currentUserEmail: String?, currentUserName: String? = nil, firestoreManager: FirestoreManager, onReply: @escaping () -> Void, onDelete: @escaping () -> Void, onEdit: (() -> Void)? = nil) {
         self.post = post
@@ -48,71 +46,34 @@ struct PostCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header with author and menu
-            HStack(alignment: .top, spacing: 12) {
-                // Avatar with bubbly effect
+            HStack(alignment: .top, spacing: 10) {
+                // Avatar
                 ZStack {
-                    // Glow effect
-                    Circle()
-                        .fill(
-                            RadialGradient(
-                                colors: [
-                                    Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.2),
-                                    .clear
-                                ],
-                                center: .center,
-                                startRadius: 0,
-                                endRadius: 30
-                            )
-                        )
-                        .frame(width: 58, height: 58)
-                        .blur(radius: 8)
-                    
                     Circle()
                         .fill(
                             LinearGradient(
                                 colors: [
                                     Color(red: 0.88, green: 0.93, blue: 0.98),
-                                    Color(red: 0.92, green: 0.95, blue: 0.99)
+                                    Color(red: 0.90, green: 0.94, blue: 0.99)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .frame(width: 50, height: 50)
-                        .overlay(
-                            Circle()
-                                .stroke(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.3),
-                                            Color(red: 0.5, green: 0.7, blue: 1.0).opacity(0.2)
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 2
-                                )
-                        )
-                        .shadow(color: Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.2), radius: 8, x: 0, y: 4)
+                        .frame(width: 48, height: 48)
                     
                     Image(systemName: "person.fill")
-                        .font(.system(size: 24))
+                        .font(.system(size: 22))
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [
                                     Color(red: 0.25, green: 0.5, blue: 0.92),
-                                    Color(red: 0.35, green: 0.6, blue: 0.98)
+                                    Color(red: 0.3, green: 0.55, blue: 0.96)
                                 ],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                }
-                .scaleEffect(avatarScale)
-                .onAppear {
-                    withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
-                        avatarScale = 1.05
-                    }
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
@@ -176,108 +137,61 @@ struct PostCard: View {
                 }
             }
             
-            // Action buttons - Bubbly design
-            HStack(spacing: 12) {
-                // Reply button with bubble effect
+            // Action buttons - Better spacing
+            HStack(spacing: 0) {
+                // Reply button
                 Button(action: onReply) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "bubble.right.fill")
-                            .font(.system(size: 15, weight: .semibold))
+                    HStack(spacing: 4) {
+                        Image(systemName: "bubble.right")
+                            .font(.system(size: 15, weight: .medium))
                         if post.replyCount > 0 {
                             Text("\(post.replyCount)")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: 13, weight: .medium))
                         }
                     }
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.4, green: 0.6, blue: 1.0),
-                                Color(red: 0.5, green: 0.7, blue: 1.0)
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .padding(.horizontal, 14)
+                    .foregroundStyle(.secondary.opacity(0.8))
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.1))
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.2), lineWidth: 1)
-                    )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 
                 Spacer()
                 
-                // Like button with animated bubble
+                // Like button with animation
                 Button(action: handleLike) {
-                    HStack(spacing: 6) {
-                        Image(systemName: isLiked ? "heart.fill" : "heart.fill")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(
-                                isLiked ? 
-                                LinearGradient(
-                                    colors: [.red, .pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ) :
-                                LinearGradient(
-                                    colors: [.secondary.opacity(0.6), .secondary.opacity(0.6)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
+                    HStack(spacing: 4) {
+                        Image(systemName: isLiked ? "heart.fill" : "heart")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(isLiked ? .red : .secondary.opacity(0.8))
                             .scaleEffect(heartScale)
                         
                         if likeCount > 0 {
                             Text("\(likeCount)")
-                                .font(.system(size: 13, weight: .bold))
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(isLiked ? .red : .secondary.opacity(0.8))
                         }
                     }
-                    .padding(.horizontal, 14)
+                    .padding(.horizontal, 12)
                     .padding(.vertical, 8)
-                    .background(
-                        Capsule()
-                            .fill(isLiked ? Color.red.opacity(0.1) : Color.secondary.opacity(0.05))
-                    )
-                    .overlay(
-                        Capsule()
-                            .stroke(isLiked ? Color.red.opacity(0.2) : Color.secondary.opacity(0.1), lineWidth: 1)
-                    )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.leading, 62)
-            .padding(.top, 10)
+            .padding(.leading, 58)
+            .padding(.top, 6)
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
         .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .shadow(color: Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.08), radius: 12, x: 0, y: 6)
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.4, green: 0.6, blue: 1.0).opacity(0.15),
-                            Color(red: 0.5, green: 0.7, blue: 1.0).opacity(0.08)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1
-                )
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(.systemGray6), lineWidth: 0.5)
         )
-        .scaleEffect(isPressed ? 0.98 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed)
         .alert("Delete Post", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -299,7 +213,7 @@ struct PostCard: View {
         guard let userEmail = currentUserEmail else { return }
         
         // Haptic feedback
-        let impactFeedback = UIImpactFeedbackGenerator(style: isLiked ? .light : .medium)
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
         impactFeedback.impactOccurred()
         
         // Optimistic update
@@ -307,33 +221,14 @@ struct PostCard: View {
         isLiked.toggle()
         likeCount += wasLiked ? -1 : 1
         
-        // Explosive heart animation when liking
-        if !wasLiked {
-            withAnimation(.spring(response: 0.2, dampingFraction: 0.4)) {
-                heartScale = 1.4
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    heartScale = 0.9
-                }
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.5)) {
-                    heartScale = 1.0
-                }
-            }
-        } else {
-            // Subtle shrink animation when unliking
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                heartScale = 0.8
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                    heartScale = 1.0
-                }
+        // Animate heart
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+            heartScale = 1.3
+        }
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5)) {
+                heartScale = 1.0
             }
         }
         
@@ -357,5 +252,4 @@ struct PostCard: View {
         }
     }
 }
-
 
