@@ -822,7 +822,7 @@ class FirestoreManager: ObservableObject {
             }
             
             // Filter to only top-level posts (no parentPostId)
-            var filteredPosts = allPosts.filter { $0.parentPostId == nil }
+            let filteredPosts = allPosts.filter { $0.parentPostId == nil }
             
             // Only pin admin posts when sorting by newest
             if sortBy == .newest {
@@ -906,7 +906,7 @@ class FirestoreManager: ObservableObject {
             }
             
             // Filter to only top-level posts (no parentPostId)
-            var filteredPosts = allPosts.filter { $0.parentPostId == nil }
+            let filteredPosts = allPosts.filter { $0.parentPostId == nil }
             
             // Only pin admin posts when sorting by newest
             if sortBy == .newest {
