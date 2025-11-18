@@ -41,7 +41,7 @@ struct CalendarView: View {
                     VStack(spacing: 8) {
                         // Title with gradient
                         Text("Kiddush Sponsorship")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [.blue, .blue.opacity(0.7)],
@@ -49,20 +49,20 @@ struct CalendarView: View {
                                     endPoint: .trailing
                                 )
                             )
-                            .shadow(color: .blue.opacity(0.15), radius: 4, x: 0, y: 2)
+                            .shadow(color: .blue.opacity(0.2), radius: 6, x: 0, y: 3)
                         
                         // Month/Year with navigation - now more compact
                         HStack(spacing: 12) {
                             Button(action: previousMonth) {
                                 Image(systemName: "chevron.left.circle.fill")
-                                    .font(.system(size: 24))
+                                    .font(.system(size: 26))
                                     .foregroundStyle(.blue.opacity(0.8))
                                     .symbolEffect(.bounce, value: currentMonth)
                             }
                             
                             Text(dateFormatter.string(from: currentMonth))
-                                .font(.system(size: 20, weight: .semibold, design: .rounded))
-                                .foregroundStyle(.secondary)
+                                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                                .foregroundStyle(.primary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                                 .contentTransition(.numericText())
@@ -70,7 +70,7 @@ struct CalendarView: View {
                             
                             Button(action: nextMonth) {
                                 Image(systemName: "chevron.right.circle.fill")
-                                    .font(.system(size: 24))
+                                    .font(.system(size: 26))
                                     .foregroundStyle(.blue.opacity(0.8))
                                     .symbolEffect(.bounce, value: currentMonth)
                             }
@@ -88,12 +88,13 @@ struct CalendarView: View {
                         HStack(spacing: 4) {
                             ForEach(Array(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].enumerated()), id: \.offset) { index, day in
                                 Text(day)
-                                    .font(.system(size: index == 6 ? 14 : 12, weight: index == 6 ? .bold : .semibold, design: .rounded))
+                                    .font(.system(size: index == 6 ? 15 : 13, weight: index == 6 ? .bold : .semibold, design: .rounded))
                                     .foregroundStyle(index == 6 ? .blue : .secondary)
                                     .frame(maxWidth: index == 6 ? .infinity : 45)
                             }
                         }
                         .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
                         
                         // Calendar Grid with wider Shabbat columns - using fixed widths to fit screen
                         LazyVGrid(
@@ -156,13 +157,13 @@ struct CalendarView: View {
                             
                             VStack(spacing: 12) {
                                 SimpleLegendRow(
-                                    color: .blue,
+                                    color: Color(red: 0.2, green: 0.6, blue: 0.3),
                                     label: "Available",
                                     description: "Tap to sponsor this Shabbat"
                                 )
                                 
                                 SimpleLegendRow(
-                                    color: .yellow,
+                                    color: Color(red: 0.9, green: 0.2, blue: 0.2),
                                     label: "Booked",
                                     description: "Already sponsored"
                                 )
@@ -176,19 +177,19 @@ struct CalendarView: View {
                         }
                         .padding(24)
                         .background(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: 24)
                                 .fill(.ultraThinMaterial)
-                                .shadow(color: .black.opacity(0.06), radius: 12, x: 0, y: 4)
+                                .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 6)
                         )
                         .overlay(
-                            RoundedRectangle(cornerRadius: 20)
+                            RoundedRectangle(cornerRadius: 24)
                                 .strokeBorder(
                                     LinearGradient(
                                         colors: [Color.secondary.opacity(0.15), Color.secondary.opacity(0.05)],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     ),
-                                    lineWidth: 1
+                                    lineWidth: 1.5
                                 )
                         )
                         .padding(.horizontal)
@@ -400,12 +401,13 @@ struct CalendarDayCell: View {
                     Spacer()
                     if sponsorship != nil {
                         Circle()
-                            .fill(.yellow)
-                            .frame(width: 7, height: 7)
+                            .fill(Color(red: 0.9, green: 0.2, blue: 0.2))
+                            .frame(width: 8, height: 8)
                             .overlay(
                                 Circle()
-                                    .stroke(.yellow.opacity(0.5), lineWidth: 2)
+                                    .stroke(Color(red: 0.9, green: 0.2, blue: 0.2).opacity(0.6), lineWidth: 2)
                             )
+                            .shadow(color: Color(red: 0.9, green: 0.2, blue: 0.2).opacity(0.3), radius: 3, x: 0, y: 1)
                     } else if isPastDate && isShabbat {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 7))
@@ -446,7 +448,13 @@ struct CalendarDayCell: View {
                 if let shabbatTime = shabbatTime, let parsha = shabbatTime.parsha {
                     Text(parsha)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(isPastDate ? Color.secondary.opacity(0.5) : .blue)
+                        .foregroundStyle(
+                            isPastDate ? 
+                            Color.secondary.opacity(0.5) : 
+                            (sponsorship != nil ? 
+                             Color(red: 0.9, green: 0.2, blue: 0.2) : 
+                             (isAvailableForSponsorship ? Color(red: 0.2, green: 0.6, blue: 0.3) : .blue))
+                        )
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .multilineTextAlignment(.center)
@@ -457,60 +465,105 @@ struct CalendarDayCell: View {
             Spacer(minLength: 1)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: isShabbat ? 85 : 65)
+        .frame(height: isShabbat ? 90 : 70)
         .background(cellBackgroundMaterial)
         .overlay(cellOverlay)
         .opacity(isCurrentMonth ? (isPastDate ? 0.5 : 1.0) : 0.25)
-        .scaleEffect(isToday ? 1.02 : 1.0)
+        .scaleEffect(isToday ? 1.05 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isToday)
+        .shadow(color: (sponsorship != nil ? Color(red: 0.9, green: 0.2, blue: 0.2) : (isShabbat && isAvailableForSponsorship && !isPastDate ? Color(red: 0.2, green: 0.6, blue: 0.3) : (isShabbat && !isPastDate ? .blue : .clear))).opacity(0.15), radius: 4, x: 0, y: 2)
     }
     
-    // Simple box backgrounds with status colors
+    // Modern box backgrounds with status colors
     @ViewBuilder
     var cellBackgroundMaterial: some View {
         ZStack {
-            // Base background - simple box
-            RoundedRectangle(cornerRadius: 10)
+            // Base background - modern rounded box
+            RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
             
-            // Status-based color overlay
+            // Status-based color overlay with gradients
             if let _ = sponsorship {
-                // Sponsored - yellow/amber (already booked)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(.yellow.opacity(0.25))
-            } else if isShabbat && isCurrentMonth && !isPastDate {
-                // Available Shabbat - light blue (can book)
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(.blue.opacity(0.08))
+                // Sponsored - red (already booked) with gradient
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.9, green: 0.2, blue: 0.2).opacity(0.2),
+                                Color(red: 0.85, green: 0.15, blue: 0.15).opacity(0.15)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+            } else if isShabbat && isAvailableForSponsorship && isCurrentMonth {
+                // Available Shabbat - green (can book) with gradient
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.2, green: 0.6, blue: 0.3).opacity(0.15),
+                                Color(red: 0.15, green: 0.5, blue: 0.25).opacity(0.1)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             } else if isPastDate && isShabbat {
                 // Past Shabbat - gray (locked)
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: 12)
                     .fill(.gray.opacity(0.08))
+            } else if isCurrentMonth && !isShabbat {
+                // Regular days - light blue tint
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.blue.opacity(0.05))
             }
         }
     }
     
-    // Simple box borders
+    // Modern box borders with gradients
     @ViewBuilder
     var cellOverlay: some View {
         if isToday {
             // Today gets a prominent blue border
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(.blue, lineWidth: 2.5)
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(.blue, lineWidth: 3)
+                .shadow(color: .blue.opacity(0.4), radius: 4, x: 0, y: 2)
         } else if sponsorship != nil {
-            // Sponsored dates get yellow border
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(.yellow.opacity(0.6), lineWidth: 2)
+            // Sponsored dates get red gradient border
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.9, green: 0.2, blue: 0.2).opacity(0.8),
+                            Color(red: 0.85, green: 0.15, blue: 0.15).opacity(0.6)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2.5
+                )
         } else if isShabbat && isAvailableForSponsorship && isCurrentMonth {
-            // Available Shabbats get blue border
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(.blue.opacity(0.3), lineWidth: 2)
+            // Available Shabbats get green gradient border
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.2, green: 0.6, blue: 0.3).opacity(0.6),
+                            Color(red: 0.15, green: 0.5, blue: 0.25).opacity(0.4)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
         } else if isCurrentMonth {
-            // Regular dates get light border
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+            // Regular dates get subtle border
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.secondary.opacity(0.15), lineWidth: 1)
         } else {
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(.clear, lineWidth: 0)
         }
     }
@@ -537,7 +590,7 @@ struct SimpleLegendRow: View {
     
     var body: some View {
         HStack(spacing: 14) {
-            // Color indicator circle
+            // Color indicator circle - modernized
             Circle()
                 .fill(
                     LinearGradient(
@@ -546,25 +599,39 @@ struct SimpleLegendRow: View {
                         endPoint: .bottomTrailing
                     )
                 )
-                .frame(width: 14, height: 14)
-                .shadow(color: color.opacity(0.3), radius: 2, x: 0, y: 1)
+                .frame(width: 16, height: 16)
+                .shadow(color: color.opacity(0.4), radius: 3, x: 0, y: 2)
+                .overlay(
+                    Circle()
+                        .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                )
             
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(label)
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .foregroundStyle(.primary)
                 
                 Text(description)
-                    .font(.system(size: 13, design: .rounded))
+                    .font(.system(size: 14, design: .rounded))
                     .foregroundStyle(.secondary)
             }
             
             Spacer()
         }
-        .padding(12)
+        .padding(14)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(color.opacity(0.08))
+            RoundedRectangle(cornerRadius: 14)
+                .fill(
+                    LinearGradient(
+                        colors: [color.opacity(0.1), color.opacity(0.05)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(color.opacity(0.2), lineWidth: 1)
         )
     }
 }
