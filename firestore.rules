@@ -36,12 +36,22 @@ service cloud.firestore {
     match /social_posts/{postId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() 
-                    && request.resource.data.authorEmail == request.auth.token.email;
+                    && request.resource.data.authorEmail == request.auth.token.email
+                    && request.resource.data.content.size() <= 140
+                    && request.resource.data.likeCount == 0
+                    && request.resource.data.replyCount == 0
+                    && (request.resource.data.parentPostId == null || request.resource.data.parentPostId is string);
       allow update: if isAuthenticated() 
                     && (resource.data.authorEmail == request.auth.token.email 
-                        || request.resource.data.authorEmail == request.auth.token.email);
+                        || (request.resource.data.authorEmail == resource.data.authorEmail
+                            && request.resource.data.content == resource.data.content
+                            && request.resource.data.timestamp == resource.data.timestamp
+                            && request.resource.data.authorName == resource.data.authorName
+                            && (request.resource.data.parentPostId == resource.data.parentPostId)
+                            && request.resource.data.replyCount >= 0));
       allow delete: if isAuthenticated() 
-                    && resource.data.authorEmail == request.auth.token.email;
+                    && (resource.data.authorEmail == request.auth.token.email 
+                        || get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.isAdmin == true);
     }
     
     // Notifications - users can only read their own notifications

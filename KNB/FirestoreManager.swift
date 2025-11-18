@@ -1058,8 +1058,21 @@ class FirestoreManager: ObservableObject {
                 parentPostId: parentPostId
             )
             
-            // Create the reply
-            try await db.collection("social_posts").document(reply.id).setData([
+            // Get parent post to verify it exists and get author email for notification
+            let parentRef = db.collection("social_posts").document(parentPostId)
+            let parentDoc = try await parentRef.getDocument()
+            
+            guard let parentData = parentDoc.data() else {
+                errorMessage = "Parent post not found"
+                return false
+            }
+            
+            // Use a batch write to atomically create reply and increment parent replyCount
+            let batch = db.batch()
+            
+            // Create the reply document
+            let replyRef = db.collection("social_posts").document(reply.id)
+            batch.setData([
                 "id": reply.id,
                 "authorName": reply.authorName,
                 "authorEmail": reply.authorEmail,
@@ -1069,30 +1082,27 @@ class FirestoreManager: ObservableObject {
                 "likeCount": 0,
                 "replyCount": 0,
                 "parentPostId": parentPostId
-            ])
+            ], forDocument: replyRef)
             
-            // Update parent post reply count
-            let parentRef = db.collection("social_posts").document(parentPostId)
-            let parentDoc = try await parentRef.getDocument()
+            // Atomically increment parent replyCount using FieldValue
+            batch.updateData([
+                "replyCount": FieldValue.increment(Int64(1))
+            ], forDocument: parentRef)
             
-            if let parentData = parentDoc.data() {
-                let currentReplyCount = parentData["replyCount"] as? Int ?? 0
-                try await parentRef.updateData([
-                    "replyCount": currentReplyCount + 1
-                ])
-                
-                // Create notification for parent post author (if not replying to own post)
-                if let notificationManager = notificationManager {
-                    let parentAuthorEmail = parentData["authorEmail"] as? String ?? ""
-                    if parentAuthorEmail != author.email {
-                        _ = await notificationManager.createNotification(
-                            type: .reply,
-                            postId: parentPostId,
-                            targetUserEmail: parentAuthorEmail,
-                            triggeredByUserEmail: author.email,
-                            triggeredByUserName: author.name
-                        )
-                    }
+            // Commit the batch
+            try await batch.commit()
+            
+            // Create notification for parent post author (if not replying to own post)
+            if let notificationManager = notificationManager {
+                let parentAuthorEmail = parentData["authorEmail"] as? String ?? ""
+                if parentAuthorEmail != author.email {
+                    _ = await notificationManager.createNotification(
+                        type: .reply,
+                        postId: parentPostId,
+                        targetUserEmail: parentAuthorEmail,
+                        triggeredByUserEmail: author.email,
+                        triggeredByUserName: author.name
+                    )
                 }
             }
             
@@ -1163,34 +1173,45 @@ class FirestoreManager: ObservableObject {
             }
             
             let parentPostId = postData["parentPostId"] as? String
-            let batch = db.batch()
+            let isTopLevelPost = parentPostId == nil
             
-            // If this is a reply, decrement parent's replyCount
-            if let parentId = parentPostId {
-                let parentRef = db.collection("social_posts").document(parentId)
-                let parentDoc = try await parentRef.getDocument()
-                
-                if let parentData = parentDoc.data() {
-                    let currentReplyCount = parentData["replyCount"] as? Int ?? 0
-                    let newReplyCount = max(0, currentReplyCount - 1)
-                    batch.updateData(["replyCount": newReplyCount], forDocument: parentRef)
-                }
-            } else {
-                // If this is a top-level post, delete all replies and reset replyCount
+            // If this is a top-level post, get all replies first
+            var replyIds: [String] = []
+            if isTopLevelPost {
                 let repliesSnapshot = try await db.collection("social_posts")
                     .whereField("parentPostId", isEqualTo: postId)
                     .getDocuments()
-                
-                for replyDoc in repliesSnapshot.documents {
-                    batch.deleteDocument(replyDoc.reference)
-                }
+                replyIds = repliesSnapshot.documents.map { $0.documentID }
+            }
+            
+            // Use a batch write to atomically delete post and update parent replyCount
+            let batch = db.batch()
+            
+            // If this is a reply, decrement parent's replyCount atomically
+            if let parentId = parentPostId {
+                let parentRef = db.collection("social_posts").document(parentId)
+                // Use FieldValue.increment to atomically decrement (with min check via rules or app logic)
+                batch.updateData([
+                    "replyCount": FieldValue.increment(Int64(-1))
+                ], forDocument: parentRef)
             }
             
             // Delete the post itself
-            batch.deleteDocument(db.collection("social_posts").document(postId))
+            let postRef = db.collection("social_posts").document(postId)
+            batch.deleteDocument(postRef)
             
-            // Commit all changes atomically
+            // Commit the batch
             try await batch.commit()
+            
+            // If this was a top-level post, delete all replies in a separate batch
+            if isTopLevelPost && !replyIds.isEmpty {
+                let repliesBatch = db.batch()
+                for replyId in replyIds {
+                    let replyRef = db.collection("social_posts").document(replyId)
+                    repliesBatch.deleteDocument(replyRef)
+                }
+                try await repliesBatch.commit()
+            }
             
             print("✅ Deleted social post: \(postId)")
             return true
