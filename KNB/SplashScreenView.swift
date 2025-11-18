@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct SplashScreenView: View {
+    @Environment(\.colorScheme) var colorScheme
     @State private var scale: CGFloat = 0.5
     @State private var opacity: Double = 0
     @State private var glowIntensity: Double = 0
@@ -17,15 +18,58 @@ struct SplashScreenView: View {
     var onComplete: () -> Void
     var preloadData: (() async -> Void)?
     
+    // Color scheme adaptive colors
+    private var backgroundGradient: [Color] {
+        if colorScheme == .dark {
+            return [
+                Color(red: 0.05, green: 0.08, blue: 0.15),
+                Color(red: 0.08, green: 0.10, blue: 0.18),
+                Color(red: 0.10, green: 0.12, blue: 0.20)
+            ]
+        } else {
+            return [
+                Color(red: 0.88, green: 0.93, blue: 0.98),
+                Color(red: 0.90, green: 0.94, blue: 0.99),
+                Color(red: 0.92, green: 0.95, blue: 0.99)
+            ]
+        }
+    }
+    
+    private var glowColor: Color {
+        colorScheme == .dark ? Color(red: 0.4, green: 0.6, blue: 1.0) : Color(red: 0.3, green: 0.5, blue: 0.95)
+    }
+    
+    private var circleBackgroundColor: Color {
+        colorScheme == .dark ? Color(red: 0.12, green: 0.15, blue: 0.25) : Color.white
+    }
+    
+    private var iconGradient: [Color] {
+        if colorScheme == .dark {
+            return [
+                Color(red: 0.4, green: 0.65, blue: 1.0),
+                Color(red: 0.5, green: 0.75, blue: 1.0)
+            ]
+        } else {
+            return [
+                Color(red: 0.25, green: 0.5, blue: 0.92),
+                Color(red: 0.3, green: 0.55, blue: 0.96)
+            ]
+        }
+    }
+    
+    private var subtitleColor: Color {
+        colorScheme == .dark ? Color(red: 0.6, green: 0.65, blue: 0.75) : Color(red: 0.4, green: 0.45, blue: 0.6)
+    }
+    
+    private var subtitleBackgroundColor: Color {
+        colorScheme == .dark ? Color(red: 0.15, green: 0.18, blue: 0.28).opacity(0.7) : Color.white.opacity(0.7)
+    }
+    
     var body: some View {
         ZStack {
-            // Modern blue gradient
+            // Adaptive gradient background
             LinearGradient(
-                colors: [
-                    Color(red: 0.88, green: 0.93, blue: 0.98),
-                    Color(red: 0.90, green: 0.94, blue: 0.99),
-                    Color(red: 0.92, green: 0.95, blue: 0.99)
-                ],
+                colors: backgroundGradient,
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
@@ -38,7 +82,7 @@ struct SplashScreenView: View {
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color(red: 0.3, green: 0.5, blue: 0.95).opacity(glowIntensity * 0.2),
+                                    glowColor.opacity(glowIntensity * (colorScheme == .dark ? 0.3 : 0.2)),
                                     .clear
                                 ],
                                 center: .center,
@@ -56,8 +100,8 @@ struct SplashScreenView: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.15),
-                                        Color(red: 0.35, green: 0.55, blue: 0.98).opacity(0.08)
+                                        glowColor.opacity(colorScheme == .dark ? 0.2 : 0.15),
+                                        glowColor.opacity(colorScheme == .dark ? 0.1 : 0.08)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
@@ -68,15 +112,15 @@ struct SplashScreenView: View {
                         
                         // Main icon circle with subtle material
                         Circle()
-                            .fill(Color.white)
+                            .fill(circleBackgroundColor)
                             .frame(width: 120, height: 120)
                             .overlay(
                                 Circle()
                                     .stroke(
                                         LinearGradient(
                                             colors: [
-                                                Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.25),
-                                                Color(red: 0.35, green: 0.55, blue: 0.98).opacity(0.12)
+                                                glowColor.opacity(colorScheme == .dark ? 0.4 : 0.25),
+                                                glowColor.opacity(colorScheme == .dark ? 0.2 : 0.12)
                                             ],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
@@ -84,23 +128,20 @@ struct SplashScreenView: View {
                                         lineWidth: 2
                                     )
                             )
-                            .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.2), radius: 20, x: 0, y: 8)
+                            .shadow(color: glowColor.opacity(colorScheme == .dark ? 0.4 : 0.2), radius: 20, x: 0, y: 8)
                         
                         // Book icon matching login theme
                         Image(systemName: "book.pages.fill")
                             .font(.system(size: 56, weight: .light))
                             .foregroundStyle(
                                 LinearGradient(
-                                    colors: [
-                                        Color(red: 0.25, green: 0.5, blue: 0.92),
-                                        Color(red: 0.3, green: 0.55, blue: 0.96)
-                                    ],
+                                    colors: iconGradient,
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 )
                             )
                             .scaleEffect(iconScale)
-                            .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.25), radius: 8, x: 0, y: 2)
+                            .shadow(color: glowColor.opacity(colorScheme == .dark ? 0.4 : 0.25), radius: 8, x: 0, y: 2)
                     }
                     .scaleEffect(scale)
                 }
@@ -112,10 +153,7 @@ struct SplashScreenView: View {
                         .font(.system(size: 52, weight: .semibold, design: .rounded))
                         .foregroundStyle(
                             LinearGradient(
-                                colors: [
-                                    Color(red: 0.25, green: 0.5, blue: 0.92),
-                                    Color(red: 0.3, green: 0.55, blue: 0.96)
-                                ],
+                                colors: iconGradient,
                                 startPoint: .leading,
                                 endPoint: .trailing
                             )
@@ -123,15 +161,15 @@ struct SplashScreenView: View {
                     
                     Text("The KNB App")
                         .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(Color(red: 0.4, green: 0.45, blue: 0.6))
+                        .foregroundStyle(subtitleColor)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 8)
                         .background(
                             Capsule()
-                                .fill(Color.white.opacity(0.7))
+                                .fill(subtitleBackgroundColor)
                                 .overlay(
                                     Capsule()
-                                        .stroke(Color(red: 0.3, green: 0.5, blue: 0.95).opacity(0.2), lineWidth: 1)
+                                        .stroke(glowColor.opacity(0.2), lineWidth: 1)
                                 )
                         )
                 }

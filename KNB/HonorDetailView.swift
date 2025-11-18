@@ -200,7 +200,7 @@ struct HonorDetailView: View {
                 
                 // Dismiss after successful purchase
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    dismiss()
+                        dismiss()
                 }
             }
         }
