@@ -121,7 +121,7 @@ struct SocialFeedView: View {
                                     )
                                     .padding(.horizontal)
                                     .transition(.asymmetric(
-                                        insertion: .opacity.combined(with: .move(edge: .top)).combined(with: .scale(scale: 0.95)),
+                                        insertion: .move(edge: .top).combined(with: .opacity),
                                         removal: .opacity.combined(with: .move(edge: .bottom))
                                     ))
                                 }

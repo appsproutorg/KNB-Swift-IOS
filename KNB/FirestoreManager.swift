@@ -8,6 +8,7 @@
 import Foundation
 import FirebaseFirestore
 import Combine
+import SwiftUI
 
 @MainActor
 class FirestoreManager: ObservableObject {
@@ -837,14 +838,18 @@ class FirestoreManager: ObservableObject {
                 let sortedRegularPosts = regularPosts.sorted { $0.timestamp > $1.timestamp }
                 
                 // Combine: admin posts first, then regular posts
-                self.socialPosts = sortedAdminPosts + sortedRegularPosts
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    self.socialPosts = sortedAdminPosts + sortedRegularPosts
+                }
             } else {
                 // Sort all posts together by most liked
-                self.socialPosts = filteredPosts.sorted {
-                    if $0.likeCount != $1.likeCount {
-                        return $0.likeCount > $1.likeCount
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                    self.socialPosts = filteredPosts.sorted {
+                        if $0.likeCount != $1.likeCount {
+                            return $0.likeCount > $1.likeCount
+                        }
+                        return $0.timestamp > $1.timestamp
                     }
-                    return $0.timestamp > $1.timestamp
                 }
             }
             
