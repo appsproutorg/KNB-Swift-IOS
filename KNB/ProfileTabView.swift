@@ -448,6 +448,7 @@ struct ProfileTabView: View {
             }
             .sheet(isPresented: $showSettings) {
                 SettingsView(appSettings: appSettings)
+                    .preferredColorScheme(appSettings.colorScheme)
             }
             .onAppear {
                 // Update notification manager with current user email

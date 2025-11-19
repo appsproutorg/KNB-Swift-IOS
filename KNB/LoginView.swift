@@ -285,6 +285,11 @@ struct LoginView: View {
             return
         }
         
+        if !email.isValidEmail {
+            authManager.errorMessage = "Please enter a valid email address"
+            return
+        }
+        
         if isSignUp && name.isEmpty {
             authManager.errorMessage = "Please enter your name"
             return
@@ -556,6 +561,11 @@ struct ForgotPasswordOverlay: View {
     private func handleResetPassword() {
         guard !email.isEmpty else {
             authManager.errorMessage = "Please enter your email address"
+            return
+        }
+        
+        if !email.isValidEmail {
+            authManager.errorMessage = "Please enter a valid email address"
             return
         }
         

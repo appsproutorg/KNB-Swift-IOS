@@ -77,9 +77,17 @@ class FirestoreManager: ObservableObject {
         ]
         
         // Check if honors already exist
-        let snapshot = try? await db.collection("honors").getDocuments()
-        if let count = snapshot?.documents.count, count > 0 {
-            print("Honors already initialized in Firestore")
+        do {
+            let snapshot = try await db.collection("honors").getDocuments()
+            if !snapshot.documents.isEmpty {
+                print("Honors already initialized in Firestore")
+                return
+            }
+        } catch {
+            print("❌ Error checking for existing honors: \(error.localizedDescription)")
+            // Continue execution to attempt initialization if check failed, 
+            // or return if you want to be conservative. 
+            // For now, we'll assume if we can't check, we shouldn't try to write to avoid duplicates if it's just a connection error.
             return
         }
         
