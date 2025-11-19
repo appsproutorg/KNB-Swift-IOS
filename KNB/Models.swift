@@ -17,6 +17,7 @@ struct Honor: Identifiable, Codable, Equatable {
     var currentWinner: String?
     var bids: [Bid]
     var isSold: Bool
+    var category: String
     
     init(
         id: UUID = UUID(),
@@ -26,7 +27,8 @@ struct Honor: Identifiable, Codable, Equatable {
         buyNowPrice: Double,
         currentWinner: String? = nil,
         bids: [Bid] = [],
-        isSold: Bool = false
+        isSold: Bool = false,
+        category: String = "General"
     ) {
         self.id = id
         self.name = name
@@ -36,6 +38,7 @@ struct Honor: Identifiable, Codable, Equatable {
         self.currentWinner = currentWinner
         self.bids = bids
         self.isSold = isSold
+        self.category = category
     }
 }
 

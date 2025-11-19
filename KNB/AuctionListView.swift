@@ -14,18 +14,76 @@ struct AuctionListView: View {
     @State private var selectedHonor: Honor?
     @State private var searchText = ""
     
+    // Sorting and Filtering
+    enum SortOption: String, CaseIterable {
+        case priceHighToLow = "Price: High to Low"
+        case priceLowToHigh = "Price: Low to High"
+        case mostActive = "Most Active"
+        case nameAZ = "Name: A-Z"
+    }
+    
+    enum FilterOption: String, CaseIterable {
+        case all = "All Items"
+        case active = "Active Only"
+        case sold = "Sold Only"
+        case myBids = "My Bids"
+    }
+    
+    @State private var sortOption: SortOption = .priceHighToLow
+    @State private var filterOption: FilterOption = .all
+    
     var totalPledged: Double {
         firestoreManager.honors.reduce(0) { $0 + $1.currentBid }
     }
     
     var filteredHonors: [Honor] {
-        if searchText.isEmpty {
-            return firestoreManager.honors
+        var honors = firestoreManager.honors
+        
+        // 1. Filter
+        switch filterOption {
+        case .all:
+            break
+        case .active:
+            honors = honors.filter { !$0.isSold }
+        case .sold:
+            honors = honors.filter { $0.isSold }
+        case .myBids:
+            if let userName = currentUser?.name {
+                honors = honors.filter { honor in
+                    honor.bids.contains { $0.bidderName == userName } || honor.currentWinner == userName
+                }
+            }
         }
-        return firestoreManager.honors.filter { 
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            $0.description.localizedCaseInsensitiveContains(searchText)
+        
+        // 2. Search
+        if !searchText.isEmpty {
+            honors = honors.filter {
+                $0.name.localizedCaseInsensitiveContains(searchText) ||
+                $0.description.localizedCaseInsensitiveContains(searchText)
+            }
         }
+        
+        // 3. Sort
+        switch sortOption {
+        case .priceHighToLow:
+            honors.sort { $0.currentBid > $1.currentBid }
+        case .priceLowToHigh:
+            honors.sort { $0.currentBid < $1.currentBid }
+        case .mostActive:
+            honors.sort { $0.bids.count > $1.bids.count }
+        case .nameAZ:
+            honors.sort { $0.name < $1.name }
+        }
+        
+        return honors
+    }
+    
+    var groupedHonors: [String: [Honor]] {
+        Dictionary(grouping: filteredHonors, by: { $0.category })
+    }
+    
+    var sortedCategories: [String] {
+        groupedHonors.keys.sorted()
     }
     
     var body: some View {
@@ -37,82 +95,74 @@ struct AuctionListView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 20) {
-                    // Header Stats Section
-                    VStack(spacing: 14) {
-                        TotalPledgedCard(amount: totalPledged)
-                        
-                        HStack(spacing: 8) {
-                            StatsCard(
-                                icon: "hand.raised.fill",
-                                title: "Active",
-                                value: "\(firestoreManager.honors.filter { !$0.isSold }.count)",
-                                color: .blue
+                            // Header Stats Section
+                            AuctionStatsView(
+                                totalPledged: totalPledged,
+                                firestoreManager: firestoreManager,
+                                currentUser: currentUser
                             )
                             
-                            StatsCard(
-                                icon: "checkmark.seal.fill",
-                                title: "Sold",
-                                value: "\(firestoreManager.honors.filter { $0.isSold }.count)",
-                                color: .green
-                            )
-                            
-                            StatsCard(
-                                icon: "scroll.fill",
-                                title: "Total",
-                                value: "\(firestoreManager.honors.count)",
-                                color: .purple
+                            // Grouped Honors List
+                            AuctionGroupedListView(
+                                sortedCategories: sortedCategories,
+                                groupedHonors: groupedHonors,
+                                selectedHonor: $selectedHonor
                             )
                         }
-                        .frame(height: 80)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 4)
-                    
-                    // Honors List
-                    LazyVStack(spacing: 12) {
-                        ForEach(Array(filteredHonors.enumerated()), id: \.element.id) { index, honor in
-                            ModernHonorCard(honor: honor)
-                                .onTapGesture {
-                                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                                    impactFeedback.impactOccurred()
-                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                        selectedHonor = honor
-                                    }
-                                }
-                                .transition(.asymmetric(
-                                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                                    removal: .scale.combined(with: .opacity)
-                                ))
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
-                        }
+                    .refreshable {
+                        await firestoreManager.fetchHonors()
                     }
                 }
             }
             .background(Color(.systemGroupedBackground).ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "Search honors...")
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        Text("Torah Honors")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.purple, .blue],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                    Text("Auction")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [
+                                    Color(red: 0.25, green: 0.5, blue: 0.92),
+                                    Color(red: 0.3, green: 0.55, blue: 0.96)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
                             )
+                        )
+                        .shadow(color: .blue.opacity(0.2), radius: 6, x: 0, y: 3)
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack {
+                        // Sort Menu
+                        Menu {
+                            Picker("Sort By", selection: $sortOption) {
+                                ForEach(SortOption.allCases, id: \.self) { option in
+                                    Text(option.rawValue).tag(option)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "arrow.up.arrow.down.circle")
+                                .font(.system(size: 16, weight: .medium))
+                        }
                         
-                        Text("Live Auction")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
+                        // Filter Menu
+                        Menu {
+                            Picker("Filter By", selection: $filterOption) {
+                                ForEach(FilterOption.allCases, id: \.self) { option in
+                                    Text(option.rawValue).tag(option)
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                                .font(.system(size: 16, weight: .medium))
+                        }
                     }
                 }
             }
-            .searchable(text: $searchText, prompt: "Search honors...")
             .sheet(item: $selectedHonor) { honor in
                 HonorDetailView(
                     honor: honor,
@@ -121,6 +171,74 @@ struct AuctionListView: View {
                 )
             }
         }
+    }
+}
+
+// MARK: - Subviews
+struct AuctionStatsView: View {
+    let totalPledged: Double
+    @ObservedObject var firestoreManager: FirestoreManager
+    let currentUser: User?
+    
+    var body: some View {
+        VStack(spacing: 14) {
+            TotalPledgedCard(amount: totalPledged)
+            
+            HStack(spacing: 8) {
+                StatsCard(
+                    icon: "hand.raised.fill",
+                    title: "Active",
+                    value: "\(firestoreManager.honors.filter { !$0.isSold }.count)",
+                    color: .blue
+                )
+                
+                StatsCard(
+                    icon: "checkmark.seal.fill",
+                    title: "Sold",
+                    value: "\(firestoreManager.honors.filter { $0.isSold }.count)",
+                    color: .green
+                )
+                
+                StatsCard(
+                    icon: "person.fill",
+                    title: "My Bids",
+                    value: "\(firestoreManager.honors.filter { $0.bids.contains { bid in bid.bidderName == currentUser?.name } }.count)",
+                    color: .purple
+                )
+            }
+        }
+        .padding(.horizontal)
+        .padding(.top)
+    }
+}
+
+struct AuctionGroupedListView: View {
+    let sortedCategories: [String]
+    let groupedHonors: [String: [Honor]]
+    @Binding var selectedHonor: Honor?
+    
+    var body: some View {
+        LazyVStack(spacing: 25) {
+            ForEach(sortedCategories, id: \.self) { category in
+                VStack(alignment: .leading, spacing: 15) {
+                    // Category Header
+                    Text(category)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal)
+                        .padding(.top, 10)
+                    
+                    ForEach(groupedHonors[category] ?? []) { honor in
+                        ModernHonorCard(honor: honor)
+                            .onTapGesture {
+                                selectedHonor = honor
+                            }
+                            .padding(.horizontal)
+                    }
+                }
+            }
+        }
+        .padding(.bottom, 20)
     }
 }
 
@@ -200,31 +318,31 @@ struct StatsCard: View {
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: icon)
-                .font(.system(size: 20))
-                .foregroundStyle(color.gradient)
-                .symbolRenderingMode(.hierarchical)
-                .frame(height: 22)
+            .font(.system(size: 20))
+            .foregroundStyle(color.gradient)
+            .symbolRenderingMode(.hierarchical)
+            .frame(height: 22)
             
             Text(value)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(.primary)
-                .frame(height: 28)
+            .font(.system(size: 24, weight: .bold, design: .rounded))
+            .foregroundStyle(.primary)
+            .frame(height: 28)
             
             Text(title)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .tracking(0.3)
-                .frame(height: 12)
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .tracking(0.3)
+            .frame(height: 12)
         }
         .frame(maxWidth: .infinity, minHeight: 80, maxHeight: 80)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(.ultraThinMaterial)
+            .fill(.ultraThinMaterial)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(color.opacity(0.15), lineWidth: 1)
+            .strokeBorder(color.opacity(0.15), lineWidth: 1)
         )
     }
 }
@@ -234,6 +352,15 @@ struct ModernHonorCard: View {
     let honor: Honor
     @State private var isPressed = false
     
+    var isHot: Bool {
+        honor.bids.count >= 3 && !honor.isSold
+    }
+    
+    var progress: Double {
+        guard honor.buyNowPrice > 0 else { return 0 }
+        return min(honor.currentBid / honor.buyNowPrice, 1.0)
+    }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header Section
@@ -241,20 +368,31 @@ struct ModernHonorCard: View {
                 // Icon Badge
                 ZStack {
                     Circle()
-                        .fill(honor.isSold ? Color.green.gradient : Color.blue.gradient)
-                        .frame(width: 48, height: 48)
+                        .fill(honor.isSold ? Color.green.gradient : (isHot ? Color.orange.gradient : Color.blue.gradient))
+                        .frame(width: 52, height: 52)
                     
-                    Image(systemName: honor.isSold ? "checkmark.seal.fill" : "scroll.fill")
+                    Image(systemName: honor.isSold ? "checkmark.seal.fill" : (isHot ? "flame.fill" : "scroll.fill"))
                         .font(.title3)
                         .foregroundStyle(.white)
                         .symbolRenderingMode(.hierarchical)
                 }
                 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(honor.name)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                    HStack {
+                        Text(honor.name)
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        
+                        if isHot {
+                            Text("HOT")
+                                .font(.system(size: 10, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Capsule().fill(Color.orange))
+                        }
+                    }
                     
                     Text(honor.description)
                         .font(.system(size: 13, weight: .regular, design: .rounded))
@@ -266,6 +404,44 @@ struct ModernHonorCard: View {
                 Spacer(minLength: 0)
             }
             .padding(16)
+            
+            // Progress Bar (if active)
+            if !honor.isSold {
+                VStack(spacing: 4) {
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.secondary.opacity(0.1))
+                                .frame(height: 4)
+                            
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.blue, .purple],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geometry.size.width * progress, height: 4)
+                        }
+                    }
+                    .frame(height: 4)
+                    
+                    HStack {
+                        Text("\(Int(progress * 100))% of Buy Now")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        
+                        Spacer()
+                        
+                        Text("\(honor.bids.count) bids")
+                            .font(.system(size: 10, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+            }
             
             // Divider
             Divider()
@@ -372,7 +548,7 @@ struct ModernHonorCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(
-                    honor.isSold ? Color.green.opacity(0.3) : Color.blue.opacity(0.1),
+                    honor.isSold ? Color.green.opacity(0.3) : (isHot ? Color.orange.opacity(0.3) : Color.blue.opacity(0.1)),
                     lineWidth: honor.isSold ? 2 : 1
                 )
         )
@@ -386,135 +562,5 @@ struct ModernHonorCard: View {
     }
 }
 
-// MARK: - Profile View
-struct ProfileView: View {
-    @Binding var user: User?
-    @ObservedObject var authManager: AuthenticationManager
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 28) {
-                    // Profile Header
-                    VStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [.blue, .purple],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 120, height: 120)
-                                .shadow(color: .blue.opacity(0.3), radius: 20, x: 0, y: 10)
-                            
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 50))
-                                .foregroundStyle(.white)
-                                .symbolRenderingMode(.hierarchical)
-                        }
-                        .padding(.top, 20)
-                        
-                        VStack(spacing: 6) {
-                            Text(user?.name ?? "Member")
-                                .font(.system(size: 28, weight: .bold, design: .rounded))
-                                .foregroundStyle(.primary)
-                            
-                            Text(user?.email ?? "")
-                                .font(.system(size: 15, design: .rounded))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    
-                    // Stats Card
-                    VStack(spacing: 0) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "dollarsign.circle.fill")
-                                        .font(.title2)
-                                        .foregroundStyle(.green.gradient)
-                                        .symbolRenderingMode(.hierarchical)
-                                    
-                                    Text("Total Pledged")
-                                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(.secondary)
-                                }
-                                
-                                Text("$\((user?.totalPledged ?? 0).toSafeInt())")
-                                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                                    .foregroundStyle(.green)
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding(20)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(.ultraThinMaterial)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .strokeBorder(.green.opacity(0.2), lineWidth: 1)
-                        )
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    // Actions Section
-                    VStack(spacing: 12) {
-                        // Sign Out Button
-                        Button(action: {
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                            impactFeedback.impactOccurred()
-                            authManager.signOut()
-                            dismiss()
-                        }) {
-                            HStack {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
-                                    .font(.body.weight(.semibold))
-                                
-                                Text("Sign Out")
-                                    .font(.system(size: 17, weight: .semibold, design: .rounded))
-                                
-                                Spacer()
-                            }
-                            .foregroundStyle(.white)
-                            .padding(18)
-                            .background(
-                                LinearGradient(
-                                    colors: [.red, .red.opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                            .shadow(color: .red.opacity(0.3), radius: 12, x: 0, y: 6)
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    
-                    Spacer(minLength: 40)
-                }
-                .padding(.vertical)
-            }
-            .background(Color(.systemGroupedBackground).ignoresSafeArea())
-            .navigationTitle("Profile")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                            .symbolRenderingMode(.hierarchical)
-                    }
-                }
-            }
-        }
-    }
-}
+
+

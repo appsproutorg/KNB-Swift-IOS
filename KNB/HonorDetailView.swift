@@ -55,12 +55,63 @@ struct HonorDetailView: View {
                                 onPlaceBid: placeBid,
                                 onBuyNow: buyNow,
                                 onShowHistory: { showingBidHistory = true },
-                                buyNowPrice: honor.buyNowPrice
+                                buyNowPrice: honor.buyNowPrice,
+                                currentBid: honor.currentBid
                             )
                             .padding(.horizontal)
                         } else {
                             SoldBanner(winner: honor.currentWinner ?? "Unknown", amount: honor.currentBid)
                                 .padding(.horizontal)
+                        }
+                        
+                        // Inline Bid History Preview
+                        if !honor.bids.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("Recent Activity")
+                                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    
+                                    Spacer()
+                                    
+                                    Button("View All") {
+                                        showingBidHistory = true
+                                    }
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                }
+                                .padding(.horizontal)
+                                
+                                VStack(spacing: 0) {
+                                    ForEach(Array(honor.bids.prefix(3).enumerated()), id: \.element.id) { index, bid in
+                                        VStack(spacing: 0) {
+                                            HStack {
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text(bid.bidderName)
+                                                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                                                    
+                                                    Text(timeAgoString(from: bid.timestamp))
+                                                        .font(.system(size: 12, design: .rounded))
+                                                        .foregroundStyle(.secondary)
+                                                }
+                                                
+                                                Spacer()
+                                                
+                                                Text("$\(bid.amount.toSafeInt())")
+                                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                                    .foregroundStyle(index == 0 ? .green : .primary)
+                                            }
+                                            .padding()
+                                            
+                                            if index < min(honor.bids.count, 3) - 1 {
+                                                Divider()
+                                                    .padding(.leading)
+                                            }
+                                        }
+                                    }
+                                }
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(16)
+                                .padding(.horizontal)
+                            }
                         }
                         
                         Spacer(minLength: 50)
@@ -101,6 +152,12 @@ struct HonorDetailView: View {
                 BidHistoryView(bids: honor.bids)
             }
         }
+    }
+    
+    private func timeAgoString(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
     
     private func placeBid() {
@@ -237,28 +294,48 @@ struct HonorHeaderView: View {
     let honor: Honor
     
     var body: some View {
-        VStack(spacing: 15) {
-            Image(systemName: "scroll.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(.blue)
-                .padding()
-                .background(
-                    Circle()
-                        .fill(.blue.opacity(0.1))
-                )
+        VStack(spacing: 20) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.blue.opacity(0.1), .purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: 100, height: 100)
+                
+                Image(systemName: "scroll.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.blue, .purple],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
+            }
             
-            Text(honor.name)
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .multilineTextAlignment(.center)
-            
-            Text(honor.description)
-                .font(.system(size: 16, design: .rounded))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+            VStack(spacing: 8) {
+                Text(honor.name)
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.primary)
+                
+                Text(honor.description)
+                    .font(.system(size: 17, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+            }
         }
-        .padding()
+        .padding(24)
+        .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial)
-        .cornerRadius(20)
+        .cornerRadius(24)
+        .shadow(color: .black.opacity(0.05), radius: 15, x: 0, y: 5)
     }
 }
 
@@ -295,9 +372,27 @@ struct CurrentBidInfo: View {
                 }
             }
         }
-        .padding()
+        .padding(20)
         .background(.ultraThinMaterial)
         .cornerRadius(20)
+    }
+}
+
+// MARK: - Quick Bid Button
+struct QuickBidButton: View {
+    let amount: Int
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text("+\(amount)")
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .foregroundStyle(.blue)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.blue.opacity(0.1))
+                .cornerRadius(12)
+        }
     }
 }
 
@@ -309,16 +404,43 @@ struct BidSection: View {
     let onBuyNow: () -> Void
     let onShowHistory: () -> Void
     let buyNowPrice: Double
+    let currentBid: Double
+    
     @State private var bidButtonPressed = false
     @State private var buyButtonPressed = false
     
+    // Dynamic bid increments based on current bid
+    private var bidIncrements: [Int] {
+        if currentBid < 1000 {
+            return [50, 100, 180, 360]
+        } else if currentBid < 5000 {
+            return [100, 250, 500, 1000]
+        } else {
+            return [250, 500, 1000, 2500]
+        }
+    }
+    
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 24) {
             // Bid input
-            VStack(alignment: .leading, spacing: 10) {
-                Text("My Bid")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text("Your Bid")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                    
+                    Spacer()
+                    
+                    Text("Min: $\((currentBid + 1).toSafeInt())")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+                
+                // Quick Bid Buttons
+                HStack(spacing: 10) {
+                    ForEach(bidIncrements, id: \.self) { amount in
+                        QuickBidButton(amount: amount) { updateBid(amount: amount) }
+                    }
+                }
                 
                 HStack {
                     Text("$")
@@ -330,13 +452,12 @@ struct BidSection: View {
                         .keyboardType(.numberPad)
                 }
                 .padding()
-                .background(.ultraThinMaterial)
+                .background(Color(.systemBackground))
                 .cornerRadius(12)
-                
-                Text("Maximum bid: $1,000,000")
-                    .font(.system(size: 12, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 5)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+                )
             }
             
             // Comment
@@ -346,14 +467,18 @@ struct BidSection: View {
                     .foregroundStyle(.secondary)
                 
                 TextField("Add a comment...", text: $comment, axis: .vertical)
-                    .lineLimit(3...5)
+                    .lineLimit(2...4)
                     .padding()
-                    .background(.ultraThinMaterial)
+                    .background(Color(.systemBackground))
                     .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+                    )
             }
             
             // Action buttons
-            VStack(spacing: 15) {
+            VStack(spacing: 16) {
                 Button(action: onPlaceBid) {
                     HStack {
                         Image(systemName: "hand.raised.fill")
@@ -363,25 +488,24 @@ struct BidSection: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(.blue)
-                    .cornerRadius(15)
-                    .shadow(color: .blue.opacity(0.4), radius: bidButtonPressed ? 5 : 10, x: 0, y: bidButtonPressed ? 2 : 5)
-                    .scaleEffect(bidButtonPressed ? 0.95 : 1.0)
+                    .background(
+                        LinearGradient(
+                            colors: [.blue, .blue.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .cornerRadius(16)
+                    .shadow(color: .blue.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .scaleEffect(bidButtonPressed ? 0.98 : 1.0)
                 }
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            withAnimation(.easeInOut(duration: 0.1)) {
-                                bidButtonPressed = true
-                            }
-                        }
-                        .onEnded { _ in
-                            withAnimation(.easeInOut(duration: 0.1)) {
-                                bidButtonPressed = false
-                            }
-                        }
+                        .onChanged { _ in withAnimation(.easeInOut(duration: 0.1)) { bidButtonPressed = true } }
+                        .onEnded { _ in withAnimation(.easeInOut(duration: 0.1)) { bidButtonPressed = false } }
                 )
                 
+                // Buy Now Button
                 Button(action: onBuyNow) {
                     HStack {
                         Image(systemName: "cart.fill")
@@ -391,38 +515,32 @@ struct BidSection: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(.green)
-                    .cornerRadius(15)
-                    .shadow(color: .green.opacity(0.4), radius: buyButtonPressed ? 5 : 10, x: 0, y: buyButtonPressed ? 2 : 5)
-                    .scaleEffect(buyButtonPressed ? 0.95 : 1.0)
+                    .background(
+                        LinearGradient(
+                            colors: [.green, .green.opacity(0.8)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .cornerRadius(16)
+                    .shadow(color: .green.opacity(0.3), radius: 8, x: 0, y: 4)
+                    .scaleEffect(buyButtonPressed ? 0.98 : 1.0)
                 }
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 0)
-                        .onChanged { _ in
-                            withAnimation(.easeInOut(duration: 0.1)) {
-                                buyButtonPressed = true
-                            }
-                        }
-                        .onEnded { _ in
-                            withAnimation(.easeInOut(duration: 0.1)) {
-                                buyButtonPressed = false
-                            }
-                        }
+                        .onChanged { _ in withAnimation(.easeInOut(duration: 0.1)) { buyButtonPressed = true } }
+                        .onEnded { _ in withAnimation(.easeInOut(duration: 0.1)) { buyButtonPressed = false } }
                 )
-                
-                Button(action: onShowHistory) {
-                    HStack {
-                        Image(systemName: "clock.arrow.circlepath")
-                        Text("View Bids History")
-                            .font(.system(size: 16, weight: .medium, design: .rounded))
-                    }
-                    .foregroundStyle(.blue)
-                }
             }
         }
-        .padding()
+        .padding(24)
         .background(.ultraThinMaterial)
-        .cornerRadius(20)
+        .cornerRadius(24)
+    }
+    
+    private func updateBid(amount: Int) {
+        let newBid = currentBid + Double(amount)
+        bidAmount = String(Int(newBid))
     }
 }
 
@@ -456,4 +574,5 @@ struct SoldBanner: View {
         .cornerRadius(20)
     }
 }
+
 

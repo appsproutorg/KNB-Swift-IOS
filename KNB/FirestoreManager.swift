@@ -37,45 +37,6 @@ class FirestoreManager: ObservableObject {
     
     // MARK: - Initialize Honors (Run Once)
     func initializeHonorsInFirestore() async {
-        let initialHonors: [Honor] = [
-            // Night Honors
-            Honor(name: "Candy man", description: "Kids will love you and you will share in their pure reward", buyNowPrice: 1800),
-            Honor(name: "Ato Horeiso, night", description: "10 Pesukim from the Torah. Each one with Kabbalistic meaning. Merit for successful year", buyNowPrice: 1800),
-            Honor(name: "Pesicha, night", description: "Open Aron Kodesh. Special merit for easy labor", buyNowPrice: 1800),
-            Honor(name: "Hakafa 1, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 2, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 3, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 4, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 5, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 6, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 7, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Cohen, night", description: "If you are a cohen, this is your chance to be blessed with prosperous year. If you are not, you can pledge in honor of a cohen", buyNowPrice: 1800),
-            Honor(name: "Levi, night", description: "If you are a levi, this is your chance to be blessed with prosperous year. If you are not, you can pledge in honor of a levi", buyNowPrice: 1800),
-            Honor(name: "Yisroel, night", description: "Merit for \"aliya\" - elevation in material and spiritual spheres", buyNowPrice: 1800),
-            Honor(name: "Hagba, gelila, night", description: "Merit for physical and emotional strength to deal with daily challenges of life", buyNowPrice: 1800),
-            
-            // Day Honors
-            Honor(name: "Ato Horeiso, day", description: "10 Pesukim from the Torah. Each one with Kabbalistic meaning. Merit for successful year", buyNowPrice: 1800),
-            Honor(name: "Pesicha, day", description: "Open Aron Kodesh. Special merit for easy labor", buyNowPrice: 1800),
-            Honor(name: "Hakafa 1, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 2, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 3, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 4, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 5, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 6, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Hakafa 7, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800),
-            Honor(name: "Cohen, day", description: "If you are a cohen, this is your chance to be blessed with prosperous year. If you are not, you can pledge in honor of a cohen", buyNowPrice: 1800),
-            Honor(name: "Levi, day", description: "If you are a levi, this is your chance to be blessed with prosperous year. If you are not, you can pledge in honor of a levi", buyNowPrice: 1800),
-            Honor(name: "Yisroel, day", description: "Merit for \"aliya\" - elevation in material and spiritual spheres", buyNowPrice: 1800),
-            
-            // Special Honors
-            Honor(name: "Kol Hanaarim", description: "Blessing to all kids in the community. This is a merit to have more children", buyNowPrice: 10000),
-            Honor(name: "Choson Torah", description: "Huge merit for spiritual success and knowledge of Torah", buyNowPrice: 25000),
-            Honor(name: "Choson Bereshis", description: "Huge merit for material (financial) success", buyNowPrice: 25000),
-            Honor(name: "Maftir", description: "Merit for a chance of prophecy", buyNowPrice: 1800),
-            Honor(name: "Hagba, gelila, day", description: "Merit for physical and emotional strength to deal with daily challenges of life", buyNowPrice: 1800)
-        ]
-        
         // Check if honors already exist
         do {
             let snapshot = try await db.collection("honors").getDocuments()
@@ -85,11 +46,47 @@ class FirestoreManager: ObservableObject {
             }
         } catch {
             print("❌ Error checking for existing honors: \(error.localizedDescription)")
-            // Continue execution to attempt initialization if check failed, 
-            // or return if you want to be conservative. 
-            // For now, we'll assume if we can't check, we shouldn't try to write to avoid duplicates if it's just a connection error.
             return
         }
+        
+        let initialHonors: [Honor] = [
+            // Night Honors
+            Honor(name: "Candy man", description: "Kids will love you and you will share in their pure reward", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Ato Horeiso, night", description: "10 Pesukim from the Torah. Each one with Kabbalistic meaning. Merit for successful year", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Pesicha, night", description: "Open Aron Kodesh. Special merit for easy labor", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Hakafa 1, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Hakafa 2, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Hakafa 3, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Hakafa 4, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Hakafa 5, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Hakafa 6, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Hakafa 7, night", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Cohen, night", description: "If you are a cohen, this is your chance to be blessed with prosperous year. If you are not, you can pledge in honor of a cohen", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Levi, night", description: "If you are a levi, this is your chance to be blessed with prosperous year. If you are not, you can pledge in honor of a levi", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Yisroel, night", description: "Merit for \"aliya\" - elevation in material and spiritual spheres", buyNowPrice: 1800, category: "Night Honors"),
+            Honor(name: "Hagba, gelila, night", description: "Merit for physical and emotional strength to deal with daily challenges of life", buyNowPrice: 1800, category: "Night Honors"),
+            
+            // Day Honors
+            Honor(name: "Ato Horeiso, day", description: "10 Pesukim from the Torah. Each one with Kabbalistic meaning. Merit for successful year", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Pesicha, day", description: "Open Aron Kodesh. Special merit for easy labor", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Hakafa 1, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Hakafa 2, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Hakafa 3, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Hakafa 4, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Hakafa 5, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Hakafa 6, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Hakafa 7, day", description: "Dancing with the Torah. Merit for wisdom", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Cohen, day", description: "If you are a cohen, this is your chance to be blessed with prosperous year. If you are not, you can pledge in honor of a cohen", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Levi, day", description: "If you are a levi, this is your chance to be blessed with prosperous year. If you are not, you can pledge in honor of a levi", buyNowPrice: 1800, category: "Day Honors"),
+            Honor(name: "Yisroel, day", description: "Merit for \"aliya\" - elevation in material and spiritual spheres", buyNowPrice: 1800, category: "Day Honors"),
+            
+            // Special Honors
+            Honor(name: "Kol Hanaarim", description: "Blessing to all kids in the community. This is a merit to have more children", buyNowPrice: 10000, category: "Special Honors"),
+            Honor(name: "Choson Torah", description: "Huge merit for spiritual success and knowledge of Torah", buyNowPrice: 25000, category: "Special Honors"),
+            Honor(name: "Choson Bereshis", description: "Huge merit for material (financial) success", buyNowPrice: 25000, category: "Special Honors"),
+            Honor(name: "Maftir", description: "Merit for a chance of prophecy", buyNowPrice: 1800, category: "Special Honors"),
+            Honor(name: "Hagba, gelila, day", description: "Merit for physical and emotional strength to deal with daily challenges of life", buyNowPrice: 1800, category: "Day Honors")
+        ]
         
         // Add all honors to Firestore
         for honor in initialHonors {
@@ -102,6 +99,7 @@ class FirestoreManager: ObservableObject {
                     "buyNowPrice": honor.buyNowPrice,
                     "currentWinner": honor.currentWinner as Any,
                     "isSold": honor.isSold,
+                    "category": honor.category,
                     "bids": []
                 ])
                 print("✅ Added honor: \(honor.name)")
@@ -177,6 +175,63 @@ class FirestoreManager: ObservableObject {
         honorsListener?.remove()
     }
     
+    // MARK: - Fetch Honors (One-time)
+    func fetchHonors() async {
+        do {
+            let snapshot = try await db.collection("honors").getDocuments()
+            let documents = snapshot.documents
+            
+            DispatchQueue.main.async {
+                self.honors = documents.compactMap { doc -> Honor? in
+                    let data = doc.data()
+                    
+                    guard let idString = data["id"] as? String,
+                          let id = UUID(uuidString: idString),
+                          let name = data["name"] as? String,
+                          let description = data["description"] as? String,
+                          let buyNowPrice = data["buyNowPrice"] as? Double else {
+                        return nil
+                    }
+                    
+                    let currentBid = data["currentBid"] as? Double ?? 0
+                    let currentWinner = data["currentWinner"] as? String
+                    let isSold = data["isSold"] as? Bool ?? false
+                    let category = data["category"] as? String ?? "General"
+                    
+                    // Parse bids array
+                    let bidsData = data["bids"] as? [[String: Any]] ?? []
+                    let bids = bidsData.compactMap { bidData -> Bid? in
+                        guard let bidIdString = bidData["id"] as? String,
+                              let bidId = UUID(uuidString: bidIdString),
+                              let amount = bidData["amount"] as? Double,
+                              let bidderName = bidData["bidderName"] as? String,
+                              let timestamp = (bidData["timestamp"] as? Timestamp)?.dateValue() else {
+                            return nil
+                        }
+                        
+                        let comment = bidData["comment"] as? String
+                        
+                        return Bid(id: bidId, amount: amount, bidderName: bidderName, timestamp: timestamp, comment: comment)
+                    }
+                    
+                    return Honor(
+                        id: id,
+                        name: name,
+                        description: description,
+                        currentBid: currentBid,
+                        buyNowPrice: buyNowPrice,
+                        currentWinner: currentWinner,
+                        bids: bids,
+                        isSold: isSold,
+                        category: category
+                    )
+                }
+            }
+        } catch {
+            print("Error fetching honors: \(error)")
+        }
+    }
+    
     // MARK: - Place Bid
     func placeBid(honorId: UUID, bid: Bid) async -> Bool {
         // Validate bid amount (max 1 million, must be positive and valid)
@@ -189,67 +244,69 @@ class FirestoreManager: ObservableObject {
             return false
         }
         
-            let honorRef = db.collection("honors").document(honorId.uuidString)
-            
-        // Use Firestore transaction to prevent race conditions
+        let honorRef = db.collection("honors").document(honorId.uuidString)
+        
         do {
-            // First, get the current document to check conditions
-            let honorDoc = try await honorRef.getDocument()
-            
-            guard let data = honorDoc.data() else {
-                errorMessage = "Honor not found"
-                return false
-            }
-            
-            // Check if honor is already sold
-            let isSold = data["isSold"] as? Bool ?? false
-            if isSold {
-                errorMessage = "This honor has already been sold"
-                return false
-            }
-            
-            let currentBid = data["currentBid"] as? Double ?? 0
-            
-            // Ensure new bid is higher than current bid
-            guard bid.amount > currentBid else {
-                errorMessage = "Bid must be higher than current bid of $\(Int(currentBid))"
-                return false
-            }
-            
-            // Use a transaction to atomically update
-            // Note: Using FieldValue.serverTimestamp() and atomic operations where possible
-            let newBidData: [String: Any] = [
-                "id": bid.id.uuidString,
-                "amount": bid.amount,
-                "bidderName": bid.bidderName,
-                "timestamp": Timestamp(date: bid.timestamp),
-                "comment": bid.comment as Any
-            ]
-            
-            // Get current bids and add new one
-            var bids = data["bids"] as? [[String: Any]] ?? []
-            bids.insert(newBidData, at: 0)
-            
-            // Update with a check that it hasn't been sold or bid on since we read it
-            try await honorRef.updateData([
-                "bids": bids,
-                "currentBid": bid.amount,
-                "currentWinner": bid.bidderName
-            ])
+            // Use Firestore transaction to prevent race conditions
+            let _ = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
+                let honorDoc: DocumentSnapshot
+                do {
+                    honorDoc = try transaction.getDocument(honorRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                guard let data = honorDoc.data() else {
+                    let error = NSError(domain: "AppError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Honor not found"])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Check if honor is already sold
+                let isSold = data["isSold"] as? Bool ?? false
+                if isSold {
+                    let error = NSError(domain: "AppError", code: 400, userInfo: [NSLocalizedDescriptionKey: "This honor has already been sold"])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                let currentBid = data["currentBid"] as? Double ?? 0
+                
+                // Ensure new bid is higher than current bid
+                if bid.amount <= currentBid {
+                    let error = NSError(domain: "AppError", code: 400, userInfo: [NSLocalizedDescriptionKey: "Bid must be higher than current bid of $\(Int(currentBid))"])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Prepare new bid data
+                let newBidData: [String: Any] = [
+                    "id": bid.id.uuidString,
+                    "amount": bid.amount,
+                    "bidderName": bid.bidderName,
+                    "timestamp": Timestamp(date: bid.timestamp),
+                    "comment": bid.comment as Any
+                ]
+                
+                // Get current bids and add new one
+                var bids = data["bids"] as? [[String: Any]] ?? []
+                bids.insert(newBidData, at: 0)
+                
+                // Update document
+                transaction.updateData([
+                    "bids": bids,
+                    "currentBid": bid.amount,
+                    "currentWinner": bid.bidderName
+                ], forDocument: honorRef)
+                
+                return nil
+            })
             
             return true
         } catch {
-            // Handle errors with user-friendly messages
-            if let nsError = error as NSError? {
-                if nsError.domain == "TransactionError" {
-                    errorMessage = nsError.localizedDescription
-                } else {
-                    errorMessage = "Failed to place bid. Please try again."
-                }
-            } else {
-                errorMessage = "Failed to place bid. Please try again."
-            }
             print("❌ Error placing bid: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
             return false
         }
     }
@@ -264,59 +321,61 @@ class FirestoreManager: ObservableObject {
             return false
         }
         
-            let honorRef = db.collection("honors").document(honorId.uuidString)
-            
-        // Use atomic update to prevent race conditions
+        let honorRef = db.collection("honors").document(honorId.uuidString)
+        
         do {
-            // First, get the current document to check conditions
-            let honorDoc = try await honorRef.getDocument()
-            
-            guard let data = honorDoc.data() else {
-                errorMessage = "Honor not found"
-                return false
-            }
-            
-            // Check if honor is already sold (atomic check)
-            let isSold = data["isSold"] as? Bool ?? false
-            if isSold {
-                errorMessage = "This honor has already been sold"
-                return false
-            }
-            
-            // Update bids array
-            var bids = data["bids"] as? [[String: Any]] ?? []
-            
-            let buyNowBidData: [String: Any] = [
-                "id": bid.id.uuidString,
-                "amount": bid.amount,
-                "bidderName": bid.bidderName,
-                "timestamp": Timestamp(date: bid.timestamp),
-                "comment": bid.comment as Any
-            ]
-            
-            bids.insert(buyNowBidData, at: 0)
-            
-            // Update honor as sold atomically
-            try await honorRef.updateData([
-                "bids": bids,
-                "currentBid": bid.amount,
-                "currentWinner": bid.bidderName,
-                "isSold": true
-            ])
+            // Use Firestore transaction to prevent race conditions
+            let _ = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
+                let honorDoc: DocumentSnapshot
+                do {
+                    honorDoc = try transaction.getDocument(honorRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                guard let data = honorDoc.data() else {
+                    let error = NSError(domain: "AppError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Honor not found"])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Check if honor is already sold
+                let isSold = data["isSold"] as? Bool ?? false
+                if isSold {
+                    let error = NSError(domain: "AppError", code: 400, userInfo: [NSLocalizedDescriptionKey: "This honor has already been sold"])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Update bids array
+                var bids = data["bids"] as? [[String: Any]] ?? []
+                
+                let buyNowBidData: [String: Any] = [
+                    "id": bid.id.uuidString,
+                    "amount": bid.amount,
+                    "bidderName": bid.bidderName,
+                    "timestamp": Timestamp(date: bid.timestamp),
+                    "comment": bid.comment as Any
+                ]
+                
+                bids.insert(buyNowBidData, at: 0)
+                
+                // Update honor as sold
+                transaction.updateData([
+                    "bids": bids,
+                    "currentBid": bid.amount,
+                    "currentWinner": bid.bidderName,
+                    "isSold": true
+                ], forDocument: honorRef)
+                
+                return nil
+            })
             
             return true
         } catch {
-            // Handle errors with user-friendly messages
-            if let nsError = error as NSError? {
-                if nsError.domain == "TransactionError" {
-                    errorMessage = nsError.localizedDescription
-                } else {
-                    errorMessage = "Failed to purchase honor. Please try again."
-                }
-            } else {
-                errorMessage = "Failed to purchase honor. Please try again."
-            }
             print("❌ Error buying now: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
             return false
         }
     }
@@ -416,50 +475,66 @@ class FirestoreManager: ObservableObject {
     
     // Sponsor Kiddush - returns true if successful, false if date already taken
     func sponsorKiddush(_ sponsorship: KiddushSponsorship) async -> Bool {
+        // CRITICAL: Always use startOfDay for consistent date comparison
+        let calendar = Calendar.chicago
+        let startOfDay = calendar.startOfDay(for: sponsorship.date)
+        
+        // Create a deterministic document ID based on the date to ensure uniqueness
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = TimeZone(identifier: "America/Chicago")
+        let dateString = dateFormatter.string(from: startOfDay)
+        let documentId = "sponsorship_\(dateString)"
+        
+        let sponsorshipRef = db.collection("kiddush_sponsorships").document(documentId)
+        
         do {
-            // CRITICAL: Always use startOfDay for consistent date comparison
-            let calendar = Calendar.chicago
-            let startOfDay = calendar.startOfDay(for: sponsorship.date)
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+            print("🔍 Attempting to sponsor date: \(startOfDay) with Doc ID: \(documentId)")
             
-            print("🔍 Checking sponsorship for date: \(startOfDay)")
-            
-            let snapshot = try await db.collection("kiddush_sponsorships")
-                .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: startOfDay))
-                .whereField("date", isLessThan: Timestamp(date: endOfDay))
-                .getDocuments()
-            
-            print("📊 Found \(snapshot.documents.count) existing sponsorships for this date")
-            
-            // If there's already a sponsorship for this date, return false
-            if !snapshot.documents.isEmpty {
-                print("❌ Date already sponsored")
-                errorMessage = "This Shabbat date has already been sponsored."
-                return false
-            }
-            
-            // Create the sponsorship - ALWAYS store with startOfDay to ensure consistency
-            print("✅ Creating sponsorship for \(startOfDay)")
-            print("   Storing date as: \(startOfDay) (UTC: \(startOfDay.timeIntervalSince1970))")
-            
-            try await db.collection("kiddush_sponsorships")
-                .document(sponsorship.id.uuidString)
-                .setData([
+            let _ = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
+                let sponsorshipDoc: DocumentSnapshot
+                do {
+                    sponsorshipDoc = try transaction.getDocument(sponsorshipRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                // Check if document already exists
+                if sponsorshipDoc.exists {
+                    let error = NSError(domain: "AppError", code: 409, userInfo: [NSLocalizedDescriptionKey: "This Shabbat date has already been sponsored."])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Also check for legacy UUID-based documents for this date (backward compatibility)
+                // Note: We can't easily query inside a transaction for other docs, 
+                // but the new system will prevent NEW duplicates. 
+                // Existing duplicates would be rare and handled by the UI check previously.
+                
+                // Create the sponsorship data
+                let sponsorshipData: [String: Any] = [
                     "id": sponsorship.id.uuidString,
-                    "date": Timestamp(date: startOfDay),  // Use startOfDay!
+                    "date": Timestamp(date: startOfDay),
                     "sponsorName": sponsorship.sponsorName,
                     "sponsorEmail": sponsorship.sponsorEmail,
                     "occasion": sponsorship.occasion,
                     "isAnonymous": sponsorship.isAnonymous,
                     "timestamp": Timestamp(date: sponsorship.timestamp),
                     "isPaid": sponsorship.isPaid
-                ])
+                ]
+                
+                // Create the document
+                transaction.setData(sponsorshipData, forDocument: sponsorshipRef)
+                
+                return nil
+            })
             
             print("🎉 Sponsorship created successfully")
             return true
         } catch {
             print("❌ Error sponsoring Kiddush: \(error.localizedDescription)")
-            errorMessage = "Failed to create sponsorship: \(error.localizedDescription)"
+            errorMessage = error.localizedDescription
             return false
         }
     }

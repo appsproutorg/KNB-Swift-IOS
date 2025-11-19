@@ -11,6 +11,10 @@ struct BidHistoryView: View {
     let bids: [Bid]
     @Environment(\.dismiss) var dismiss
     
+    var sortedBids: [Bid] {
+        bids.sorted { $0.timestamp > $1.timestamp }
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -27,11 +31,11 @@ struct BidHistoryView: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
-                            ForEach(Array(bids.enumerated()), id: \.element.id) { index, bid in
+                            ForEach(Array(sortedBids.enumerated()), id: \.element.id) { index, bid in
                                 BidHistoryRow(
                                     bid: bid,
                                     isFirst: index == 0,
-                                    isLast: index == bids.count - 1
+                                    isLast: index == sortedBids.count - 1
                                 )
                             }
                         }
@@ -64,16 +68,19 @@ struct BidHistoryRow: View {
                 // Top connector (hidden for first item)
                 if !isFirst {
                     Rectangle()
-                        .fill(Color.blue.opacity(0.3))
+                        .fill(Color.blue.opacity(0.2))
                         .frame(width: 2)
-                        .frame(height: 20)
+                        .frame(height: 24)
+                } else {
+                    Spacer().frame(height: 24)
                 }
                 
                 // Circle indicator
                 ZStack {
                     Circle()
-                        .fill(Color.blue)
-                        .frame(width: 12, height: 12)
+                        .fill(isFirst ? Color.green : Color.blue)
+                        .frame(width: 14, height: 14)
+                        .shadow(color: (isFirst ? Color.green : Color.blue).opacity(0.3), radius: 4, x: 0, y: 2)
                     
                     Circle()
                         .fill(Color.white)
@@ -83,25 +90,27 @@ struct BidHistoryRow: View {
                 // Bottom connector (hidden for last item)
                 if !isLast {
                     Rectangle()
-                        .fill(Color.blue.opacity(0.3))
+                        .fill(Color.blue.opacity(0.2))
                         .frame(width: 2)
                         .frame(maxHeight: .infinity)
+                } else {
+                    Spacer()
                 }
             }
-            .frame(width: 12)
+            .frame(width: 16)
             
             // Bid content
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text("$\(bid.amount.toSafeInt())")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(.primary)
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                        .foregroundColor(isFirst ? .green : .primary)
                     
                     Spacer()
                     
                     if isFirst {
-                        Text("Current")
-                            .font(.system(size: 12, weight: .semibold))
+                        Text("Current Leader")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -112,35 +121,54 @@ struct BidHistoryRow: View {
                     }
                 }
                 
-                Text(bid.bidderName)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.primary)
+                HStack {
+                    Image(systemName: "person.fill")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    
+                    Text(bid.bidderName)
+                        .font(.system(size: 16, weight: .medium, design: .rounded))
+                        .foregroundColor(.primary)
+                }
                 
                 if let comment = bid.comment, !comment.isEmpty {
                     Text(comment)
-                        .font(.system(size: 14, weight: .regular))
+                        .font(.system(size: 14, weight: .regular, design: .rounded))
                         .foregroundColor(.secondary)
                         .padding(.top, 2)
+                        .padding(.leading, 8)
+                        .overlay(
+                            Rectangle()
+                                .fill(Color.secondary.opacity(0.2))
+                                .frame(width: 2)
+                                .padding(.vertical, 2),
+                            alignment: .leading
+                        )
                 }
                 
                 Text(timeAgoString(from: bid.timestamp))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundColor(.secondary.opacity(0.8))
+                    .padding(.top, 4)
             }
-            .padding()
+            .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 16)
                     .fill(Color(.systemBackground))
-                    .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+                    .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(isFirst ? Color.green.opacity(0.3) : Color.clear, lineWidth: 1)
             )
         }
-        .padding(.vertical, 4)
+        .padding(.bottom, 16)
     }
     
     private func timeAgoString(from date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
+        formatter.unitsStyle = .full
         return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
@@ -150,14 +178,14 @@ struct EmptyBidHistoryView: View {
         VStack(spacing: 16) {
             Image(systemName: "gavel")
                 .font(.system(size: 60))
-                .foregroundColor(.secondary)
+                .foregroundColor(.secondary.opacity(0.5))
             
             Text("No Bids Yet")
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundColor(.primary)
             
             Text("Be the first to place a bid!")
-                .font(.system(size: 15, weight: .regular))
+                .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundColor(.secondary)
         }
     }
