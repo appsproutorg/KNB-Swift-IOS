@@ -174,6 +174,9 @@ struct ReplyCard: View {
     @ObservedObject var firestoreManager: FirestoreManager
     var onDelete: () -> Void
     
+    @State private var authorDisplayName: String = ""
+    private let userCache = UserCacheManager.shared
+    
     @State private var isLiked: Bool
     @State private var likeCount: Int
     @State private var heartScale: CGFloat = 1.0
@@ -240,7 +243,7 @@ struct ReplyCard: View {
                     
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 8) {
-                            Text(reply.authorName)
+                            Text(authorDisplayName.isEmpty ? "Loading..." : authorDisplayName)
                                 .font(.system(size: 15, weight: .semibold))
                             
                             Text(relativeTime)
@@ -308,6 +311,43 @@ struct ReplyCard: View {
         }
         .onChange(of: reply.likeCount) { _, newCount in
             likeCount = newCount
+        }
+        .onAppear {
+            loadAuthorName()
+        }
+    }
+    
+    private func loadAuthorName() {
+        // 1. Check cache first
+        if let cachedName = userCache.getCachedName(for: reply.authorEmail) {
+            authorDisplayName = cachedName
+            return
+        }
+        
+        // 2. If it's the current user, use their name and cache it
+        if let currentUserEmail = currentUserEmail, 
+           currentUserEmail == reply.authorEmail {
+            // We don't have the current user's name passed directly to ReplyCard,
+            // but we can use the one from the reply object as a starting point
+            // or rely on the cache/fetch.
+            // Ideally, we should pass currentUserName to ReplyCard too.
+        }
+        
+        // 3. Use the name from the reply object as a fallback/placeholder and cache it
+        // This ensures we show something immediately while potentially fetching updates
+        if authorDisplayName.isEmpty {
+            authorDisplayName = reply.authorName
+            userCache.cacheName(reply.authorName, for: reply.authorEmail)
+        }
+        
+        // 4. Fetch from Firestore to get the latest name
+        Task {
+            if let userData = await firestoreManager.fetchUserData(email: reply.authorEmail) {
+                await MainActor.run {
+                    authorDisplayName = userData.name
+                    userCache.cacheName(userData.name, for: reply.authorEmail)
+                }
+            }
         }
     }
     
