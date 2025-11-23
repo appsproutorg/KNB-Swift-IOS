@@ -167,6 +167,10 @@ struct PostCard: View {
                     }
                 }
             }
+            .contentShape(Rectangle()) // Make the whole area tappable
+            .onTapGesture {
+                onReply()
+            }
             
             // Action buttons - Better spacing
             HStack(spacing: 0) {

@@ -45,7 +45,26 @@ struct ReplyThreadView: View {
                         )
                         .padding()
                         
-                        Divider()
+                        // Replies Header
+                        HStack {
+                            Text("Replies")
+                                .font(.system(size: 18, weight: .bold, design: .rounded))
+                            
+                            if post.replyCount > 0 {
+                                Text("\(post.replyCount)")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 2)
+                                    .background(Color.secondary.opacity(0.1))
+                                    .cornerRadius(8)
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .padding(.bottom, 4)
                         
                         // Replies section
                         if isLoadingReplies {
@@ -202,12 +221,23 @@ struct ReplyCard: View {
     }
     
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Thread line
-            Rectangle()
-                .fill(Color.secondary.opacity(0.3))
-                .frame(width: 2)
-                .padding(.top, 8)
+        HStack(alignment: .top, spacing: 16) {
+            // Thread line - Enhanced design
+            VStack(spacing: 0) {
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.secondary.opacity(0.2),
+                                Color.secondary.opacity(0.1)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: 3)
+            }
+            .padding(.top, 2)
             
             VStack(alignment: .leading, spacing: 8) {
                 // Header
