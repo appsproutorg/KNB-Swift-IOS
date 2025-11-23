@@ -46,7 +46,7 @@ service cloud.firestore {
                         || (request.resource.data.authorEmail == resource.data.authorEmail
                             && request.resource.data.content == resource.data.content
                             && request.resource.data.timestamp == resource.data.timestamp
-                            && request.resource.data.authorName == resource.data.authorName
+                            && request.resource.data.authorName == resource.data.authorName  // authorName cannot be changed
                             && (request.resource.data.parentPostId == resource.data.parentPostId)
                             && request.resource.data.replyCount >= 0));
       allow delete: if isAuthenticated() 
@@ -71,8 +71,15 @@ service cloud.firestore {
       allow create: if isAuthenticated() 
                     && request.resource.data.email == request.auth.token.email;
       allow update: if isAuthenticated() 
-                    && (resource.data.email == request.auth.token.email 
-                        || request.resource.data.email == request.auth.token.email);
+                    && resource.data.email == request.auth.token.email
+                    && request.resource.data.email == resource.data.email  // Cannot change email
+                    && (!request.resource.data.keys().hasAny(['isAdmin']) 
+                        || request.resource.data.isAdmin == resource.data.isAdmin  // Cannot change isAdmin unless already admin
+                        || get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.isAdmin == true)
+                    && (!request.resource.data.keys().hasAny(['name']) 
+                        || (request.resource.data.name is string 
+                            && request.resource.data.name.size() >= 3 
+                            && request.resource.data.name.size() <= 50));  // Name validation: 3-50 chars
     }
     
     // Push notifications queue - only authenticated users can create

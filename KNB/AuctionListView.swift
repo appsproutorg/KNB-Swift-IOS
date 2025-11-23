@@ -452,7 +452,7 @@ struct ModernHonorCard: View {
                 // Current Bid
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 4) {
-                        Image(systemName: "gavel.fill")
+                        Image(systemName: "hammer.fill")
                             .font(.caption2)
                             .foregroundStyle(.blue)
                         

@@ -176,7 +176,7 @@ struct BidHistoryRow: View {
 struct EmptyBidHistoryView: View {
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "gavel")
+            Image(systemName: "hammer")
                 .font(.system(size: 60))
                 .foregroundColor(.secondary.opacity(0.5))
             

@@ -1419,6 +1419,43 @@ class FirestoreManager: ObservableObject {
         }
     }
     
+    // Update user's name
+    func updateUserName(email: String, newName: String) async -> Bool {
+        // Validate name
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !trimmedName.isEmpty else {
+            errorMessage = "Name cannot be empty"
+            return false
+        }
+        
+        guard trimmedName.count >= 3 else {
+            errorMessage = "Name must be at least 3 characters"
+            return false
+        }
+        
+        guard trimmedName.count <= 50 else {
+            errorMessage = "Name must be 50 characters or less"
+            return false
+        }
+        
+        do {
+            let userRef = db.collection("users").document(email)
+            try await userRef.updateData([
+                "name": trimmedName,
+                "lastUpdated": Timestamp(date: Date())
+            ])
+            
+            print("✅ Updated name for \(email): \(trimmedName)")
+            return true
+        } catch {
+            print("❌ Error updating name: \(error.localizedDescription)")
+            errorMessage = "Failed to update name: \(error.localizedDescription)"
+            return false
+        }
+    }
+    
+    
 }
 
 

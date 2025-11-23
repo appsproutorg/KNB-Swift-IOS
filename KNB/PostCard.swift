@@ -20,6 +20,8 @@ struct PostCard: View {
     @State private var likeCount: Int
     @State private var heartScale: CGFloat = 1.0
     @State private var showDeleteConfirmation = false
+    @State private var authorDisplayName: String = ""
+    private let userCache = UserCacheManager.shared
     
     init(post: SocialPost, currentUserEmail: String?, currentUserName: String? = nil, firestoreManager: FirestoreManager, onReply: @escaping () -> Void, onDelete: @escaping () -> Void, onEdit: (() -> Void)? = nil) {
         self.post = post
@@ -78,7 +80,7 @@ struct PostCard: View {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(post.authorName)
+                        Text(authorDisplayName.isEmpty ? "Loading..." : authorDisplayName)
                             .font(.system(size: 16, weight: .semibold))
                             .foregroundStyle(.primary)
                         
@@ -229,6 +231,9 @@ struct PostCard: View {
         } message: {
             Text("Are you sure you want to delete this post? This action cannot be undone.")
         }
+        .onAppear {
+            loadAuthorName()
+        }
         .onChange(of: post.likes) { _, newLikes in
             isLiked = newLikes.contains(currentUserEmail ?? "")
             likeCount = post.likeCount
@@ -276,6 +281,43 @@ struct PostCard: View {
                 await MainActor.run {
                     isLiked = wasLiked
                     likeCount = post.likeCount
+                }
+            }
+        }
+    }
+    
+    private func loadAuthorName() {
+        // Check cache first
+        if let cachedName = userCache.getCachedName(for: post.authorEmail) {
+            authorDisplayName = cachedName
+            return
+        }
+        
+        // If current user, use their name immediately
+        if post.authorEmail == currentUserEmail, let currentName = currentUserName {
+            authorDisplayName = currentName
+            userCache.cacheName(currentName, for: post.authorEmail)
+            return
+        }
+        
+        // Fall back to authorName from post for backwards compatibility
+        if !post.authorName.isEmpty {
+            authorDisplayName = post.authorName
+            userCache.cacheName(post.authorName, for: post.authorEmail)
+            return
+        }
+        
+        // Fetch from Firestore
+        Task {
+            if let userData = await firestoreManager.fetchUserData(email: post.authorEmail) {
+                await MainActor.run {
+                    authorDisplayName = userData.name
+                    userCache.cacheName(userData.name, for: post.authorEmail)
+                }
+            } else {
+                // Fallback if user not found
+                await MainActor.run {
+                    authorDisplayName = "Unknown User"
                 }
             }
         }

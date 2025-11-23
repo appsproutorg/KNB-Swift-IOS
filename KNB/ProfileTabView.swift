@@ -19,6 +19,12 @@ struct ProfileTabView: View {
     @State private var showSettings = false
     @StateObject private var notificationManager = NotificationManager(currentUserEmail: "")
     
+    // Name editing state
+    @State private var showNameEditor = false
+    @State private var editedName = ""
+    @State private var isUpdatingName = false
+    @State private var nameUpdateMessage: String?
+    
     init(user: Binding<User?>, authManager: AuthenticationManager, firestoreManager: FirestoreManager) {
         self._user = user
         self.authManager = authManager
@@ -34,6 +40,71 @@ struct ProfileTabView: View {
         guard let email = user?.email else { return 0 }
         // Count sponsorships from real-time data
         return firestoreManager.kiddushSponsorships.filter { $0.sponsorEmail == email }.count
+    }
+    
+    func loadUserSponsorships() {
+        guard let email = user?.email else {
+            print("⚠️ No user email available for loading sponsorships")
+            return
+        }
+        
+        print("🔍 Loading sponsorships for: \(email)")
+        isLoadingSponsorships = true
+        
+        Task {
+            userSponsorships = await firestoreManager.fetchUserSponsorships(email: email)
+            print("✅ Loaded \(userSponsorships.count) sponsorships for user")
+            
+            // Also check the real-time data
+            let realtimeCount = firestoreManager.kiddushSponsorships.filter { $0.sponsorEmail == email }.count
+            print("📊 Real-time listener has \(realtimeCount) sponsorships for user")
+            print("📋 Total sponsorships in Firestore: \(firestoreManager.kiddushSponsorships.count)")
+            
+            isLoadingSponsorships = false
+        }
+    }
+    
+    func updateUserName() async {
+        guard let email = user?.email else {
+            nameUpdateMessage = "User email not found"
+            return
+        }
+        
+        isUpdatingName = true
+        nameUpdateMessage = nil
+        
+        let success = await firestoreManager.updateUserName(email: email, newName: editedName)
+        
+        await MainActor.run {
+            isUpdatingName = false
+            
+            if success {
+                // Update local user object
+                let trimmedName = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
+                user?.name = trimmedName
+                
+                // Update cache so all posts show new name immediately
+                UserCacheManager.shared.updateCachedName(trimmedName, for: email)
+                
+                // Haptic feedback
+                let feedbackGenerator = UINotificationFeedbackGenerator()
+                feedbackGenerator.notificationOccurred(.success)
+                
+                nameUpdateMessage = "Name updated successfully!"
+                
+                // Close sheet after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    showNameEditor = false
+                    nameUpdateMessage = nil
+                }
+            } else {
+                nameUpdateMessage = firestoreManager.errorMessage ?? "Failed to update name"
+                
+                // Haptic feedback for error
+                let feedbackGenerator = UINotificationFeedbackGenerator()
+                feedbackGenerator.notificationOccurred(.error)
+            }
+        }
     }
     
     var body: some View {
@@ -86,7 +157,8 @@ struct ProfileTabView: View {
                             }
                             .padding(.top, 20)
                             
-                            VStack(spacing: 8) {
+                            VStack(spacing: 12) {
+                                // Name display
                                 Text(user?.name ?? "Member")
                                     .font(.system(size: 28, weight: .bold, design: .rounded))
                                     .foregroundStyle(
@@ -96,6 +168,35 @@ struct ProfileTabView: View {
                                             endPoint: .trailing
                                         )
                                     )
+                                
+                                // Prominent Edit Name button
+                                Button(action: {
+                                    editedName = user?.name ?? ""
+                                    showNameEditor = true
+                                }) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "pencil")
+                                            .font(.system(size: 13, weight: .semibold))
+                                        Text("Edit Name")
+                                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                    }
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 0.25, green: 0.5, blue: 0.92),
+                                                Color(red: 0.3, green: 0.55, blue: 0.96)
+                                            ],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .clipShape(Capsule())
+                                    .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.4), radius: 8, x: 0, y: 4)
+                                }
+                            }
                                 
                                 Text(user?.email ?? "")
                                     .font(.system(size: 15, design: .rounded))
@@ -450,6 +551,17 @@ struct ProfileTabView: View {
                 SettingsView(appSettings: appSettings)
                     .preferredColorScheme(appSettings.colorScheme)
             }
+            .sheet(isPresented: $showNameEditor) {
+                NameEditorView(
+                    currentName: user?.name ?? "",
+                    editedName: $editedName,
+                    isUpdating: $isUpdatingName,
+                    updateMessage: $nameUpdateMessage,
+                    onSave: {
+                        await updateUserName()
+                    }
+                )
+            }
             .onAppear {
                 // Update notification manager with current user email
                 if let email = user?.email {
@@ -475,28 +587,6 @@ struct ProfileTabView: View {
         }
     }
     
-    func loadUserSponsorships() {
-        guard let email = user?.email else {
-            print("⚠️ No user email available for loading sponsorships")
-            return
-        }
-        
-        print("🔍 Loading sponsorships for: \(email)")
-        isLoadingSponsorships = true
-        
-        Task {
-            userSponsorships = await firestoreManager.fetchUserSponsorships(email: email)
-            print("✅ Loaded \(userSponsorships.count) sponsorships for user")
-            
-            // Also check the real-time data
-            let realtimeCount = firestoreManager.kiddushSponsorships.filter { $0.sponsorEmail == email }.count
-            print("📊 Real-time listener has \(realtimeCount) sponsorships for user")
-            print("📋 Total sponsorships in Firestore: \(firestoreManager.kiddushSponsorships.count)")
-            
-            isLoadingSponsorships = false
-        }
-    }
-}
 
 // MARK: - Honor Bid Card
 struct HonorBidCard: View {
@@ -772,4 +862,180 @@ struct DebugActionButton: View {
     )
     .environmentObject(AppSettings())
 }
+
+// MARK: - Name Editor View
+struct NameEditorView: View {
+    let currentName: String
+    @Binding var editedName: String
+    @Binding var isUpdating: Bool
+    @Binding var updateMessage: String?
+    var onSave: () async -> Void
+    
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isTextFieldFocused: Bool
+    
+    private var isNameValid: Bool {
+        let trimmed = editedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count >= 3 && trimmed.count <= 50
+    }
+    
+    private var characterCountColor: Color {
+        let count = editedName.count
+        if count == 0 || count > 50 {
+            return .red
+        } else if count < 3 {
+            return .orange
+        } else {
+            return .green
+        }
+    }
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Background gradient
+                LinearGradient(
+                    colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+                
+                VStack(spacing: 30) {
+                    // Title section
+                    VStack(spacing: 8) {
+                        Text("Edit Your Name")
+                            .font(.system(size: 28, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.blue, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                        
+                        Text("This name will appear on your profile and future posts")
+                            .font(.system(size: 14, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 20)
+                    
+                    // Text field card
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Name")
+                            .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        
+                        TextField("Enter your name", text: $editedName)
+                            .font(.system(size: 18, weight: .medium, design: .rounded))
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .cornerRadius(12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        isNameValid ? Color.green.opacity(0.5) : Color.red.opacity(0.3),
+                                        lineWidth: isNameValid ? 2 : 1
+                                    )
+                            )
+                            .focused($isTextFieldFocused)
+                            .disabled(isUpdating)
+                        
+                        // Character counter
+                        HStack {
+                            if !isNameValid {
+                                Text(editedName.count < 3 ? "Minimum 3 characters" : "Maximum 50 characters")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundStyle(characterCountColor)
+                            }
+                            
+                            Spacer()
+                            
+                            Text("\(editedName.count)/50")
+                                .font(.system(size: 12, weight: .medium, design: .rounded))
+                                .foregroundStyle(characterCountColor)
+                        }
+                    }
+                    .padding(20)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(20)
+                    .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 5)
+                    
+                    // Update message
+                    if let message = updateMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: message.contains("success") ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(message.contains("success") ? .green : .red)
+                            
+                            Text(message)
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                                .foregroundStyle(message.contains("success") ? .green : .red)
+                        }
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(message.contains("success") ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
+                        )
+                        .transition(.scale.combined(with: .opacity))
+                    }
+                    
+                    Spacer()
+                    
+                    // Save button
+                    Button(action: {
+                        isTextFieldFocused = false
+                        Task {
+                            await onSave()
+                        }
+                    }) {
+                        HStack(spacing: 10) {
+                            if isUpdating {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(0.8)
+                                Text("Updating...")
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 18))
+                                Text("Save Changes")
+                            }
+                        }
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            LinearGradient(
+                                colors: isNameValid && !isUpdating ? [.blue, .purple] : [.gray, .gray.opacity(0.8)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .cornerRadius(16)
+                        .shadow(color: isNameValid ? .blue.opacity(0.3) : .clear, radius: 10, x: 0, y: 5)
+                    }
+                    .disabled(!isNameValid || isUpdating)
+                }
+                .padding()
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                    .disabled(isUpdating)
+                }
+            }
+            .onAppear {
+                // Auto-focus text field
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isTextFieldFocused = true
+                }
+            }
+        }
+    }
+}
+
 

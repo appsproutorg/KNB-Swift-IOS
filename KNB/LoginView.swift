@@ -14,7 +14,7 @@ struct LoginView: View {
     @State private var name = ""
     @State private var isLoading = false
     @State private var showError = false
-    @State private var backgroundOffset: CGFloat = 0
+
     @State private var showForgotPassword = false
     @State private var forgotPasswordEmail = ""
     @State private var isSendingReset = false
@@ -23,22 +23,21 @@ struct LoginView: View {
     @ObservedObject var authManager: AuthenticationManager
     
     var body: some View {
-        GeometryReader { geometry in
+        ZStack {
+            // Background image with gray tint overlay (same as splash screen)
+            // Fixed: Moved outside GeometryReader so it doesn't shrink when keyboard appears
             ZStack {
-                // Background image with gray tint overlay (same as splash screen)
-                ZStack {
-                    Image("SplashBackground")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: geometry.size.height)
-                        .clipped()
-                        .ignoresSafeArea()
-                    
-                    // Gray tint overlay
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                }
+                Image("SplashBackground")
+                    .resizable()
+                    .scaledToFill()
+                    .ignoresSafeArea()
                 
+                // Gray tint overlay
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+            }
+            
+            GeometryReader { geometry in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 30) {
                         Spacer(minLength: geometry.size.height > 600 ? 20 : 40)
@@ -250,30 +249,24 @@ struct LoginView: View {
                     .padding(.horizontal, geometry.size.width > 800 ? max(0, (geometry.size.width - 500) / 2) : 40)
                 }
                 .frame(maxWidth: .infinity)
-                
-                // Forgot Password Overlay
-                if showForgotPassword {
-                    ForgotPasswordOverlay(
-                        email: $forgotPasswordEmail,
-                        isSending: $isSendingReset,
-                        emailSent: $resetEmailSent,
-                        authManager: authManager,
-                        onDismiss: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                showForgotPassword = false
-                                forgotPasswordEmail = ""
-                                resetEmailSent = false
-                            }
-                        }
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                }
             }
-            .onAppear {
-                // Subtle background animation
-                withAnimation(.linear(duration: 20).repeatForever(autoreverses: true)) {
-                    backgroundOffset = 0.3
-                }
+            
+            // Forgot Password Overlay
+            if showForgotPassword {
+                ForgotPasswordOverlay(
+                    email: $forgotPasswordEmail,
+                    isSending: $isSendingReset,
+                    emailSent: $resetEmailSent,
+                    authManager: authManager,
+                    onDismiss: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showForgotPassword = false
+                            forgotPasswordEmail = ""
+                            resetEmailSent = false
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
     }
