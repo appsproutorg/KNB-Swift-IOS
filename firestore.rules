@@ -54,16 +54,7 @@ service cloud.firestore {
                         || get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.isAdmin == true);
     }
     
-    // Notifications - users can only read their own notifications
-    match /notifications/{notificationId} {
-      allow read: if isAuthenticated() 
-                  && resource.data.recipientEmail == request.auth.token.email;
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated() 
-                    && resource.data.recipientEmail == request.auth.token.email;
-      allow delete: if isAuthenticated() 
-                    && resource.data.recipientEmail == request.auth.token.email;
-    }
+
     
     // Users collection - users can read their own data, create/update their own profile
     match /users/{userId} {
@@ -82,12 +73,7 @@ service cloud.firestore {
                             && request.resource.data.name.size() <= 50));  // Name validation: 3-50 chars
     }
     
-    // Push notifications queue - only authenticated users can create
-    // Cloud Functions have admin access, so they can read/write
-    match /push_notifications/{notificationId} {
-      allow create: if isAuthenticated();
-      allow read, write: if false; // Functions use admin SDK
-    }
+
   }
 }
 

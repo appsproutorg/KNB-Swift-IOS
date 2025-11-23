@@ -180,40 +180,5 @@ struct SocialPost: Identifiable, Codable, Equatable {
     }
 }
 
-// MARK: - Notification Model
-struct AppNotification: Identifiable, Codable, Equatable {
-    let id: String
-    let type: NotificationType
-    let postId: String?
-    let userId: String  // User who triggered the notification (liker/replier)
-    let userName: String  // Name of user who triggered the notification
-    let message: String
-    let timestamp: Date
-    var isRead: Bool
-    
-    init(
-        id: String = UUID().uuidString,
-        type: NotificationType,
-        postId: String? = nil,
-        userId: String,
-        userName: String,
-        message: String,
-        timestamp: Date = Date(),
-        isRead: Bool = false
-    ) {
-        self.id = id
-        self.type = type
-        self.postId = postId
-        self.userId = userId
-        self.userName = userName
-        self.message = message
-        self.timestamp = timestamp
-        self.isRead = isRead
-    }
-}
 
-enum NotificationType: String, Codable {
-    case like
-    case reply
-}
 

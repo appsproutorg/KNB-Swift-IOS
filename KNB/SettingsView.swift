@@ -22,14 +22,7 @@ struct SettingsView: View {
                     }
                 }
                 
-                Section("Notifications") {
-                    Toggle("Enable Notifications", isOn: $appSettings.notificationsEnabled)
-                    
-                    if appSettings.notificationsEnabled {
-                        Toggle("Like Notifications", isOn: $appSettings.likeNotificationsEnabled)
-                        Toggle("Reply Notifications", isOn: $appSettings.replyNotificationsEnabled)
-                    }
-                }
+
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

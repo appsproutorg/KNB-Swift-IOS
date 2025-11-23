@@ -27,8 +27,7 @@ class FirestoreManager: ObservableObject {
     private var sponsorshipsListener: ListenerRegistration?
     private var socialPostsListener: ListenerRegistration?
     
-    // Optional notification manager for creating notifications
-    weak var notificationManager: NotificationManager?
+
     
     enum SocialPostSortOption {
         case newest
@@ -1096,7 +1095,7 @@ class FirestoreManager: ObservableObject {
     }
     
     // Toggle like on a post
-    func toggleLike(postId: String, userEmail: String, userName: String? = nil) async -> Bool {
+    func toggleLike(postId: String, userEmail: String) async -> Bool {
         do {
             let postRef = db.collection("social_posts").document(postId)
             let postDoc = try await postRef.getDocument()
@@ -1121,17 +1120,7 @@ class FirestoreManager: ObservableObject {
                 likes.append(userEmail)
                 likeCount += 1
                 
-                // Create notification for post author (if not liking own post)
-                if let notificationManager = notificationManager, postAuthorEmail != userEmail {
-                    let currentUserName = userName ?? "Someone"
-                    _ = await notificationManager.createNotification(
-                        type: .like,
-                        postId: postId,
-                        targetUserEmail: postAuthorEmail,
-                        triggeredByUserEmail: userEmail,
-                        triggeredByUserName: currentUserName
-                    )
-                }
+
             }
             
             try await postRef.updateData([
@@ -1168,7 +1157,7 @@ class FirestoreManager: ObservableObject {
                 parentPostId: parentPostId
             )
             
-            // Get parent post to verify it exists and get author email for notification
+            // Get parent post to verify it exists
             let parentRef = db.collection("social_posts").document(parentPostId)
             let parentDoc = try await parentRef.getDocument()
             
@@ -1202,19 +1191,7 @@ class FirestoreManager: ObservableObject {
             // Commit the batch
             try await batch.commit()
             
-            // Create notification for parent post author (if not replying to own post)
-            if let notificationManager = notificationManager {
-                let parentAuthorEmail = parentData["authorEmail"] as? String ?? ""
-                if parentAuthorEmail != author.email {
-                    _ = await notificationManager.createNotification(
-                        type: .reply,
-                        postId: parentPostId,
-                        targetUserEmail: parentAuthorEmail,
-                        triggeredByUserEmail: author.email,
-                        triggeredByUserName: author.name
-                    )
-                }
-            }
+
             
             print("✅ Created reply: \(reply.id) for post: \(parentPostId)")
             return true

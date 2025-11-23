@@ -15,9 +15,7 @@ struct ProfileTabView: View {
     
     @State private var userSponsorships: [KiddushSponsorship] = []
     @State private var isLoadingSponsorships = false
-    @State private var showNotifications = false
     @State private var showSettings = false
-    @StateObject private var notificationManager = NotificationManager(currentUserEmail: "")
     
     // Name editing state
     @State private var showNameEditor = false
@@ -514,26 +512,6 @@ struct ProfileTabView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
-                        // Notification button with badge
-                        Button(action: {
-                            showNotifications = true
-                        }) {
-                            ZStack {
-                                Image(systemName: "bell")
-                                    .font(.system(size: 20))
-                                
-                                if notificationManager.unreadCount > 0 {
-                                    Text("\(notificationManager.unreadCount)")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(4)
-                                        .background(Color.red)
-                                        .clipShape(Circle())
-                                        .offset(x: 8, y: -8)
-                                }
-                            }
-                        }
-                        
                         // Settings button
                         Button(action: {
                             showSettings = true
@@ -544,9 +522,7 @@ struct ProfileTabView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showNotifications) {
-                NotificationView(notificationManager: notificationManager)
-            }
+
             .sheet(isPresented: $showSettings) {
                 SettingsView(appSettings: appSettings)
                     .preferredColorScheme(appSettings.colorScheme)
@@ -563,19 +539,12 @@ struct ProfileTabView: View {
                 )
             }
             .onAppear {
-                // Update notification manager with current user email
-                if let email = user?.email {
-                    notificationManager.currentUserEmail = email
-                    notificationManager.startListening()
-                }
-                firestoreManager.notificationManager = notificationManager
                 loadUserSponsorships()
                 // Start listening to real-time updates
                 firestoreManager.startListeningToSponsorships()
             }
             .onDisappear {
                 firestoreManager.stopListeningToSponsorships()
-                notificationManager.stopListening()
             }
             .refreshable {
                 loadUserSponsorships()

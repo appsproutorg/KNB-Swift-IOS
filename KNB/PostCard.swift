@@ -272,12 +272,10 @@ struct PostCard: View {
         
         // Update in Firestore
         Task {
-            // Get user name for notification
-            let userName = currentUserName ?? "Someone"
+
             let success = await firestoreManager.toggleLike(
                 postId: post.id,
-                userEmail: userEmail,
-                userName: userName
+                userEmail: userEmail
             )
             
             if !success {

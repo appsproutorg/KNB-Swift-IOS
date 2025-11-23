@@ -28,9 +28,7 @@ enum ThemeMode: String, CaseIterable {
 
 class AppSettings: ObservableObject {
     @AppStorage("themeMode") var themeMode: ThemeMode = .system
-    @AppStorage("notificationsEnabled") var notificationsEnabled: Bool = true
-    @AppStorage("likeNotificationsEnabled") var likeNotificationsEnabled: Bool = true
-    @AppStorage("replyNotificationsEnabled") var replyNotificationsEnabled: Bool = true
+
     
     var colorScheme: ColorScheme? {
         themeMode.colorScheme
