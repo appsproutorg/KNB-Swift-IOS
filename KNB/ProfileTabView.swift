@@ -118,6 +118,40 @@ struct ProfileTabView: View {
                 
                 ScrollView {
                     VStack(spacing: 25) {
+                        // Header with Profile title and Settings button
+                        ZStack {
+                            // Centered Profile title
+                            VStack(spacing: 2) {
+                                Text("Profile")
+                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [.blue, .purple],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                
+                                Text("My Activity")
+                                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                            }
+                            
+                            // Settings button - top right
+                            HStack {
+                                Spacer()
+                                Button(action: {
+                                    showSettings = true
+                                }) {
+                                    Image(systemName: "gearshape.fill")
+                                        .font(.system(size: 22))
+                                        .foregroundStyle(.blue)
+                                }
+                                .padding(.trailing, 20)
+                            }
+                        }
+                        .padding(.top, 8)
+                        
                         // User Info Section with enhanced design
                         VStack(spacing: 20) {
                             // Avatar with clean border
@@ -490,6 +524,7 @@ struct ProfileTabView: View {
                     }
                 }
             }
+            .navigationTitle("") // Empty title so our custom toolbar principal shows
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
@@ -518,6 +553,7 @@ struct ProfileTabView: View {
                         }) {
                             Image(systemName: "gearshape")
                                 .font(.system(size: 20))
+                                .foregroundStyle(.blue)
                         }
                     }
                 }
