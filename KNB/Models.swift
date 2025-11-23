@@ -71,10 +71,35 @@ struct User: Codable, Equatable {
     var email: String
     var totalPledged: Double
     var isAdmin: Bool = false
+    var notificationPrefs: NotificationPreferences?
+    var fcmTokens: [String: TokenDetails]?
     
     // Helper to check if user is admin
     var hasAdminAccess: Bool {
         return isAdmin
+    }
+}
+
+struct TokenDetails: Codable, Equatable {
+    let platform: String
+    let updatedAt: Date
+}
+
+struct NotificationPreferences: Codable, Equatable {
+    var adminPosts: Bool = true
+    var postLikes: Bool = true
+    var postReplies: Bool = true
+    var replyLikes: Bool = true
+    var outbid: Bool = true
+    
+    init() {}
+    
+    init(data: [String: Any]) {
+        self.adminPosts = data["adminPosts"] as? Bool ?? true
+        self.postLikes = data["postLikes"] as? Bool ?? true
+        self.postReplies = data["postReplies"] as? Bool ?? true
+        self.replyLikes = data["replyLikes"] as? Bool ?? true
+        self.outbid = data["outbid"] as? Bool ?? true
     }
 }
 
@@ -182,3 +207,65 @@ struct SocialPost: Identifiable, Codable, Equatable {
 
 
 
+// MARK: - Notification Model
+struct AppNotification: Identifiable, Codable, Equatable {
+    let id: String
+    let type: NotificationType
+    let title: String
+    let body: String
+    let data: [String: String]? // Stores IDs like postId, replyId, auctionId
+    let isRead: Bool
+    let createdAt: Date
+    
+    init(
+        id: String = UUID().uuidString,
+        type: NotificationType,
+        title: String,
+        body: String,
+        data: [String: String]? = nil,
+        isRead: Bool = false,
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.type = type
+        self.title = title
+        self.body = body
+        self.data = data
+        self.isRead = isRead
+        self.createdAt = createdAt
+    }
+}
+
+enum NotificationType: String, Codable {
+    case adminPost = "ADMIN_POST"
+    case postLike = "POST_LIKE"
+    case postReply = "POST_REPLY"
+    case replyLike = "REPLY_LIKE"
+    case outbid = "OUTBID"
+    
+    // Custom decoding to handle legacy lowercase values
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let rawString = try container.decode(String.self)
+        
+        // Try to match exact raw value first
+        if let type = NotificationType(rawValue: rawString) {
+            self = type
+            return
+        }
+        
+        // Try case-insensitive matching for legacy data
+        switch rawString.uppercased() {
+        case "ADMIN_POST", "ADMINPOST": self = .adminPost
+        case "POST_LIKE", "POSTLIKE": self = .postLike
+        case "POST_REPLY", "POSTREPLY": self = .postReply
+        case "REPLY_LIKE", "REPLYLIKE": self = .replyLike
+        case "OUTBID": self = .outbid
+        default:
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Cannot initialize NotificationType from invalid String value \(rawString)"
+            )
+        }
+    }
+}

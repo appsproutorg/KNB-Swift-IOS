@@ -52,8 +52,7 @@ struct MainTabView: View {
                 // Profile Tab
                 ProfileTabView(
                     user: $currentUser,
-                    authManager: authManager,
-                    firestoreManager: firestoreManager
+                    authManager: authManager
                 )
                 .tabItem {
                     Label("Profile", systemImage: "person.crop.circle")

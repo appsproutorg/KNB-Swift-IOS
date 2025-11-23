@@ -10,7 +10,7 @@ import SwiftUI
 struct ProfileTabView: View {
     @Binding var user: User?
     @ObservedObject var authManager: AuthenticationManager
-    @ObservedObject var firestoreManager: FirestoreManager
+    @EnvironmentObject var firestoreManager: FirestoreManager
     @EnvironmentObject var appSettings: AppSettings
     
     @State private var userSponsorships: [KiddushSponsorship] = []
@@ -22,11 +22,14 @@ struct ProfileTabView: View {
     @State private var editedName = ""
     @State private var isUpdatingName = false
     @State private var nameUpdateMessage: String?
+
+    // New: Inbox button and NotificationManager
+    @StateObject private var notificationManager = NotificationManager(currentUserEmail: "")
+    @State private var showInbox = false
     
-    init(user: Binding<User?>, authManager: AuthenticationManager, firestoreManager: FirestoreManager) {
+    init(user: Binding<User?>, authManager: AuthenticationManager) {
         self._user = user
         self.authManager = authManager
-        self.firestoreManager = firestoreManager
     }
     
     var userHonors: [Honor] {
@@ -138,8 +141,30 @@ struct ProfileTabView: View {
                             }
                             
                             // Settings button - top right
-                            HStack {
+                            HStack(spacing: 16) {
                                 Spacer()
+                                
+                                // Inbox Button
+                                Button(action: {
+                                    showInbox = true
+                                }) {
+                                    ZStack(alignment: .topTrailing) {
+                                        Image(systemName: "bell.fill")
+                                            .font(.system(size: 22))
+                                            .foregroundStyle(.blue)
+                                        
+                                        if notificationManager.unreadCount > 0 {
+                                            Text("\(min(notificationManager.unreadCount, 99))")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .frame(width: 16, height: 16)
+                                                .background(Color.red)
+                                                .clipShape(Circle())
+                                                .offset(x: 6, y: -6)
+                                        }
+                                    }
+                                }
+                                
                                 Button(action: {
                                     showSettings = true
                                 }) {
@@ -147,8 +172,8 @@ struct ProfileTabView: View {
                                         .font(.system(size: 22))
                                         .foregroundStyle(.blue)
                                 }
-                                .padding(.trailing, 20)
                             }
+                            .padding(.trailing, 20)
                         }
                         .padding(.top, 8)
                         
@@ -561,6 +586,12 @@ struct ProfileTabView: View {
 
             .sheet(isPresented: $showSettings) {
                 SettingsView(appSettings: appSettings)
+                    .environmentObject(firestoreManager)
+                    .preferredColorScheme(appSettings.colorScheme)
+            }
+            .sheet(isPresented: $showInbox) {
+                NotificationListView(notificationManager: notificationManager)
+                    .environmentObject(firestoreManager)
                     .preferredColorScheme(appSettings.colorScheme)
             }
             .sheet(isPresented: $showNameEditor) {
@@ -573,6 +604,18 @@ struct ProfileTabView: View {
                         await updateUserName()
                     }
                 )
+            }
+            .onAppear {
+                if let email = firestoreManager.currentUser?.email {
+                    notificationManager.currentUserEmail = email
+                    notificationManager.startListening()
+                }
+            }
+            .onChange(of: firestoreManager.currentUser) { _, newUser in
+                if let email = newUser?.email {
+                    notificationManager.currentUserEmail = email
+                    notificationManager.startListening()
+                }
             }
             .onAppear {
                 loadUserSponsorships()
@@ -858,12 +901,15 @@ struct DebugActionButton: View {
 
 #Preview {
     let authManager = AuthenticationManager()
-    let firestoreManager = FirestoreManager()
     
     return ProfileTabView(
-        user: .constant(User(name: "John Doe", email: "john@example.com", totalPledged: 1800)),
-        authManager: authManager,
-        firestoreManager: firestoreManager
+        user: .constant(User(
+            name: "Rabbi 2",
+            email: "test@gmail.com",
+            totalPledged: 0,
+            isAdmin: true
+        )),
+        authManager: authManager
     )
     .environmentObject(AppSettings())
 }

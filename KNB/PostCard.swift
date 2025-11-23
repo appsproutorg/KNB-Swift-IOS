@@ -245,6 +245,10 @@ struct PostCard: View {
         .onChange(of: post.likeCount) { _, newCount in
             likeCount = newCount
         }
+        .onChange(of: post.authorName) { _, newName in
+            authorDisplayName = newName
+            userCache.cacheName(newName, for: post.authorEmail)
+        }
     }
     
     private func handleLike() {
@@ -289,27 +293,28 @@ struct PostCard: View {
     }
     
     private func loadAuthorName() {
-        // Check cache first
-        if let cachedName = userCache.getCachedName(for: post.authorEmail) {
-            authorDisplayName = cachedName
-            return
-        }
-        
-        // If current user, use their name immediately
+        // 1. If current user, use current name
         if post.authorEmail == currentUserEmail, let currentName = currentUserName {
             authorDisplayName = currentName
             userCache.cacheName(currentName, for: post.authorEmail)
             return
         }
         
-        // Fall back to authorName from post for backwards compatibility
+        // 2. If post has a name, use it (Source of Truth)
         if !post.authorName.isEmpty {
             authorDisplayName = post.authorName
+            // Update cache just in case
             userCache.cacheName(post.authorName, for: post.authorEmail)
             return
         }
         
-        // Fetch from Firestore
+        // 3. Check cache (Fallback for legacy posts with no name)
+        if let cachedName = userCache.getCachedName(for: post.authorEmail) {
+            authorDisplayName = cachedName
+            return
+        }
+        
+        // 4. Fetch from Firestore (Last resort)
         Task {
             if let userData = await firestoreManager.fetchUserData(email: post.authorEmail) {
                 await MainActor.run {

@@ -31,6 +31,7 @@ struct ContentView: View {
                     preloadData: {
                         // Check auth state first
                         await MainActor.run {
+                            authManager.setFirestoreManager(firestoreManager)
                             authManager.checkAuthState()
                         }
                         
@@ -61,6 +62,7 @@ struct ContentView: View {
                                 currentUser: $authManager.user,
                                 authManager: authManager
                             )
+                            .environmentObject(firestoreManager)
                             .environmentObject(appSettings)
                             .environmentObject(networkMonitor)
                             .onAppear {

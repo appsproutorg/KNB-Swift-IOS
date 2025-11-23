@@ -6,6 +6,10 @@
 	<key>FirebaseAppCheckEnabled</key>
 	<false/>
 	<key>FirebaseAppDelegateProxyEnabled</key>
-	<true/>
+	<false/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

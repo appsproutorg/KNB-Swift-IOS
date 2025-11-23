@@ -22,6 +22,7 @@ class FirestoreManager: ObservableObject {
     @Published var availableDates: [Date] = []
     @Published var socialPosts: [SocialPost] = []
     @Published var lastUpdated: Date?
+    @Published var currentUser: User?
     
     private var honorsListener: ListenerRegistration?
     private var sponsorshipsListener: ListenerRegistration?
@@ -700,16 +701,26 @@ class FirestoreManager: ObservableObject {
     
     // Delete ALL sponsorships (use with caution - for testing only)
     func deleteAllSponsorships() async {
+        guard let currentUser = currentUser else { return }
+        
         do {
             let snapshot = try await db.collection("kiddush_sponsorships").getDocuments()
-            print("🗑️ Deleting \(snapshot.documents.count) sponsorships...")
+            print("🗑️ Deleting sponsorships...")
             
             for doc in snapshot.documents {
-                try await doc.reference.delete()
-                print("   ✅ Deleted: \(doc.documentID)")
+                let data = doc.data()
+                let sponsorEmail = data["sponsorEmail"] as? String
+                
+                // Only delete if admin OR if it's my own sponsorship
+                if currentUser.isAdmin || sponsorEmail == currentUser.email {
+                    try await doc.reference.delete()
+                    print("   ✅ Deleted: \(doc.documentID)")
+                } else {
+                    print("   ⚠️ Skipped (not owner): \(doc.documentID)")
+                }
             }
             
-            print("✅ All sponsorships deleted")
+            print("✅ Finished deleting sponsorships")
         } catch {
             print("❌ Error deleting sponsorships: \(error.localizedDescription)")
         }
@@ -1109,7 +1120,6 @@ class FirestoreManager: ObservableObject {
             var likeCount = data["likeCount"] as? Int ?? 0
             
             let wasLiked = likes.contains(userEmail)
-            let postAuthorEmail = data["authorEmail"] as? String ?? ""
             
             if wasLiked {
                 // Unlike
@@ -1161,7 +1171,7 @@ class FirestoreManager: ObservableObject {
             let parentRef = db.collection("social_posts").document(parentPostId)
             let parentDoc = try await parentRef.getDocument()
             
-            guard let parentData = parentDoc.data() else {
+            guard parentDoc.exists else {
                 errorMessage = "Parent post not found"
                 return false
             }
@@ -1344,6 +1354,7 @@ class FirestoreManager: ObservableObject {
             ], merge: true)
             
             print("✅ User document synced: \(user.email)")
+            self.currentUser = user
             return true
         } catch {
             print("❌ Error syncing user: \(error.localizedDescription)")
@@ -1366,12 +1377,16 @@ class FirestoreManager: ObservableObject {
             let totalPledged = data["totalPledged"] as? Double ?? 0
             let isAdmin = data["isAdmin"] as? Bool ?? false
             
-            return User(
+            let user = User(
                 name: name,
                 email: email,
                 totalPledged: totalPledged,
-                isAdmin: isAdmin
+                isAdmin: isAdmin,
+                notificationPrefs: NotificationPreferences(data: data["notificationPrefs"] as? [String: Any] ?? [:])
             )
+            
+            self.currentUser = user
+            return user
         } catch {
             print("❌ Error fetching user data: \(error.localizedDescription)")
             return nil
@@ -1433,6 +1448,29 @@ class FirestoreManager: ObservableObject {
     }
     
     
+
+    
+    // Update notification preferences
+    func updateNotificationPreferences(prefs: NotificationPreferences, userEmail: String) async -> Bool {
+        do {
+            try await db.collection("users").document(userEmail).updateData([
+                "notificationPrefs": try Firestore.Encoder().encode(prefs)
+            ])
+            
+            // Update local user state
+            await MainActor.run {
+                if self.currentUser?.email == userEmail {
+                    self.currentUser?.notificationPrefs = prefs
+                }
+            }
+            
+            print("✅ Notification preferences updated for \(userEmail)")
+            return true
+        } catch {
+            print("❌ Error updating notification preferences: \(error.localizedDescription)")
+            return false
+        }
+    }
 }
 
 

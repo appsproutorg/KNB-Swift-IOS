@@ -23,7 +23,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() 
                     && request.resource.data.sponsorEmail == request.auth.token.email;
-      allow update, delete: if false; // Only allow through admin console
+      allow delete: if isAuthenticated() 
+                    && (resource.data.sponsorEmail == request.auth.token.email 
+                        || get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.isAdmin == true);
+      allow update: if false; // Only allow through admin console
     }
     
     // Available Shabbat Dates - read by all authenticated users
@@ -71,6 +74,12 @@ service cloud.firestore {
                         || (request.resource.data.name is string 
                             && request.resource.data.name.size() >= 3 
                             && request.resource.data.name.size() <= 50));  // Name validation: 3-50 chars
+      
+      // Notifications subcollection
+      match /notifications/{notificationId} {
+        allow read: if isAuthenticated() && request.auth.token.email == userId;
+        allow write: if isAuthenticated() && request.auth.token.email == userId;
+      }
     }
     
 

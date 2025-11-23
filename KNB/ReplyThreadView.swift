@@ -339,8 +339,9 @@ struct ReplyCard: View {
             isLiked = newLikes.contains(currentUserEmail ?? "")
             likeCount = reply.likeCount
         }
-        .onChange(of: reply.likeCount) { _, newCount in
-            likeCount = newCount
+        .onChange(of: reply.authorName) { _, newName in
+            authorDisplayName = newName
+            userCache.cacheName(newName, for: reply.authorEmail)
         }
         .onAppear {
             loadAuthorName()
@@ -348,29 +349,28 @@ struct ReplyCard: View {
     }
     
     private func loadAuthorName() {
-        // 1. Check cache first
+        // 1. If current user, use current name
+        if let currentUserEmail = currentUserEmail, 
+           currentUserEmail == reply.authorEmail {
+            // Ideally pass currentUserName, but for now rely on reply.authorName if it matches
+            // or fetch if needed.
+        }
+        
+        // 2. If reply has a name, use it (Source of Truth)
+        if !reply.authorName.isEmpty {
+            authorDisplayName = reply.authorName
+            // Update cache just in case
+            userCache.cacheName(reply.authorName, for: reply.authorEmail)
+            return
+        }
+        
+        // 3. Check cache (Fallback)
         if let cachedName = userCache.getCachedName(for: reply.authorEmail) {
             authorDisplayName = cachedName
             return
         }
         
-        // 2. If it's the current user, use their name and cache it
-        if let currentUserEmail = currentUserEmail, 
-           currentUserEmail == reply.authorEmail {
-            // We don't have the current user's name passed directly to ReplyCard,
-            // but we can use the one from the reply object as a starting point
-            // or rely on the cache/fetch.
-            // Ideally, we should pass currentUserName to ReplyCard too.
-        }
-        
-        // 3. Use the name from the reply object as a fallback/placeholder and cache it
-        // This ensures we show something immediately while potentially fetching updates
-        if authorDisplayName.isEmpty {
-            authorDisplayName = reply.authorName
-            userCache.cacheName(reply.authorName, for: reply.authorEmail)
-        }
-        
-        // 4. Fetch from Firestore to get the latest name
+        // 4. Fetch from Firestore
         Task {
             if let userData = await firestoreManager.fetchUserData(email: reply.authorEmail) {
                 await MainActor.run {
