@@ -10,6 +10,7 @@ import SwiftUI
 struct SocialFeedView: View {
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
+    @EnvironmentObject var navigationManager: NavigationManager
     
     @State private var sortOption: FirestoreManager.SocialPostSortOption = .newest
     @State private var showPostComposer = false
@@ -95,41 +96,58 @@ struct SocialFeedView: View {
                                     .padding(.top, 8)
                             }
                         }
-                        ScrollView {
-                            LazyVStack(spacing: 12) {
-                                ForEach(firestoreManager.socialPosts) { post in
-                                    PostCard(
-                                        post: post,
-                                        currentUserEmail: currentUser?.email,
-                                        currentUserName: currentUser?.name,
-                                        firestoreManager: firestoreManager,
-                                        onReply: {
-                                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                                selectedPost = post
-                                                showReplyThread = true
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(spacing: 12) {
+                                    ForEach(firestoreManager.socialPosts) { post in
+                                        PostCard(
+                                            post: post,
+                                            currentUserEmail: currentUser?.email,
+                                            currentUserName: currentUser?.name,
+                                            firestoreManager: firestoreManager,
+                                            onReply: {
+                                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                                    selectedPost = post
+                                                    showReplyThread = true
+                                                }
+                                            },
+                                            onDelete: {
+                                                Task {
+                                                    await firestoreManager.deleteSocialPost(postId: post.id)
+                                                }
+                                            },
+                                            onEdit: {
+                                                postToEdit = post
+                                                showPostComposer = true
                                             }
-                                        },
-                                        onDelete: {
-                                            Task {
-                                                await firestoreManager.deleteSocialPost(postId: post.id)
-                                            }
-                                        },
-                                        onEdit: {
-                                            postToEdit = post
-                                            showPostComposer = true
+                                        )
+                                        .id(post.id) // Important for scrolling
+                                        .padding(.horizontal)
+                                        .transition(.asymmetric(
+                                            insertion: .move(edge: .top).combined(with: .opacity),
+                                            removal: .opacity.combined(with: .move(edge: .bottom))
+                                        ))
+                                    }
+                                }
+                                .padding(.vertical)
+                            }
+                            .refreshable {
+                                await firestoreManager.fetchSocialPosts(sortBy: sortOption)
+                            }
+                            .onChange(of: navigationManager.navigateToPostId) { postId in
+                                if let postId = postId {
+                                    // Find the post
+                                    if let post = firestoreManager.socialPosts.first(where: { $0.id == postId }) {
+                                        withAnimation {
+                                            proxy.scrollTo(postId, anchor: .top)
+                                            selectedPost = post
+                                            showReplyThread = true
                                         }
-                                    )
-                                    .padding(.horizontal)
-                                    .transition(.asymmetric(
-                                        insertion: .move(edge: .top).combined(with: .opacity),
-                                        removal: .opacity.combined(with: .move(edge: .bottom))
-                                    ))
+                                        // Reset navigation state
+                                        navigationManager.navigateToPostId = nil
+                                    }
                                 }
                             }
-                            .padding(.vertical)
-                        }
-                        .refreshable {
-                            await firestoreManager.fetchSocialPosts(sortBy: sortOption)
                         }
                     }
                 }

@@ -34,7 +34,7 @@ struct NotificationListView: View {
                     List {
                         ForEach(notificationManager.notifications) { notification in
                             NotificationRow(notification: notification)
-                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                                 .listRowBackground(Color.clear)
                                 .listRowSeparator(.hidden)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
@@ -69,39 +69,47 @@ struct NotificationListView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.gray.opacity(0.6))
                     }
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
+                    HStack(spacing: 16) {
                         if !notificationManager.notifications.isEmpty {
-                            Button {
-                                Task {
-                                    await notificationManager.markAllAsRead()
+                            Menu {
+                                Button {
+                                    Task {
+                                        await notificationManager.markAllAsRead()
+                                    }
+                                } label: {
+                                    Label("Mark all as read", systemImage: "checkmark.circle")
+                                }
+                                
+                                Button(role: .destructive) {
+                                    Task {
+                                        await notificationManager.deleteAll()
+                                    }
+                                } label: {
+                                    Label("Clear all", systemImage: "trash")
                                 }
                             } label: {
-                                Image(systemName: "checkmark.circle")
-                                    .font(.system(size: 16, weight: .medium))
-                            }
-                            
-                            Button(role: .destructive) {
-                                Task {
-                                    await notificationManager.deleteAll()
-                                }
-                            } label: {
-                                Image(systemName: "trash")
-                                    .font(.system(size: 16, weight: .medium))
-                                    .foregroundStyle(.red)
+                                Image(systemName: "ellipsis.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundStyle(.gray.opacity(0.6))
                             }
                         }
                         
                         Button {
                             showSettings = true
                         } label: {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 16, weight: .medium))
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 24))
+                                .foregroundStyle(.gray.opacity(0.6))
                         }
                     }
                 }
@@ -124,28 +132,28 @@ struct NotificationRow: View {
     let notification: AppNotification
     
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .top, spacing: 12) {
             // Icon
             ZStack {
                 Circle()
-                    .fill(iconColor.opacity(0.15))
-                    .frame(width: 48, height: 48)
+                    .fill(iconColor.opacity(0.1))
+                    .frame(width: 40, height: 40)
                 
                 Image(systemName: iconName)
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(iconColor)
             }
             
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(notification.title)
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.primary)
                     
                     Spacer()
                     
                     Text(timeAgo)
-                        .font(.caption)
+                        .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
                 
@@ -153,6 +161,7 @@ struct NotificationRow: View {
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             
             if !notification.isRead {
@@ -162,11 +171,11 @@ struct NotificationRow: View {
                     .padding(.top, 6)
             }
         }
-        .padding(16)
+        .padding(12)
         .background(Color(uiColor: .secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
-        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
-        .opacity(notification.isRead ? 0.7 : 1.0)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
+        .opacity(notification.isRead ? 0.6 : 1.0)
     }
     
     private var iconName: String {

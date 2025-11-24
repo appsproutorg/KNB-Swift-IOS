@@ -188,7 +188,7 @@ exports.onPostReplyCreate = functions.firestore
         const notification = {
             type: "POST_REPLY",
             title: "New Reply",
-            body: `${reply.authorName} replied to your post`,
+            body: `${reply.authorName} replied: "${reply.content.length > 100 ? reply.content.substring(0, 100) + '...' : reply.content}"`,
             data: { postId: postId, replyId: replyId },
         };
 

@@ -12,12 +12,12 @@ struct MainTabView: View {
     @Binding var currentUser: User?
     @ObservedObject var authManager: AuthenticationManager
     @EnvironmentObject var appSettings: AppSettings
+    @EnvironmentObject var navigationManager: NavigationManager
     
-    @State private var selectedTab = 0
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $navigationManager.selectedTab) {
                 // Kiddush Tab
                 CalendarView(
                     firestoreManager: firestoreManager,

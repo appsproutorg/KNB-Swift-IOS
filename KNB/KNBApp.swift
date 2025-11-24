@@ -64,11 +64,13 @@ struct KNBApp: App {
     // Register app delegate for Firebase setup
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject private var appSettings = AppSettings()
+    @StateObject private var navigationManager = NavigationManager.shared
     
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environmentObject(appSettings)
+                .environmentObject(navigationManager)
                 .preferredColorScheme(appSettings.colorScheme)
                 .onAppear {
                     // Request push permissions on app launch

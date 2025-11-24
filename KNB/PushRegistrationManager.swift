@@ -173,6 +173,7 @@ extension PushRegistrationManager: UNUserNotificationCenterDelegate {
         
         // Handle deep linking here if needed
         // NotificationManager or AppState can observe this
+        NavigationManager.shared.handleDeepLink(userInfo: userInfo)
         
         completionHandler()
     }

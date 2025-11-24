@@ -11,6 +11,7 @@ struct AuctionListView: View {
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
     @ObservedObject var authManager: AuthenticationManager
+    @EnvironmentObject var navigationManager: NavigationManager
     @State private var selectedHonor: Honor?
     @State private var searchText = ""
     
@@ -112,6 +113,14 @@ struct AuctionListView: View {
                     }
                     .refreshable {
                         await firestoreManager.fetchHonors()
+                    }
+                    .onChange(of: navigationManager.navigateToAuctionId) { honorId in
+                        if let honorId = honorId {
+                            if let honor = firestoreManager.honors.first(where: { $0.id.uuidString == honorId }) {
+                                selectedHonor = honor
+                                navigationManager.navigateToAuctionId = nil
+                            }
+                        }
                     }
                 }
             }
