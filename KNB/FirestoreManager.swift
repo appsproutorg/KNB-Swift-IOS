@@ -1348,13 +1348,22 @@ class FirestoreManager: ObservableObject {
     func createOrUpdateUser(user: User) async -> Bool {
         do {
             let userRef = db.collection("users").document(user.email)
-            try await userRef.setData([
+            // Create data dict
+            var userData: [String: Any] = [
                 "name": user.name,
                 "email": user.email,
                 "totalPledged": user.totalPledged,
-                "isAdmin": user.isAdmin,
                 "lastUpdated": Timestamp(date: Date())
-            ], merge: true)
+            ]
+            
+            // Only set isAdmin if it's the super admin or if we are creating a new user (default false)
+            // But since we use merge: true, omitting it is safer for existing users.
+            // Exception: If it's the super admin, force true.
+            if user.email.lowercased() == "admin@knb.com" {
+                userData["isAdmin"] = true
+            }
+            
+            try await userRef.setData(userData, merge: true)
             
             print("✅ User document synced: \(user.email)")
             self.currentUser = user
@@ -1389,11 +1398,78 @@ class FirestoreManager: ObservableObject {
             )
             
             self.currentUser = user
+            
+            // Start listening for real-time updates to this user
+            self.startListeningToUser(email: email)
+            
             return user
         } catch {
             print("❌ Error fetching user data: \(error.localizedDescription)")
             return nil
         }
+    }
+    
+    // Listen for real-time updates to the current user's profile
+    private var userListener: ListenerRegistration?
+    
+    func startListeningToUser(email: String) {
+        // Remove existing listener if any
+        userListener?.remove()
+        
+        print("👂 Starting real-time listener for user: \(email)")
+        
+        userListener = db.collection("users").document(email)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("❌ Error listening to user updates: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let snapshot = snapshot, let data = snapshot.data() else {
+                    print("⚠️ User document does not exist")
+                    return
+                }
+                
+                // Parse updated user data
+                let name = data["name"] as? String ?? "Member"
+                let totalPledged = data["totalPledged"] as? Double ?? 0
+                let isAdmin = data["isAdmin"] as? Bool ?? false
+                
+                // Update current user on main thread
+                DispatchQueue.main.async {
+                    // Create updated user object
+                    let updatedUser = User(
+                        name: name,
+                        email: email,
+                        totalPledged: totalPledged,
+                        isAdmin: isAdmin,
+                        notificationPrefs: NotificationPreferences(data: data["notificationPrefs"] as? [String: Any] ?? [:])
+                    )
+                    
+                    // Only update if something changed to avoid loops
+                    if self.currentUser?.isAdmin != updatedUser.isAdmin || 
+                       self.currentUser?.name != updatedUser.name ||
+                       self.currentUser?.totalPledged != updatedUser.totalPledged {
+                        
+                        print("🔄 User profile updated from Firestore. Admin: \(isAdmin)")
+                        self.currentUser = updatedUser
+                        
+                        // Also update admin list if this user became an admin
+                        if isAdmin {
+                            self.adminEmails.insert(email)
+                        } else {
+                            self.adminEmails.remove(email)
+                        }
+                    }
+                }
+            }
+    }
+    
+    func stopListeningToUser() {
+        userListener?.remove()
+        userListener = nil
     }
     
     // Update user's totalPledged amount

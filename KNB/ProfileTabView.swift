@@ -649,10 +649,22 @@ struct ProfileTabView: View {
             }
             .refreshable {
                 loadUserSponsorships()
+                if let email = user?.email {
+                    // Force refresh user data and update binding
+                    if let updatedUser = await firestoreManager.fetchUserData(email: email) {
+                        user = updatedUser
+                    }
+                }
             }
             .onChange(of: firestoreManager.kiddushSponsorships) { _, _ in
                 // Automatically update when sponsorships change
                 loadUserSponsorships()
+            }
+            .onChange(of: firestoreManager.currentUser) { _, newUser in
+                // Sync FirestoreManager updates (real-time) to the local user binding
+                if let newUser = newUser {
+                    user = newUser
+                }
             }
         }
     }

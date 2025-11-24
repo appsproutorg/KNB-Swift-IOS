@@ -195,11 +195,7 @@ class AuthenticationManager: ObservableObject {
     }
     
     private func isAdminEmail(_ email: String) -> Bool {
-        let adminEmails = [
-            "appsproutorg@gmail.com", // Add admin emails here
-            "admin@knb.com"
-        ]
-        return adminEmails.contains(email.lowercased())
+        return email.lowercased() == "admin@knb.com"
     }
     
     // MARK: - Error Message Helpers

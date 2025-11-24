@@ -22,7 +22,14 @@ service cloud.firestore {
     match /honors/{honorId} {
       allow read: if isAuthenticated();
       allow create: if isAdmin(); // Only admins can create honors
-      allow update: if isAuthenticated(); // Users need to bid
+      allow update: if isAuthenticated() 
+                    && (isAdmin() 
+                        || (
+                           // Non-admins can only update bids, currentBid, and currentWinner
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bids', 'currentBid', 'currentWinner'])
+                           && request.resource.data.currentBid > resource.data.currentBid // Bid must increase
+                           && request.resource.data.bids.size() == resource.data.bids.size() + 1 // Must add exactly one bid
+                        ));
       allow delete: if isAdmin(); // Only admins can delete
     }
     
