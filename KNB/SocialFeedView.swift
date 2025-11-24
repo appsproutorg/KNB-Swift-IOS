@@ -134,7 +134,7 @@ struct SocialFeedView: View {
                             .refreshable {
                                 await firestoreManager.fetchSocialPosts(sortBy: sortOption)
                             }
-                            .onChange(of: navigationManager.navigateToPostId) { postId in
+                            .onChange(of: navigationManager.navigateToPostId) { _, postId in
                                 if let postId = postId {
                                     // Find the post
                                     if let post = firestoreManager.socialPosts.first(where: { $0.id == postId }) {
@@ -237,6 +237,9 @@ struct SocialFeedView: View {
             }
             .onAppear {
                 firestoreManager.startListeningToSocialPosts(sortBy: sortOption)
+                Task {
+                    await firestoreManager.fetchAdmins()
+                }
             }
             .onDisappear {
                 firestoreManager.stopListeningToSocialPosts()

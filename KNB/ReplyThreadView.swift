@@ -276,6 +276,22 @@ struct ReplyCard: View {
                             Text(authorDisplayName.isEmpty ? "Loading..." : authorDisplayName)
                                 .font(.system(size: 15, weight: .semibold))
                             
+                            // Verified badge for admin replies
+                            if firestoreManager.adminEmails.contains(reply.authorEmail) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(
+                                        LinearGradient(
+                                            colors: [
+                                                Color(red: 1.0, green: 0.84, blue: 0.0), // Gold
+                                                Color(red: 1.0, green: 0.65, blue: 0.0)  // Darker gold
+                                            ],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
+                                    )
+                            }
+                            
                             Text(relativeTime)
                                 .font(.system(size: 13))
                                 .foregroundStyle(.secondary)

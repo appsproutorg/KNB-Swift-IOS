@@ -85,7 +85,7 @@ struct PostCard: View {
                             .foregroundStyle(.primary)
                         
                         // Verified badge and Admin label for admin posts
-                        if post.isAdminPost {
+                        if firestoreManager.adminEmails.contains(post.authorEmail) {
                             Image(systemName: "checkmark.seal.fill")
                                 .font(.system(size: 14, weight: .semibold))
                                 .foregroundStyle(
@@ -144,14 +144,16 @@ struct PostCard: View {
                 
                 Spacer()
                 
-                // Three-dot menu (only for own posts)
-                if isOwnPost {
+                // Three-dot menu (for own posts or admin)
+                if isOwnPost || firestoreManager.currentUser?.isAdmin == true {
                     Menu {
-                        Button(action: {
-                            // Edit action will be handled by parent
-                            onEdit?()
-                        }) {
-                            Label("Edit", systemImage: "pencil")
+                        if isOwnPost {
+                            Button(action: {
+                                // Edit action will be handled by parent
+                                onEdit?()
+                            }) {
+                                Label("Edit", systemImage: "pencil")
+                            }
                         }
                         
                         Button(role: .destructive, action: {

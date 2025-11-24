@@ -200,9 +200,8 @@ struct SocialPost: Identifiable, Codable, Equatable {
     }
     
     // Check if post is from admin account
-    var isAdminPost: Bool {
-        return authorEmail.lowercased() == "ethangoizman16@gmail.com"
-    }
+    // Logic moved to FirestoreManager to be dynamic
+    // var isAdminPost: Bool { ... }
 }
 
 

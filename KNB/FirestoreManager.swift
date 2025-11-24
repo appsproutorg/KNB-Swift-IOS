@@ -23,6 +23,7 @@ class FirestoreManager: ObservableObject {
     @Published var socialPosts: [SocialPost] = []
     @Published var lastUpdated: Date?
     @Published var currentUser: User?
+    @Published var adminEmails: Set<String> = ["admin@knb.com"] // Always include super admin
     
     private var honorsListener: ListenerRegistration?
     private var sponsorshipsListener: ListenerRegistration?
@@ -921,8 +922,9 @@ class FirestoreManager: ObservableObject {
             // Only pin admin posts when sorting by newest
             if sortBy == .newest {
                 // Separate admin posts and regular posts
-                let adminPosts = filteredPosts.filter { $0.isAdminPost }
-                let regularPosts = filteredPosts.filter { !$0.isAdminPost }
+                // Separate admin posts and regular posts
+                let adminPosts = filteredPosts.filter { self.adminEmails.contains($0.authorEmail) }
+                let regularPosts = filteredPosts.filter { !self.adminEmails.contains($0.authorEmail) }
                 
                 // Sort admin posts by newest
                 let sortedAdminPosts = adminPosts.sorted { $0.timestamp > $1.timestamp }
@@ -1009,8 +1011,9 @@ class FirestoreManager: ObservableObject {
             // Only pin admin posts when sorting by newest
             if sortBy == .newest {
                 // Separate admin posts and regular posts
-                let adminPosts = filteredPosts.filter { $0.isAdminPost }
-                let regularPosts = filteredPosts.filter { !$0.isAdminPost }
+                // Separate admin posts and regular posts
+                let adminPosts = filteredPosts.filter { self.adminEmails.contains($0.authorEmail) }
+                let regularPosts = filteredPosts.filter { !self.adminEmails.contains($0.authorEmail) }
                 
                 // Sort admin posts by newest
                 let sortedAdminPosts = adminPosts.sorted { $0.timestamp > $1.timestamp }
@@ -1468,6 +1471,79 @@ class FirestoreManager: ObservableObject {
             return true
         } catch {
             print("❌ Error updating notification preferences: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
+    // MARK: - Admin User Management
+    
+    // Fetch all admins and update local cache
+    func fetchAdmins() async {
+        do {
+            let snapshot = try await db.collection("users")
+                .whereField("isAdmin", isEqualTo: true)
+                .getDocuments()
+            
+            let admins = snapshot.documents.map { $0.documentID } // email is document ID
+            
+            await MainActor.run {
+                // Always keep super admin
+                var newSet = Set(admins)
+                newSet.insert("admin@knb.com")
+                self.adminEmails = newSet
+            }
+            
+            print("✅ Fetched \(admins.count) admins")
+        } catch {
+            print("❌ Error fetching admins: \(error.localizedDescription)")
+        }
+    }
+    
+    // Fetch all users (Admin only)
+    func fetchAllUsers() async -> [User] {
+        do {
+            let snapshot = try await db.collection("users")
+                .order(by: "name")
+                .getDocuments()
+            
+            let users = snapshot.documents.compactMap { doc -> User? in
+                let data = doc.data()
+                let email = doc.documentID
+                
+                let name = data["name"] as? String ?? "Member"
+                let totalPledged = data["totalPledged"] as? Double ?? 0
+                let isAdmin = data["isAdmin"] as? Bool ?? false
+                
+                return User(
+                    name: name,
+                    email: email,
+                    totalPledged: totalPledged,
+                    isAdmin: isAdmin,
+                    notificationPrefs: NotificationPreferences(data: data["notificationPrefs"] as? [String: Any] ?? [:])
+                )
+            }
+            
+            print("✅ Fetched \(users.count) users")
+            return users
+        } catch {
+            print("❌ Error fetching all users: \(error.localizedDescription)")
+            return []
+        }
+    }
+    
+    // Update user admin status (Super Admin only)
+    func updateUserAdminStatus(email: String, isAdmin: Bool) async -> Bool {
+        do {
+            try await db.collection("users").document(email).updateData([
+                "isAdmin": isAdmin,
+                "lastUpdated": Timestamp(date: Date())
+            ])
+            
+            print("✅ Updated admin status for \(email) to \(isAdmin)")
+            return true
+        } catch {
+            print("❌ Error updating admin status: \(error.localizedDescription)")
+            errorMessage = "Failed to update admin status: \(error.localizedDescription)"
             return false
         }
     }

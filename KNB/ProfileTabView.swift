@@ -24,8 +24,9 @@ struct ProfileTabView: View {
     @State private var nameUpdateMessage: String?
 
     // New: Inbox button and NotificationManager
-    @StateObject private var notificationManager = NotificationManager(currentUserEmail: "")
     @State private var showInbox = false
+    @State private var showAdminManagement = false
+    @StateObject private var notificationManager = NotificationManager(currentUserEmail: "")
     
     init(user: Binding<User?>, authManager: AuthenticationManager) {
         self._user = user
@@ -420,60 +421,77 @@ struct ProfileTabView: View {
                             }
                         }
                         
-                        // Debug Menu Section
-                        VStack(alignment: .leading, spacing: 15) {
-                            HStack {
-                                Image(systemName: "wrench.and.screwdriver.fill")
-                                    .foregroundStyle(.purple)
-                                Text("Debug Tools")
-                                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                            }
-                            .padding(.horizontal)
-                            
-                            VStack(spacing: 12) {
-                                DebugActionButton(
-                                    title: "Clear Cache & Refresh Parsha Data",
-                                    icon: "arrow.triangle.2.circlepath",
-                                    color: .blue
-                                ) {
-                                    // Clear all caches and force reload
-                                    CalendarCacheManager.shared.clearCache()
-                                    UserDefaults.standard.set(0, forKey: "hebrew_cache_version")
-                                    print("✅ Cache cleared! Close and reopen app to reload Parsha data.")
+                        // Debug Menu Section (Admins Only)
+                        if user?.isAdmin == true {
+                            VStack(alignment: .leading, spacing: 15) {
+                                HStack {
+                                    Image(systemName: "wrench.and.screwdriver.fill")
+                                        .foregroundStyle(.purple)
+                                    Text("Admin Tools")
+                                        .font(.system(size: 22, weight: .bold, design: .rounded))
                                 }
+                                .padding(.horizontal)
                                 
-                                DebugActionButton(
-                                    title: "Reset All Bids",
-                                    icon: "arrow.counterclockwise.circle.fill",
-                                    color: .orange
-                                ) {
-                                    Task {
-                                        await firestoreManager.resetAllBids()
+                                VStack(spacing: 12) {
+                                    // Super Admin Only: Manage Admins
+                                    if user?.email.lowercased() == "admin@knb.com" {
+                                        Button(action: {
+                                            showAdminManagement = true
+                                        }) {
+                                            HStack {
+                                                Image(systemName: "person.badge.shield.checkmark.fill")
+                                                Text("Manage Admins")
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                            }
+                                            .padding()
+                                            .background(Color.purple.opacity(0.1))
+                                            .cornerRadius(12)
+                                        }
+                                        .buttonStyle(.plain)
                                     }
-                                }
-                                
-                                DebugActionButton(
-                                    title: "Reset All Honors",
-                                    icon: "trash.circle.fill",
-                                    color: .red
-                                ) {
-                                    Task {
-                                        await firestoreManager.resetAllHonors()
+                                    
+                                    DebugActionButton(
+                                        title: "Clear Cache & Refresh Parsha Data",
+                                        icon: "arrow.triangle.2.circlepath",
+                                        color: .blue
+                                    ) {
+                                        // Clear all caches and force reload
+                                        CalendarCacheManager.shared.clearCache()
+                                        UserDefaults.standard.set(0, forKey: "hebrew_cache_version")
+                                        print("✅ Cache cleared! Close and reopen app to reload Parsha data.")
                                     }
-                                }
-                                
-                                DebugActionButton(
-                                    title: "Delete All Sponsorships",
-                                    icon: "calendar.badge.minus",
-                                    color: .purple
-                                ) {
-                                    Task {
-                                        await firestoreManager.deleteAllSponsorships()
+                                    
+                                    DebugActionButton(
+                                        title: "Reset All Bids",
+                                        icon: "arrow.counterclockwise.circle.fill",
+                                        color: .orange
+                                    ) {
+                                        Task {
+                                            await firestoreManager.resetAllBids()
+                                        }
                                     }
-                                }
-                                
-                                // Admin only: Delete All Social Posts
-                                if user?.isAdmin == true {
+                                    
+                                    DebugActionButton(
+                                        title: "Reset All Honors",
+                                        icon: "trash.circle.fill",
+                                        color: .red
+                                    ) {
+                                        Task {
+                                            await firestoreManager.resetAllHonors()
+                                        }
+                                    }
+                                    
+                                    DebugActionButton(
+                                        title: "Delete All Sponsorships",
+                                        icon: "calendar.badge.minus",
+                                        color: .purple
+                                    ) {
+                                        Task {
+                                            await firestoreManager.deleteAllSponsorships()
+                                        }
+                                    }
+                                    
                                     DebugActionButton(
                                         title: "Delete All Social Posts",
                                         icon: "bubble.left.and.bubble.right.fill",
@@ -484,35 +502,35 @@ struct ProfileTabView: View {
                                         }
                                     }
                                 }
-                            }
-                            .padding(.horizontal)
-                            
-                            // Debug Info
-                            VStack(spacing: 8) {
-                                HStack {
-                                    Text("Total Honors:")
-                                        .font(.system(size: 14, design: .rounded))
-                                    Spacer()
-                                    Text("\(firestoreManager.honors.count)")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.blue)
-                                }
+                                .padding(.horizontal)
                                 
-                                HStack {
-                                    Text("Total Sponsorships:")
-                                        .font(.system(size: 14, design: .rounded))
-                                    Spacer()
-                                    Text("\(firestoreManager.kiddushSponsorships.count)")
-                                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                                        .foregroundStyle(.blue)
+                                // Debug Info
+                                VStack(spacing: 8) {
+                                    HStack {
+                                        Text("Total Honors:")
+                                            .font(.system(size: 14, design: .rounded))
+                                        Spacer()
+                                        Text("\(firestoreManager.honors.count)")
+                                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                                            .foregroundStyle(.blue)
+                                    }
+                                    
+                                    HStack {
+                                        Text("Total Sponsorships:")
+                                            .font(.system(size: 14, design: .rounded))
+                                        Spacer()
+                                        Text("\(firestoreManager.kiddushSponsorships.count)")
+                                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                                            .foregroundStyle(.blue)
+                                    }
                                 }
+                                .padding()
+                                .background(.ultraThinMaterial)
+                                .cornerRadius(12)
+                                .padding(.horizontal)
                             }
-                            .padding()
-                            .background(.ultraThinMaterial)
-                            .cornerRadius(12)
-                            .padding(.horizontal)
+                            .padding(.top, 10)
                         }
-                        .padding(.top, 10)
                         
                         // Enhanced Sign Out Button
                         Button(action: {
@@ -604,6 +622,10 @@ struct ProfileTabView: View {
                         await updateUserName()
                     }
                 )
+            }
+            .sheet(isPresented: $showAdminManagement) {
+                AdminManagementView()
+                    .environmentObject(firestoreManager)
             }
             .onAppear {
                 if let email = firestoreManager.currentUser?.email {

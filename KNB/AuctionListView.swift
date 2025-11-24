@@ -114,7 +114,7 @@ struct AuctionListView: View {
                     .refreshable {
                         await firestoreManager.fetchHonors()
                     }
-                    .onChange(of: navigationManager.navigateToAuctionId) { honorId in
+                    .onChange(of: navigationManager.navigateToAuctionId) { _, honorId in
                         if let honorId = honorId {
                             if let honor = firestoreManager.honors.first(where: { $0.id.uuidString == honorId }) {
                                 selectedHonor = honor
