@@ -35,7 +35,7 @@ class NavigationManager: ObservableObject {
         } else if let honorId = userInfo["honorId"] as? String {
             print("🔗 Deep Link: Found honorId \(honorId)")
             DispatchQueue.main.async {
-                self.selectedTab = 2 // Auction Tab
+                self.selectedTab = 3 // More Tab (Auction is now in More menu)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     self.navigateToAuctionId = honorId
                 }
@@ -46,7 +46,7 @@ class NavigationManager: ObservableObject {
             case "ADMIN_POST", "POST_LIKE", "POST_REPLY", "REPLY_LIKE":
                 DispatchQueue.main.async { self.selectedTab = 1 }
             case "OUTBID":
-                DispatchQueue.main.async { self.selectedTab = 2 }
+                DispatchQueue.main.async { self.selectedTab = 3 } // More Tab (Auction is now in More menu)
             default:
                 break
             }

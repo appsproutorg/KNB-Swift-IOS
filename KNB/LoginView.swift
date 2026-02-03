@@ -40,7 +40,7 @@ struct LoginView: View {
             GeometryReader { geometry in
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 30) {
-                        Spacer(minLength: geometry.size.height > 600 ? 20 : 40)
+                        Spacer(minLength: 20)
                         
                         // Modern logo section
                         VStack(spacing: 20) {
@@ -247,6 +247,7 @@ struct LoginView: View {
                     }
                     .frame(maxWidth: geometry.size.width > 800 ? 500 : .infinity)
                     .padding(.horizontal, geometry.size.width > 800 ? max(0, (geometry.size.width - 500) / 2) : 40)
+                    .frame(minHeight: geometry.size.height)
                 }
                 .frame(maxWidth: .infinity)
             }

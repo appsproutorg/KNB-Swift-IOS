@@ -38,24 +38,23 @@ struct MainTabView: View {
                 }
                 .tag(1)
                 
-                // Auction Tab
-                AuctionListView(
+                // Seating Tab
+                SeatingView(
                     firestoreManager: firestoreManager,
+                    currentUser: $currentUser
+                )
+                .tabItem {
+                    Label("Seating", systemImage: "chair.fill")
+                }
+                .tag(2)
+                
+                // More Tab
+                MoreMenuView(
                     currentUser: $currentUser,
                     authManager: authManager
                 )
                 .tabItem {
-                    Label("Auction", systemImage: "book.closed")
-                }
-                .tag(2)
-                
-                // Profile Tab
-                ProfileTabView(
-                    user: $currentUser,
-                    authManager: authManager
-                )
-                .tabItem {
-                    Label("Profile", systemImage: "person.crop.circle")
+                    Label("More", systemImage: "ellipsis.circle.fill")
                 }
                 .tag(3)
         }

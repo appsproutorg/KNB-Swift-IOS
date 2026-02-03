@@ -235,6 +235,32 @@ struct AppNotification: Identifiable, Codable, Equatable {
     }
 }
 
+// MARK: - Seat Reservation Model
+struct SeatReservation: Identifiable, Codable, Equatable {
+    let id: String
+    let row: String
+    let number: Int
+    let reservedBy: String // User email
+    let reservedByName: String // User name
+    let timestamp: Date
+    
+    init(
+        id: String = UUID().uuidString,
+        row: String,
+        number: Int,
+        reservedBy: String,
+        reservedByName: String,
+        timestamp: Date = Date()
+    ) {
+        self.id = id
+        self.row = row
+        self.number = number
+        self.reservedBy = reservedBy
+        self.reservedByName = reservedByName
+        self.timestamp = timestamp
+    }
+}
+
 enum NotificationType: String, Codable {
     case adminPost = "ADMIN_POST"
     case postLike = "POST_LIKE"

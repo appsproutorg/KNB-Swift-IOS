@@ -24,10 +24,12 @@ class FirestoreManager: ObservableObject {
     @Published var lastUpdated: Date?
     @Published var currentUser: User?
     @Published var adminEmails: Set<String> = ["admin@knb.com"] // Always include super admin
+    @Published var seatReservations: [SeatReservation] = []
     
     private var honorsListener: ListenerRegistration?
     private var sponsorshipsListener: ListenerRegistration?
     private var socialPostsListener: ListenerRegistration?
+    private var seatReservationsListener: ListenerRegistration?
     
 
     
@@ -1622,6 +1624,141 @@ class FirestoreManager: ObservableObject {
             errorMessage = "Failed to update admin status: \(error.localizedDescription)"
             return false
         }
+    }
+    
+    // MARK: - Seat Reservations
+    
+    // Start listening to seat reservations with real-time updates
+    func startListeningToSeatReservations() {
+        seatReservationsListener?.remove()
+        
+        seatReservationsListener = db.collection("seat_reservations")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("❌ Error listening to seat reservations: \(error.localizedDescription)")
+                    return
+                }
+                
+                guard let documents = snapshot?.documents else { return }
+                
+                self.seatReservations = documents.compactMap { doc -> SeatReservation? in
+                    let data = doc.data()
+                    
+                    guard let id = data["id"] as? String,
+                          let row = data["row"] as? String,
+                          let number = data["number"] as? Int,
+                          let reservedBy = data["reservedBy"] as? String,
+                          let reservedByName = data["reservedByName"] as? String,
+                          let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+                        return nil
+                    }
+                    
+                    return SeatReservation(
+                        id: id,
+                        row: row,
+                        number: number,
+                        reservedBy: reservedBy,
+                        reservedByName: reservedByName,
+                        timestamp: timestamp
+                    )
+                }
+            }
+    }
+    
+    // Stop listening to seat reservations
+    func stopListeningToSeatReservations() {
+        seatReservationsListener?.remove()
+    }
+    
+    // Reserve a seat (with transaction to prevent conflicts)
+    func reserveSeat(row: String, number: Int, userEmail: String, userName: String) async -> Bool {
+        // Create unique document ID based on row and number
+        let seatId = "\(row)-\(number)"
+        let seatRef = db.collection("seat_reservations").document(seatId)
+        
+        do {
+            let _ = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
+                let seatDoc: DocumentSnapshot
+                do {
+                    seatDoc = try transaction.getDocument(seatRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+                
+                // Check if seat is already reserved
+                if seatDoc.exists {
+                    let error = NSError(domain: "AppError", code: 409, userInfo: [NSLocalizedDescriptionKey: "This seat is already reserved"])
+                    errorPointer?.pointee = error
+                    return nil
+                }
+                
+                // Create the reservation
+                let reservationData: [String: Any] = [
+                    "id": UUID().uuidString,
+                    "row": row,
+                    "number": number,
+                    "reservedBy": userEmail,
+                    "reservedByName": userName,
+                    "timestamp": Timestamp(date: Date())
+                ]
+                
+                transaction.setData(reservationData, forDocument: seatRef)
+                
+                return nil
+            })
+            
+            print("✅ Seat \(row)\(number) reserved successfully")
+            return true
+        } catch {
+            print("❌ Error reserving seat: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+    
+    // Cancel a seat reservation (only by the person who reserved it or admin)
+    func cancelSeatReservation(row: String, number: Int, userEmail: String) async -> Bool {
+        let seatId = "\(row)-\(number)"
+        let seatRef = db.collection("seat_reservations").document(seatId)
+        
+        do {
+            let seatDoc = try await seatRef.getDocument()
+            
+            guard seatDoc.exists,
+                  let data = seatDoc.data(),
+                  let reservedBy = data["reservedBy"] as? String else {
+                errorMessage = "Seat reservation not found"
+                return false
+            }
+            
+            // Check if user is admin or the person who reserved it
+            guard let currentUser = currentUser,
+                  (currentUser.isAdmin || reservedBy == userEmail) else {
+                errorMessage = "You can only cancel your own reservations"
+                return false
+            }
+            
+            try await seatRef.delete()
+            print("✅ Seat \(row)\(number) reservation cancelled")
+            return true
+        } catch {
+            print("❌ Error cancelling seat reservation: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+    
+    // Get reservation for a specific seat
+    func getSeatReservation(row: String, number: Int) -> SeatReservation? {
+        return seatReservations.first { $0.row == row && $0.number == number }
+    }
+    
+    // Get all reservations for a user
+    func getUserSeatReservations(userEmail: String) -> [SeatReservation] {
+        return seatReservations.filter { $0.reservedBy == userEmail }
     }
 }
 

@@ -72,6 +72,21 @@ service cloud.firestore {
                         || isAdmin());
     }
     
+    // Seat Reservations
+    match /seat_reservations/{seatId} {
+      allow read: if isAuthenticated(); // Everyone can see which seats are reserved
+      allow create: if isAuthenticated() 
+                    && request.resource.data.reservedBy == request.auth.token.email
+                    && request.resource.data.reservedByName is string
+                    && request.resource.data.row is string
+                    && request.resource.data.number is int
+                    && request.resource.data.timestamp is timestamp;
+      allow delete: if isAuthenticated() 
+                    && (resource.data.reservedBy == request.auth.token.email 
+                        || isAdmin());
+      allow update: if false; // No updates allowed - only create/delete
+    }
+    
     // Users collection
     match /users/{userId} {
       allow read: if isAuthenticated();
