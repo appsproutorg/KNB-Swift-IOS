@@ -129,19 +129,31 @@ struct MoreMenuView: View {
             .navigationTitle("More")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(item: $selectedOption) { option in
-                Group {
-                    switch option {
-                    case .account:
-                        ProfileTabView(
-                            user: $currentUser,
-                            authManager: authManager
-                        )
-                    case .auction:
-                        AuctionListView(
-                            firestoreManager: firestoreManager,
-                            currentUser: $currentUser,
-                            authManager: authManager
-                        )
+                NavigationStack {
+                    Group {
+                        switch option {
+                        case .account:
+                            ProfileTabView(
+                                user: $currentUser,
+                                authManager: authManager
+                            )
+                        case .auction:
+                            AuctionListView(
+                                firestoreManager: firestoreManager,
+                                currentUser: $currentUser,
+                                authManager: authManager
+                            )
+                        }
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                selectedOption = nil
+                            } label: {
+                                Text("Cancel")
+                                    .foregroundColor(.blue)
+                            }
+                        }
                     }
                 }
             }

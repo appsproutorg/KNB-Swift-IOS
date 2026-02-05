@@ -565,6 +565,7 @@ struct SelectionPanelView: View {
     @Environment(\.colorScheme) var colorScheme
     
     @State private var showConfirmation = false
+    @State private var wasReserving = false
     @State private var checkmarkScale: CGFloat = 0
     @State private var checkmarkRotation: Double = -90
     @State private var textOpacity: Double = 0
@@ -644,12 +645,12 @@ struct SelectionPanelView: View {
                     Button {
                         withAnimation { selectedSeats.removeAll() }
                     } label: {
-                        Text("Clear")
+                        Text("Cancel")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
-                            .foregroundColor(.blue)
+                            .foregroundColor(.red)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 8)
-                            .background(Capsule().fill(Color.blue.opacity(0.15)))
+                            .background(Capsule().fill(Color.red.opacity(0.15)))
                     }
                     
                     Button {
@@ -688,72 +689,89 @@ struct SelectionPanelView: View {
                 .fill(.ultraThinMaterial)
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 10, x: 0, y: -2)
         )
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 36)
         .padding(.bottom, 4)
+        .onChange(of: isReserving) { oldValue, newValue in
+            // Track when we start reserving
+            if newValue == true {
+                wasReserving = true
+            }
+            // If reservation finished and seats are already empty, show confirmation
+            if oldValue == true && newValue == false && selectedSeats.isEmpty && wasReserving {
+                wasReserving = false
+                triggerConfirmationAnimation()
+            }
+        }
         .onChange(of: selectedSeats) { oldValue, newValue in
-            if oldValue.count > 0 && newValue.isEmpty && !isReserving {
-                // Reset all animation states
+            // Only show confirmation if we were in the middle of reserving (not from cancel)
+            if oldValue.count > 0 && newValue.isEmpty && wasReserving && !isReserving {
+                wasReserving = false
+                triggerConfirmationAnimation()
+            }
+        }
+    }
+    
+    private func triggerConfirmationAnimation() {
+        // Reset all animation states
+        checkmarkScale = 0
+        checkmarkRotation = -90
+        textOpacity = 0
+        textOffset = 20
+        circleScale = 0
+        pulseScale = 1.0
+        glowOpacity = 0
+        bounceOffset = 0
+        
+        // Show confirmation
+        withAnimation(.easeOut(duration: 0.15)) {
+            showConfirmation = true
+        }
+        
+        // 1. Circle pops in with overshoot
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.5).delay(0.05)) {
+            circleScale = 1.0
+        }
+        
+        // 2. Glow appears
+        withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
+            glowOpacity = 0.8
+        }
+        
+        // 3. Checkmark rotates and scales in
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.45).delay(0.2)) {
+            checkmarkScale = 1.0
+            checkmarkRotation = 0
+        }
+        
+        // 4. Bounce effect
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.4).delay(0.25)) {
+            bounceOffset = -8
+        }
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.5).delay(0.4)) {
+            bounceOffset = 0
+        }
+        
+        // 5. Pulse the glow
+        withAnimation(.easeInOut(duration: 0.6).delay(0.3)) {
+            pulseScale = 1.3
+            glowOpacity = 0.4
+        }
+        
+        // 6. Text slides in
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.7).delay(0.35)) {
+            textOpacity = 1.0
+            textOffset = 0
+        }
+        
+        // Hide after 2.5 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            withAnimation(.easeOut(duration: 0.5)) {
+                showConfirmation = false
+                circleScale = 0.5
                 checkmarkScale = 0
-                checkmarkRotation = -90
                 textOpacity = 0
-                textOffset = 20
-                circleScale = 0
-                pulseScale = 1.0
+                textOffset = -20
                 glowOpacity = 0
-                bounceOffset = 0
-                
-                // Show confirmation
-                withAnimation(.easeOut(duration: 0.15)) {
-                    showConfirmation = true
-                }
-                
-                // 1. Circle pops in with overshoot
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.5).delay(0.05)) {
-                    circleScale = 1.0
-                }
-                
-                // 2. Glow appears
-                withAnimation(.easeOut(duration: 0.3).delay(0.1)) {
-                    glowOpacity = 0.8
-                }
-                
-                // 3. Checkmark rotates and scales in
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.45).delay(0.2)) {
-                    checkmarkScale = 1.0
-                    checkmarkRotation = 0
-                }
-                
-                // 4. Bounce effect
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.4).delay(0.25)) {
-                    bounceOffset = -8
-                }
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.5).delay(0.4)) {
-                    bounceOffset = 0
-                }
-                
-                // 5. Pulse the glow
-                withAnimation(.easeInOut(duration: 0.6).delay(0.3)) {
-                    pulseScale = 1.3
-                    glowOpacity = 0.4
-                }
-                
-                // 6. Text slides in
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.7).delay(0.35)) {
-                    textOpacity = 1.0
-                    textOffset = 0
-                }
-                
-                // Hide after 2.5 seconds
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        showConfirmation = false
-                        circleScale = 0.5
-                        checkmarkScale = 0
-                        textOpacity = 0
-                        textOffset = -20
-                        glowOpacity = 0
-                    }
-                }
             }
         }
     }
