@@ -19,6 +19,7 @@ struct MoreMenuView: View {
     enum MenuOption: String, Identifiable {
         case account = "Account"
         case auction = "Auction"
+        case seating = "Seating"
         
         var id: String { rawValue }
         
@@ -26,6 +27,7 @@ struct MoreMenuView: View {
             switch self {
             case .account: return "person.crop.circle.fill"
             case .auction: return "hammer.fill"
+            case .seating: return "chair.fill"
             }
         }
         
@@ -33,6 +35,7 @@ struct MoreMenuView: View {
             switch self {
             case .account: return .blue
             case .auction: return .orange
+            case .seating: return .purple
             }
         }
         
@@ -40,6 +43,7 @@ struct MoreMenuView: View {
             switch self {
             case .account: return "View your profile and activity"
             case .auction: return "Browse and bid on honors"
+            case .seating: return "Reserve your seat"
             }
         }
     }
@@ -120,6 +124,13 @@ struct MoreMenuView: View {
                                     selectedOption = .auction
                                 }
                             )
+                            
+                            MenuOptionCard(
+                                option: .seating,
+                                action: {
+                                    selectedOption = .seating
+                                }
+                            )
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 40)
@@ -142,6 +153,11 @@ struct MoreMenuView: View {
                                 firestoreManager: firestoreManager,
                                 currentUser: $currentUser,
                                 authManager: authManager
+                            )
+                        case .seating:
+                            SeatingView(
+                                firestoreManager: firestoreManager,
+                                currentUser: $currentUser
                             )
                         }
                     }

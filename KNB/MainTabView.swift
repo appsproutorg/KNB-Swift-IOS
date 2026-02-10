@@ -38,13 +38,10 @@ struct MainTabView: View {
                 }
                 .tag(1)
                 
-                // Seating Tab
-                SeatingView(
-                    firestoreManager: firestoreManager,
-                    currentUser: $currentUser
-                )
+                // Siddur Tab
+                SiddurView()
                 .tabItem {
-                    Label("Seating", systemImage: "chair.fill")
+                    Label("Siddur", systemImage: "book.closed.fill")
                 }
                 .tag(2)
                 
