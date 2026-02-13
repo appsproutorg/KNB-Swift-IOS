@@ -6,6 +6,8 @@
 	<false/>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location access is used to orient the compass so it can point East during prayer.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

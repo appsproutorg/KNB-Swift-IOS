@@ -110,6 +110,8 @@ struct KiddushSponsorship: Identifiable, Codable, Equatable {
     var sponsorName: String
     var sponsorEmail: String
     var occasion: String
+    var tierName: String
+    var tierAmount: Int
     var isAnonymous: Bool
     var timestamp: Date  // When sponsorship was made
     var isPaid: Bool
@@ -120,6 +122,8 @@ struct KiddushSponsorship: Identifiable, Codable, Equatable {
         sponsorName: String,
         sponsorEmail: String,
         occasion: String,
+        tierName: String = "Gold Kiddush",
+        tierAmount: Int = 500,
         isAnonymous: Bool = false,
         timestamp: Date = Date(),
         isPaid: Bool = false
@@ -129,6 +133,8 @@ struct KiddushSponsorship: Identifiable, Codable, Equatable {
         self.sponsorName = sponsorName
         self.sponsorEmail = sponsorEmail
         self.occasion = occasion
+        self.tierName = tierName
+        self.tierAmount = tierAmount
         self.isAnonymous = isAnonymous
         self.timestamp = timestamp
         self.isPaid = isPaid

@@ -567,41 +567,6 @@ struct ProfileTabView: View {
                     }
                 }
             }
-            .navigationTitle("") // Empty title so our custom toolbar principal shows
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        Text("Profile")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.blue, .purple],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                        
-                        Text("My Activity")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        // Settings button
-                        Button(action: {
-                            showSettings = true
-                        }) {
-                            Image(systemName: "gearshape")
-                                .font(.system(size: 20))
-                                .foregroundStyle(.blue)
-                        }
-                    }
-                }
-            }
-
             .sheet(isPresented: $showSettings) {
                 SettingsView(appSettings: appSettings)
                     .environmentObject(firestoreManager)
@@ -1122,5 +1087,4 @@ struct NameEditorView: View {
         }
     }
 }
-
 

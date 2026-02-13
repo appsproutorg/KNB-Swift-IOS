@@ -7,6 +7,52 @@
 
 import SwiftUI
 
+struct SeatingLayoutMetrics {
+    let isCompactPhone: Bool
+    let sectionSpacing: CGFloat
+    let sectionVerticalSpacing: CGFloat
+    let sectionTitleBottomPadding: CGFloat
+    let seatSize: CGFloat
+    let seatSpacing: CGFloat
+    let rowLabelWidth: CGFloat
+    let rowLabelFontSize: CGFloat
+    let sectionHorizontalPadding: CGFloat
+    let sectionVerticalPadding: CGFloat
+    let bemaWidth: CGFloat
+    let bemaHeight: CGFloat
+    let bemaIconSize: CGFloat
+    let bemaTextSize: CGFloat
+    let panelHorizontalInset: CGFloat
+    let panelVerticalPadding: CGFloat
+    let panelMaxWidth: CGFloat
+    let panelButtonFontSize: CGFloat
+    let panelButtonHorizontalPadding: CGFloat
+    let panelButtonVerticalPadding: CGFloat
+    
+    init(containerWidth: CGFloat) {
+        isCompactPhone = containerWidth <= 390
+        sectionSpacing = isCompactPhone ? 8 : 12
+        sectionVerticalSpacing = isCompactPhone ? 4 : 6
+        sectionTitleBottomPadding = isCompactPhone ? 2 : 4
+        seatSize = isCompactPhone ? 13 : 16
+        seatSpacing = isCompactPhone ? 3 : 4
+        rowLabelWidth = isCompactPhone ? 16 : 18
+        rowLabelFontSize = isCompactPhone ? 8 : 9
+        sectionHorizontalPadding = isCompactPhone ? 10 : 16
+        sectionVerticalPadding = isCompactPhone ? 14 : 20
+        bemaWidth = isCompactPhone ? 52 : 60
+        bemaHeight = isCompactPhone ? 42 : 50
+        bemaIconSize = isCompactPhone ? 12 : 14
+        bemaTextSize = isCompactPhone ? 6 : 7
+        panelHorizontalInset = isCompactPhone ? 16 : 20
+        panelVerticalPadding = isCompactPhone ? 10 : 12
+        panelMaxWidth = isCompactPhone ? 320 : 350
+        panelButtonFontSize = isCompactPhone ? 12 : 13
+        panelButtonHorizontalPadding = isCompactPhone ? 12 : 16
+        panelButtonVerticalPadding = isCompactPhone ? 7 : 8
+    }
+}
+
 // MARK: - Seat Model
 struct Seat: Identifiable {
     let id: String
@@ -72,105 +118,110 @@ struct SeatingView: View {
             ZStack {
                 backgroundColor.ignoresSafeArea()
                 
-                VStack(spacing: 0) {
-                    // Aron Kodesh
-                    AronKodeshView()
-                        .padding(.top, 8)
-                        .padding(.bottom, 16)
+                GeometryReader { geometry in
+                    let metrics = SeatingLayoutMetrics(containerWidth: geometry.size.width)
                     
-                    // Main seating area
                     VStack(spacing: 0) {
-                        ScrollView(showsIndicators: false) {
-                            HStack(alignment: .top, spacing: 12) {
-                                // LEFT SECTION
-                                VStack(spacing: 6) {
-                                    Text("LEFT")
-                                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                                        .foregroundColor(.secondary)
-                                        .padding(.bottom, 4)
+                        // Aron Kodesh
+                        AronKodeshView()
+                            .padding(.top, 8)
+                            .padding(.bottom, 16)
+                        
+                        // Main seating area
+                        VStack(spacing: 0) {
+                            ScrollView(showsIndicators: false) {
+                                HStack(alignment: .top, spacing: metrics.sectionSpacing) {
+                                    // LEFT SECTION
+                                    VStack(spacing: metrics.sectionVerticalSpacing) {
+                                        Text("LEFT")
+                                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                                            .foregroundColor(.secondary)
+                                            .padding(.bottom, metrics.sectionTitleBottomPadding)
+                                        
+                                        ForEach(Array(leftSectionSeats.enumerated()), id: \.offset) { idx, row in
+                                            SectionRowView(
+                                                rowLabel: leftRowLabels[idx],
+                                                seats: row,
+                                                selectedSeats: $selectedSeats,
+                                                firestoreManager: firestoreManager,
+                                                currentUser: $currentUser,
+                                                metrics: metrics
+                                            )
+                                        }
+                                    }
                                     
-                                    ForEach(Array(leftSectionSeats.enumerated()), id: \.offset) { idx, row in
-                                        SectionRowView(
-                                            rowLabel: leftRowLabels[idx],
-                                            seats: row,
-                                            selectedSeats: $selectedSeats,
-                                            firestoreManager: firestoreManager,
-                                            currentUser: $currentUser
-                                        )
+                                    // CENTER SECTION with Bema
+                                    VStack(spacing: metrics.sectionVerticalSpacing) {
+                                        Text("CENTER")
+                                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                                            .foregroundColor(.secondary)
+                                            .padding(.bottom, metrics.sectionTitleBottomPadding)
+                                        
+                                        if middleSectionSeats.count > 0 {
+                                            CenterRowView(
+                                                rowLabel: middleRowLabels[0],
+                                                seats: middleSectionSeats[0],
+                                                selectedSeats: $selectedSeats,
+                                                firestoreManager: firestoreManager,
+                                                currentUser: $currentUser,
+                                                metrics: metrics
+                                            )
+                                        }
+                                        
+                                        BemaView(metrics: metrics)
+                                        
+                                        ForEach(Array(middleSectionSeats.dropFirst().enumerated()), id: \.offset) { idx, row in
+                                            CenterRowView(
+                                                rowLabel: middleRowLabels[idx + 1],
+                                                seats: row,
+                                                selectedSeats: $selectedSeats,
+                                                firestoreManager: firestoreManager,
+                                                currentUser: $currentUser,
+                                                metrics: metrics
+                                            )
+                                        }
+                                    }
+                                    
+                                    // RIGHT SECTION
+                                    VStack(spacing: metrics.sectionVerticalSpacing) {
+                                        Text("RIGHT")
+                                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                                            .foregroundColor(.secondary)
+                                            .padding(.bottom, metrics.sectionTitleBottomPadding)
+                                        
+                                        ForEach(Array(rightSectionSeats.enumerated()), id: \.offset) { idx, row in
+                                            SectionRowView(
+                                                rowLabel: rightRowLabels[idx],
+                                                seats: row,
+                                                selectedSeats: $selectedSeats,
+                                                firestoreManager: firestoreManager,
+                                                currentUser: $currentUser,
+                                                metrics: metrics
+                                            )
+                                        }
                                     }
                                 }
-                                
-                                Spacer()
-                                
-                                // CENTER SECTION with Bema
-                                VStack(spacing: 6) {
-                                    Text("CENTER")
-                                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                                        .foregroundColor(.secondary)
-                                        .padding(.bottom, 4)
-                                    
-                                    if middleSectionSeats.count > 0 {
-                                        CenterRowView(
-                                            rowLabel: middleRowLabels[0],
-                                            seats: middleSectionSeats[0],
-                                            selectedSeats: $selectedSeats,
-                                            firestoreManager: firestoreManager,
-                                            currentUser: $currentUser
-                                        )
-                                    }
-                                    
-                                    BemaView()
-                                    
-                                    ForEach(Array(middleSectionSeats.dropFirst().enumerated()), id: \.offset) { idx, row in
-                                        CenterRowView(
-                                            rowLabel: middleRowLabels[idx + 1],
-                                            seats: row,
-                                            selectedSeats: $selectedSeats,
-                                            firestoreManager: firestoreManager,
-                                            currentUser: $currentUser
-                                        )
-                                    }
-                                }
-                                
-                                Spacer()
-                                
-                                // RIGHT SECTION
-                                VStack(spacing: 6) {
-                                    Text("RIGHT")
-                                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                                        .foregroundColor(.secondary)
-                                        .padding(.bottom, 4)
-                                    
-                                    ForEach(Array(rightSectionSeats.enumerated()), id: \.offset) { idx, row in
-                                        SectionRowView(
-                                            rowLabel: rightRowLabels[idx],
-                                            seats: row,
-                                            selectedSeats: $selectedSeats,
-                                            firestoreManager: firestoreManager,
-                                            currentUser: $currentUser
-                                        )
-                                    }
-                                }
+                                .padding(.horizontal, metrics.sectionHorizontalPadding)
+                                .padding(.vertical, metrics.sectionVerticalPadding)
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 20)
                         }
+                        .background(
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .fill(cardBackground)
+                                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 20, x: 0, y: 4)
+                        )
+                        .padding(.horizontal, 16)
+                        
+                        Spacer(minLength: 8)
+                        
+                        // Bottom panel
+                        SelectionPanelView(
+                            selectedSeats: $selectedSeats,
+                            isReserving: $isReserving,
+                            onConfirm: confirmSeatReservations,
+                            metrics: metrics
+                        )
                     }
-                    .background(
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .fill(cardBackground)
-                            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 20, x: 0, y: 4)
-                    )
-                    .padding(.horizontal, 16)
-                    
-                    Spacer(minLength: 8)
-                    
-                    // Bottom panel
-                    SelectionPanelView(
-                        selectedSeats: $selectedSeats,
-                        isReserving: $isReserving,
-                        onConfirm: confirmSeatReservations
-                    )
                 }
             }
             .navigationTitle("Seating")
@@ -266,6 +317,7 @@ struct SeatingView: View {
 // MARK: - Bema View
 struct BemaView: View {
     @Environment(\.colorScheme) var colorScheme
+    let metrics: SeatingLayoutMetrics
     
     var body: some View {
         ZStack {
@@ -279,7 +331,7 @@ struct BemaView: View {
                         endPoint: .bottom
                     )
                 )
-                .frame(width: 60, height: 50)
+                .frame(width: metrics.bemaWidth, height: metrics.bemaHeight)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(Color.white.opacity(colorScheme == .dark ? 0.2 : 0.5), lineWidth: 1)
@@ -288,10 +340,10 @@ struct BemaView: View {
             
             VStack(spacing: 2) {
                 Image(systemName: "book.closed.fill")
-                    .font(.system(size: 14))
+                    .font(.system(size: metrics.bemaIconSize))
                     .foregroundColor(colorScheme == .dark ? Color(red: 0.9, green: 0.85, blue: 0.75) : Color(red: 0.5, green: 0.4, blue: 0.3))
                 Text("BEMA")
-                    .font(.system(size: 7, weight: .bold, design: .rounded))
+                    .font(.system(size: metrics.bemaTextSize, weight: .bold, design: .rounded))
                     .foregroundColor(colorScheme == .dark ? Color(red: 0.9, green: 0.85, blue: 0.75) : Color(red: 0.5, green: 0.4, blue: 0.3))
             }
         }
@@ -306,18 +358,19 @@ struct SectionRowView: View {
     @Binding var selectedSeats: Set<String>
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
+    let metrics: SeatingLayoutMetrics
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: metrics.seatSpacing) {
             Text(rowLabel)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .font(.system(size: metrics.rowLabelFontSize, weight: .semibold, design: .rounded))
                 .foregroundColor(colorScheme == .dark ? Color(red: 0.5, green: 0.55, blue: 0.7) : Color(red: 0.55, green: 0.6, blue: 0.7))
-                .frame(width: 18, alignment: .trailing)
+                .frame(width: metrics.rowLabelWidth, alignment: .trailing)
             
-            HStack(spacing: 4) {
+            HStack(spacing: metrics.seatSpacing) {
                 ForEach(seats) { seat in
-                    SeatView(seat: seat, selectedSeats: $selectedSeats, firestoreManager: firestoreManager, currentUser: $currentUser)
+                    SeatView(seat: seat, selectedSeats: $selectedSeats, firestoreManager: firestoreManager, currentUser: $currentUser, metrics: metrics)
                 }
             }
         }
@@ -331,26 +384,27 @@ struct CenterRowView: View {
     @Binding var selectedSeats: Set<String>
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
+    let metrics: SeatingLayoutMetrics
     @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: metrics.seatSpacing) {
             // Row label on left - but invisible spacer on right to balance
             Text(rowLabel)
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .font(.system(size: metrics.rowLabelFontSize, weight: .semibold, design: .rounded))
                 .foregroundColor(colorScheme == .dark ? Color(red: 0.5, green: 0.55, blue: 0.7) : Color(red: 0.55, green: 0.6, blue: 0.7))
-                .frame(width: 18, alignment: .trailing)
+                .frame(width: metrics.rowLabelWidth, alignment: .trailing)
             
             // Seats
-            HStack(spacing: 4) {
+            HStack(spacing: metrics.seatSpacing) {
                 ForEach(seats) { seat in
-                    SeatView(seat: seat, selectedSeats: $selectedSeats, firestoreManager: firestoreManager, currentUser: $currentUser)
+                    SeatView(seat: seat, selectedSeats: $selectedSeats, firestoreManager: firestoreManager, currentUser: $currentUser, metrics: metrics)
                 }
             }
             
             // Invisible spacer to balance the row label
             Color.clear
-                .frame(width: 18)
+                .frame(width: metrics.rowLabelWidth)
         }
     }
 }
@@ -407,6 +461,7 @@ struct SeatView: View {
     @Binding var selectedSeats: Set<String>
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
+    let metrics: SeatingLayoutMetrics
     @Environment(\.colorScheme) var colorScheme
     @State private var showReservationInfo = false
     
@@ -446,7 +501,7 @@ struct SeatView: View {
         } label: {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(seatColor)
-                .frame(width: 16, height: 16)
+                .frame(width: metrics.seatSize, height: metrics.seatSize)
                 .overlay(
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .stroke(isSelected ? Color.blue.opacity(0.5) : Color.white.opacity(colorScheme == .dark ? 0.15 : 0.4), lineWidth: 0.5)
@@ -562,6 +617,7 @@ struct SelectionPanelView: View {
     @Binding var selectedSeats: Set<String>
     @Binding var isReserving: Bool
     var onConfirm: () -> Void
+    let metrics: SeatingLayoutMetrics
     @Environment(\.colorScheme) var colorScheme
     
     @State private var showConfirmation = false
@@ -646,10 +702,10 @@ struct SelectionPanelView: View {
                         withAnimation { selectedSeats.removeAll() }
                     } label: {
                         Text("Cancel")
-                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                            .font(.system(size: metrics.panelButtonFontSize, weight: .semibold, design: .rounded))
                             .foregroundColor(.red)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, metrics.panelButtonHorizontalPadding)
+                            .padding(.vertical, metrics.panelButtonVerticalPadding)
                             .background(Capsule().fill(Color.red.opacity(0.15)))
                     }
                     
@@ -663,11 +719,11 @@ struct SelectionPanelView: View {
                                     .scaleEffect(0.7)
                             }
                             Text(isReserving ? "Reserving..." : "Confirm")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .font(.system(size: metrics.panelButtonFontSize, weight: .bold, design: .rounded))
                         }
                         .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .padding(.horizontal, metrics.panelButtonHorizontalPadding)
+                        .padding(.vertical, metrics.panelButtonVerticalPadding)
                         .background(
                             Capsule()
                                 .fill(LinearGradient(colors: [.blue, .blue.opacity(0.85)], startPoint: .top, endPoint: .bottom))
@@ -682,14 +738,15 @@ struct SelectionPanelView: View {
                 ))
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, metrics.panelHorizontalInset)
+        .padding(.vertical, metrics.panelVerticalPadding)
+        .frame(maxWidth: metrics.panelMaxWidth)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(.ultraThinMaterial)
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 10, x: 0, y: -2)
         )
-        .padding(.horizontal, 36)
+        .padding(.horizontal, 16)
         .padding(.bottom, 4)
         .onChange(of: isReserving) { oldValue, newValue in
             // Track when we start reserving

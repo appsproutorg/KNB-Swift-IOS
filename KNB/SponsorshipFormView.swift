@@ -7,8 +7,49 @@
 
 import SwiftUI
 
+private enum SponsorshipTier: String, CaseIterable, Identifiable {
+    case platinum
+    case gold
+    case silver
+    
+    var id: String { rawValue }
+    
+    var title: String {
+        switch self {
+        case .platinum: return "Platinum exclusive Kiddush"
+        case .gold: return "Gold Kiddush"
+        case .silver: return "Silver Kiddush (or co-sponsored Kiddush)"
+        }
+    }
+    
+    var amount: Int {
+        switch self {
+        case .platinum: return 700
+        case .gold: return 500
+        case .silver: return 360
+        }
+    }
+    
+    var subtitle: String {
+        switch self {
+        case .platinum: return "Exclusive full Kiddush sponsorship"
+        case .gold: return "Standard full Kiddush sponsorship"
+        case .silver: return "Co-sponsored Kiddush option"
+        }
+    }
+    
+    var accentColor: Color {
+        switch self {
+        case .platinum: return Color(red: 0.52, green: 0.55, blue: 0.62)
+        case .gold: return Color(red: 0.86, green: 0.67, blue: 0.2)
+        case .silver: return Color(red: 0.38, green: 0.58, blue: 0.88)
+        }
+    }
+}
+
 struct SponsorshipFormView: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.openURL) private var openURL
     @ObservedObject var firestoreManager: FirestoreManager
     
     let shabbatDate: Date
@@ -24,6 +65,10 @@ struct SponsorshipFormView: View {
     @State private var errorMessage: String?
     @State private var hebrewDate: String?
     @State private var existingSponsorship: KiddushSponsorship?
+    @State private var didOpenPaymentLink = false
+    @State private var selectedTier: SponsorshipTier = .gold
+    
+    private let squareCheckoutURL = "https://checkout.square.site/merchant/MLQJKX2QTSGN8/checkout/POVM2FK25UAE2G4AHUIZY6SQ"
     
     var isPastDate: Bool {
         shabbatDate < Date()
@@ -278,7 +323,7 @@ struct SponsorshipFormView: View {
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundStyle(.secondary)
                             
-                            Text("$500")
+                            Text("$\(selectedTier.amount)")
                                 .font(.system(size: 48, weight: .bold, design: .rounded))
                                 .foregroundStyle(
                                     LinearGradient(
@@ -313,6 +358,35 @@ struct SponsorshipFormView: View {
                             }
                         )
                         .shadow(color: .green.opacity(0.1), radius: 15, x: 0, y: 8)
+                        .padding(.horizontal)
+                        
+                        // Sponsorship Tier Selection
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Choose Sponsorship Tier")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .foregroundStyle(.primary)
+                            
+                            ForEach(SponsorshipTier.allCases) { tier in
+                                Button {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                                        selectedTier = tier
+                                    }
+                                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                                } label: {
+                                    SponsorshipTierOptionCard(
+                                        tier: tier,
+                                        isSelected: selectedTier == tier
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(18)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                        )
                         .padding(.horizontal)
                         
                         // Form Fields (only show if not already sponsored and not past date)
@@ -381,29 +455,49 @@ struct SponsorshipFormView: View {
                         .padding(.horizontal)
                         }
                         
-                        // Submit Button (only show if not already sponsored and not past date)
+                        // Payment + Submit Buttons (only show if not already sponsored and not past date)
                         if existingSponsorship == nil && !isPastDate {
-                        Button(action: submitSponsorship) {
-                            HStack {
-                                if isSubmitting {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                } else {
-                                    Image(systemName: "checkmark.circle.fill")
-                                    Text("Confirm Sponsorship")
-                                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                            VStack(spacing: 12) {
+                                Button(action: {
+                                    openSquareCheckout()
+                                    didOpenPaymentLink = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "creditcard.fill")
+                                        Text("Continue to Payment")
+                                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                                    }
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(isFormValid ? .blue : .gray)
+                                    .cornerRadius(15)
+                                    .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
                                 }
+                                .disabled(!isFormValid || isSubmitting)
+                                
+                                Button(action: submitSponsorship) {
+                                    HStack {
+                                        if isSubmitting {
+                                            ProgressView()
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        } else {
+                                            Image(systemName: "checkmark.circle.fill")
+                                            Text("I've Paid - Confirm Sponsorship")
+                                                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                        }
+                                    }
+                                    .foregroundStyle(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background((isFormValid && didOpenPaymentLink) ? .green : .gray)
+                                    .cornerRadius(15)
+                                    .shadow(color: .green.opacity(0.3), radius: 10, x: 0, y: 5)
+                                }
+                                .disabled(!isFormValid || !didOpenPaymentLink || isSubmitting)
                             }
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(isFormValid ? .blue : .gray)
-                            .cornerRadius(15)
-                            .shadow(color: .blue.opacity(0.3), radius: 10, x: 0, y: 5)
-                        }
-                        .disabled(!isFormValid || isSubmitting)
-                        .padding(.horizontal)
-                        .padding(.top, 10)
+                            .padding(.horizontal)
+                            .padding(.top, 10)
                         }
                         
                         // Error Message
@@ -430,11 +524,14 @@ struct SponsorshipFormView: View {
                 }
             }
             .alert("Sponsorship Confirmed!", isPresented: $showingConfirmation) {
+                Button("Pay Now") {
+                    openSquareCheckout()
+                }
                 Button("Done") {
                     dismiss()
                 }
             } message: {
-                Text("Thank you for sponsoring Kiddush! A confirmation email with payment details will be sent to \(email).")
+                Text("Thank you for sponsoring Kiddush! If needed, you can tap Pay Now again.")
             }
             .onAppear {
                 loadHebrewDate()
@@ -466,7 +563,7 @@ struct SponsorshipFormView: View {
     }
     
     func submitSponsorship() {
-        guard isFormValid else { return }
+        guard isFormValid, didOpenPaymentLink else { return }
         
         isSubmitting = true
         errorMessage = nil
@@ -477,6 +574,8 @@ struct SponsorshipFormView: View {
                 sponsorName: name,
                 sponsorEmail: email,
                 occasion: occasion,
+                tierName: selectedTier.title,
+                tierAmount: selectedTier.amount,
                 isAnonymous: isAnonymous
             )
             
@@ -505,6 +604,64 @@ struct SponsorshipFormView: View {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
+    
+    func openSquareCheckout() {
+        guard let url = URL(string: squareCheckoutURL) else { return }
+        openURL(url)
+    }
+}
+
+private struct SponsorshipTierOptionCard: View {
+    let tier: SponsorshipTier
+    let isSelected: Bool
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack {
+                Circle()
+                    .fill(isSelected ? tier.accentColor.opacity(0.2) : Color.clear)
+                    .frame(width: 30, height: 30)
+                
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(isSelected ? tier.accentColor : .secondary)
+            }
+            
+            VStack(alignment: .leading, spacing: 2) {
+                Text(tier.title)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
+                
+                Text(tier.subtitle)
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+            
+            Spacer()
+            
+            Text("$\(tier.amount)")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(isSelected ? .white : tier.accentColor)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    Capsule()
+                        .fill(isSelected ? tier.accentColor : tier.accentColor.opacity(0.16))
+                )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(isSelected ? tier.accentColor.opacity(0.08) : Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(isSelected ? tier.accentColor.opacity(0.55) : Color.white.opacity(0.12), lineWidth: isSelected ? 1.6 : 1)
+        )
+        .shadow(color: isSelected ? tier.accentColor.opacity(0.2) : .clear, radius: 8, x: 0, y: 3)
+        .scaleEffect(isSelected ? 1.01 : 1.0)
+    }
 }
 
 #Preview {
@@ -520,4 +677,3 @@ struct SponsorshipFormView: View {
         firestoreManager: FirestoreManager()
     )
 }
-

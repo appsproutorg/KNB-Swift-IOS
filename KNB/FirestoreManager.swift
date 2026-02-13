@@ -416,6 +416,8 @@ class FirestoreManager: ObservableObject {
                     
                     let isAnonymous = data["isAnonymous"] as? Bool ?? false
                     let isPaid = data["isPaid"] as? Bool ?? false
+                    let tierName = data["tierName"] as? String ?? "Gold Kiddush"
+                    let tierAmount = data["tierAmount"] as? Int ?? 500
                     
                     return KiddushSponsorship(
                         id: id,
@@ -423,6 +425,8 @@ class FirestoreManager: ObservableObject {
                         sponsorName: sponsorName,
                         sponsorEmail: sponsorEmail,
                         occasion: occasion,
+                        tierName: tierName,
+                        tierAmount: tierAmount,
                         isAnonymous: isAnonymous,
                         timestamp: timestamp,
                         isPaid: isPaid
@@ -458,6 +462,8 @@ class FirestoreManager: ObservableObject {
                 
                 let isAnonymous = data["isAnonymous"] as? Bool ?? false
                 let isPaid = data["isPaid"] as? Bool ?? false
+                let tierName = data["tierName"] as? String ?? "Gold Kiddush"
+                let tierAmount = data["tierAmount"] as? Int ?? 500
                 
                 return KiddushSponsorship(
                     id: id,
@@ -465,6 +471,8 @@ class FirestoreManager: ObservableObject {
                     sponsorName: sponsorName,
                     sponsorEmail: sponsorEmail,
                     occasion: occasion,
+                    tierName: tierName,
+                    tierAmount: tierAmount,
                     isAnonymous: isAnonymous,
                     timestamp: timestamp,
                     isPaid: isPaid
@@ -522,6 +530,8 @@ class FirestoreManager: ObservableObject {
                     "sponsorName": sponsorship.sponsorName,
                     "sponsorEmail": sponsorship.sponsorEmail,
                     "occasion": sponsorship.occasion,
+                    "tierName": sponsorship.tierName,
+                    "tierAmount": sponsorship.tierAmount,
                     "isAnonymous": sponsorship.isAnonymous,
                     "timestamp": Timestamp(date: sponsorship.timestamp),
                     "isPaid": sponsorship.isPaid
@@ -655,6 +665,8 @@ class FirestoreManager: ObservableObject {
                 
                 let isAnonymous = data["isAnonymous"] as? Bool ?? false
                 let isPaid = data["isPaid"] as? Bool ?? false
+                let tierName = data["tierName"] as? String ?? "Gold Kiddush"
+                let tierAmount = data["tierAmount"] as? Int ?? 500
                 
                 return KiddushSponsorship(
                     id: id,
@@ -662,6 +674,8 @@ class FirestoreManager: ObservableObject {
                     sponsorName: sponsorName,
                     sponsorEmail: sponsorEmail,
                     occasion: occasion,
+                    tierName: tierName,
+                    tierAmount: tierAmount,
                     isAnonymous: isAnonymous,
                     timestamp: timestamp,
                     isPaid: isPaid
@@ -1761,6 +1775,5 @@ class FirestoreManager: ObservableObject {
         return seatReservations.filter { $0.reservedBy == userEmail }
     }
 }
-
 
 
