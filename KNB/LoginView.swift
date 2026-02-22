@@ -197,14 +197,7 @@ struct LoginView: View {
 
                             Button(action: handleGoogleSignIn) {
                                 HStack(spacing: 12) {
-                                    ZStack {
-                                        Circle()
-                                            .fill(Color.white)
-                                            .frame(width: 26, height: 26)
-                                        Text("G")
-                                            .font(.system(size: 14, weight: .bold))
-                                            .foregroundStyle(Color(red: 0.23, green: 0.48, blue: 0.96))
-                                    }
+                                    GoogleLogoBadge()
 
                                     if isLoading {
                                         ProgressView()
@@ -403,6 +396,26 @@ struct LoginView: View {
             top = presented
         }
         return top
+    }
+}
+
+private struct GoogleLogoBadge: View {
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white)
+                .frame(width: 27, height: 27)
+                .overlay(
+                    Circle()
+                        .stroke(Color.black.opacity(0.12), lineWidth: 0.6)
+                )
+
+            Image("GoogleLogo")
+                .resizable()
+                .renderingMode(.original)
+                .scaledToFit()
+                .frame(width: 16, height: 16)
+        }
     }
 }
 

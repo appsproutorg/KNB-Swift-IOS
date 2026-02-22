@@ -7,16 +7,20 @@
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
 	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.676119484487-ldesssmu8up047s09atfn6fmkod4oqjj</string>
-			</array>
-		</dict>
-	</array>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Location access is used to orient the compass so it can point East during prayer.</string>
+		<array>
+			<dict>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.676119484487-ldesssmu8up047s09atfn6fmkod4oqjj</string>
+				</array>
+			</dict>
+		</array>
+		<key>CFBundleDisplayName</key>
+		<string>The KNB App</string>
+		<key>CFBundleName</key>
+		<string>The KNB App</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Location access is used to orient the compass so it can point East during prayer.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
