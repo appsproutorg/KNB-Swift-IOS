@@ -97,11 +97,22 @@ struct SponsorshipFormView: View {
         }
         return sponsorship.sponsorName
     }
+
+    private var displayedAmount: Int {
+        existingSponsorship?.tierAmount ?? selectedTier.amount
+    }
     
     var formattedDate: String {
         let formatter = DateFormatter()
         formatter.dateStyle = .long
         return formatter.string(from: shabbatDate)
+    }
+
+    private var tierStorageKey: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "America/Chicago")
+        return "kiddushSelectedTier_\(formatter.string(from: shabbatDate))"
     }
     
     var body: some View {
@@ -323,7 +334,7 @@ struct SponsorshipFormView: View {
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
                                 .foregroundStyle(.secondary)
                             
-                            Text("$\(selectedTier.amount)")
+                            Text("$\(displayedAmount)")
                                 .font(.system(size: 48, weight: .bold, design: .rounded))
                                 .foregroundStyle(
                                     LinearGradient(
@@ -333,7 +344,7 @@ struct SponsorshipFormView: View {
                                     )
                                 )
                             
-                            Text("Payment details will be sent via email")
+                            Text(existingSponsorship == nil ? "Payment details will be sent via email" : "Recorded sponsorship amount")
                                 .font(.system(size: 13, design: .rounded))
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
@@ -368,17 +379,21 @@ struct SponsorshipFormView: View {
                             
                             ForEach(SponsorshipTier.allCases) { tier in
                                 Button {
+                                    guard existingSponsorship == nil else { return }
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
                                         selectedTier = tier
                                     }
+                                    UserDefaults.standard.set(tier.rawValue, forKey: tierStorageKey)
                                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                                 } label: {
                                     SponsorshipTierOptionCard(
                                         tier: tier,
-                                        isSelected: selectedTier == tier
+                                        isSelected: (existingSponsorship?.tierAmount == tier.amount) || (existingSponsorship == nil && selectedTier == tier)
                                     )
                                 }
                                 .buttonStyle(.plain)
+                                .disabled(existingSponsorship != nil)
+                                .opacity(existingSponsorship != nil ? 0.7 : 1.0)
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -534,6 +549,10 @@ struct SponsorshipFormView: View {
                 Text("Thank you for sponsoring Kiddush! If needed, you can tap Pay Now again.")
             }
             .onAppear {
+                if let storedRaw = UserDefaults.standard.string(forKey: tierStorageKey),
+                   let storedTier = SponsorshipTier(rawValue: storedRaw) {
+                    selectedTier = storedTier
+                }
                 loadHebrewDate()
                 checkExistingSponsorship()
             }
@@ -552,7 +571,11 @@ struct SponsorshipFormView: View {
     func checkExistingSponsorship() {
         existingSponsorship = firestoreManager.getSponsorship(for: shabbatDate)
         if let existing = existingSponsorship {
+            if let matchedTier = SponsorshipTier.allCases.first(where: { $0.amount == existing.tierAmount }) {
+                selectedTier = matchedTier
+            }
             print("⚠️ Date already sponsored by: \(existing.sponsorEmail)")
+            print("💰 Existing sponsorship amount: \(existing.tierAmount)")
         } else {
             print("✅ Date is available for sponsorship")
         }
@@ -569,6 +592,7 @@ struct SponsorshipFormView: View {
         errorMessage = nil
         
         Task {
+            print("💰 Submitting sponsorship tier: \(selectedTier.title) ($\(selectedTier.amount))")
             let sponsorship = KiddushSponsorship(
                 date: shabbatDate,
                 sponsorName: name,
@@ -586,6 +610,7 @@ struct SponsorshipFormView: View {
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
                 
                 await MainActor.run {
+                    UserDefaults.standard.removeObject(forKey: tierStorageKey)
                     isSubmitting = false
                     showingConfirmation = true
                 }

@@ -782,7 +782,7 @@ struct SponsorshipCard: View {
             HStack {
                 Image(systemName: "dollarsign.circle.fill")
                     .foregroundStyle(.green)
-                Text("$500")
+                Text("$\(sponsorship.tierAmount)")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundStyle(.green)
             }
@@ -1087,4 +1087,3 @@ struct NameEditorView: View {
         }
     }
 }
-

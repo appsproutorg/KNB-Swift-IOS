@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SeatingLayoutMetrics {
     let isCompactPhone: Bool
+    let isVeryCompactPhone: Bool
     let sectionSpacing: CGFloat
     let sectionVerticalSpacing: CGFloat
     let sectionTitleBottomPadding: CGFloat
@@ -28,28 +29,53 @@ struct SeatingLayoutMetrics {
     let panelButtonFontSize: CGFloat
     let panelButtonHorizontalPadding: CGFloat
     let panelButtonVerticalPadding: CGFloat
+    let contentHorizontalInset: CGFloat
+    let aronTitleFontSize: CGFloat
+    let aronBarWidth: CGFloat
+    let aronBoxWidth: CGFloat
+    let aronBoxHeight: CGFloat
+    let edgeCompensationPadding: CGFloat
+
+    var sideSectionRowWidth: CGFloat {
+        rowLabelWidth + seatSpacing + (seatSize * 5) + (seatSpacing * 4)
+    }
+
+    var centerSectionRowWidth: CGFloat {
+        (rowLabelWidth * 2) + seatSpacing + (seatSize * 3) + (seatSpacing * 2)
+    }
+
+    var mapContentWidth: CGFloat {
+        sideSectionRowWidth + centerSectionRowWidth + sideSectionRowWidth + (sectionSpacing * 2) + ((sectionHorizontalPadding + edgeCompensationPadding) * 2)
+    }
     
     init(containerWidth: CGFloat) {
         isCompactPhone = containerWidth <= 390
-        sectionSpacing = isCompactPhone ? 8 : 12
-        sectionVerticalSpacing = isCompactPhone ? 4 : 6
-        sectionTitleBottomPadding = isCompactPhone ? 2 : 4
-        seatSize = isCompactPhone ? 13 : 16
-        seatSpacing = isCompactPhone ? 3 : 4
-        rowLabelWidth = isCompactPhone ? 16 : 18
-        rowLabelFontSize = isCompactPhone ? 8 : 9
-        sectionHorizontalPadding = isCompactPhone ? 10 : 16
-        sectionVerticalPadding = isCompactPhone ? 14 : 20
-        bemaWidth = isCompactPhone ? 52 : 60
-        bemaHeight = isCompactPhone ? 42 : 50
-        bemaIconSize = isCompactPhone ? 12 : 14
-        bemaTextSize = isCompactPhone ? 6 : 7
-        panelHorizontalInset = isCompactPhone ? 16 : 20
-        panelVerticalPadding = isCompactPhone ? 10 : 12
-        panelMaxWidth = isCompactPhone ? 320 : 350
-        panelButtonFontSize = isCompactPhone ? 12 : 13
-        panelButtonHorizontalPadding = isCompactPhone ? 12 : 16
-        panelButtonVerticalPadding = isCompactPhone ? 7 : 8
+        isVeryCompactPhone = containerWidth <= 350
+        sectionSpacing = isVeryCompactPhone ? 6 : (isCompactPhone ? 8 : 12)
+        sectionVerticalSpacing = isVeryCompactPhone ? 3 : (isCompactPhone ? 4 : 6)
+        sectionTitleBottomPadding = isVeryCompactPhone ? 1 : (isCompactPhone ? 2 : 4)
+        seatSize = isVeryCompactPhone ? 11 : (isCompactPhone ? 13 : 16)
+        seatSpacing = isVeryCompactPhone ? 2 : (isCompactPhone ? 3 : 4)
+        rowLabelWidth = isVeryCompactPhone ? 13 : (isCompactPhone ? 16 : 18)
+        rowLabelFontSize = isVeryCompactPhone ? 7 : (isCompactPhone ? 8 : 9)
+        sectionHorizontalPadding = isVeryCompactPhone ? 6 : (isCompactPhone ? 10 : 16)
+        sectionVerticalPadding = isVeryCompactPhone ? 10 : (isCompactPhone ? 14 : 20)
+        bemaWidth = isVeryCompactPhone ? 46 : (isCompactPhone ? 52 : 60)
+        bemaHeight = isVeryCompactPhone ? 38 : (isCompactPhone ? 42 : 50)
+        bemaIconSize = isVeryCompactPhone ? 10 : (isCompactPhone ? 12 : 14)
+        bemaTextSize = isVeryCompactPhone ? 5 : (isCompactPhone ? 6 : 7)
+        panelHorizontalInset = isVeryCompactPhone ? 12 : (isCompactPhone ? 16 : 20)
+        panelVerticalPadding = isVeryCompactPhone ? 8 : (isCompactPhone ? 10 : 12)
+        panelMaxWidth = isVeryCompactPhone ? 300 : (isCompactPhone ? 320 : 350)
+        panelButtonFontSize = isVeryCompactPhone ? 11 : (isCompactPhone ? 12 : 13)
+        panelButtonHorizontalPadding = isVeryCompactPhone ? 10 : (isCompactPhone ? 12 : 16)
+        panelButtonVerticalPadding = isVeryCompactPhone ? 6 : (isCompactPhone ? 7 : 8)
+        contentHorizontalInset = isVeryCompactPhone ? 8 : 16
+        aronTitleFontSize = isVeryCompactPhone ? 10 : 12
+        aronBarWidth = isVeryCompactPhone ? 28 : 40
+        aronBoxWidth = isVeryCompactPhone ? 118 : 140
+        aronBoxHeight = isVeryCompactPhone ? 20 : 24
+        edgeCompensationPadding = isVeryCompactPhone ? 3 : 4
     }
 }
 
@@ -120,10 +146,12 @@ struct SeatingView: View {
                 
                 GeometryReader { geometry in
                     let metrics = SeatingLayoutMetrics(containerWidth: geometry.size.width)
+                    let availableCardWidth = max(1, geometry.size.width - (metrics.contentHorizontalInset * 2))
+                    let mapScale = min(1, availableCardWidth / metrics.mapContentWidth)
                     
                     VStack(spacing: 0) {
                         // Aron Kodesh
-                        AronKodeshView()
+                        AronKodeshView(metrics: metrics)
                             .padding(.top, 8)
                             .padding(.bottom, 16)
                         
@@ -201,8 +229,12 @@ struct SeatingView: View {
                                         }
                                     }
                                 }
-                                .padding(.horizontal, metrics.sectionHorizontalPadding)
+                                .padding(.horizontal, metrics.sectionHorizontalPadding + metrics.edgeCompensationPadding)
                                 .padding(.vertical, metrics.sectionVerticalPadding)
+                                .frame(width: metrics.mapContentWidth)
+                                .scaleEffect(mapScale, anchor: .top)
+                                .frame(width: metrics.mapContentWidth * mapScale)
+                                .frame(maxWidth: .infinity, alignment: .center)
                             }
                         }
                         .background(
@@ -210,7 +242,7 @@ struct SeatingView: View {
                                 .fill(cardBackground)
                                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 20, x: 0, y: 4)
                         )
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, metrics.contentHorizontalInset)
                         
                         Spacer(minLength: 8)
                         
@@ -412,6 +444,7 @@ struct CenterRowView: View {
 // MARK: - Aron Kodesh View
 struct AronKodeshView: View {
     @Environment(\.colorScheme) var colorScheme
+    let metrics: SeatingLayoutMetrics
     
     var body: some View {
         VStack(spacing: 8) {
@@ -428,10 +461,10 @@ struct AronKodeshView: View {
                     .fill(LinearGradient(colors: [Color.blue.opacity(colorScheme == .dark ? 0.5 : 0.3), .clear], startPoint: .leading, endPoint: .trailing))
                     .frame(height: 2)
             }
-            .padding(.horizontal, 40)
+            .padding(.horizontal, metrics.aronBarWidth)
             
             Text("ARON KODESH")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(.system(size: metrics.aronTitleFontSize, weight: .bold, design: .rounded))
                 .tracking(2)
                 .foregroundColor(colorScheme == .dark ? Color(red: 0.6, green: 0.7, blue: 0.9) : Color(red: 0.3, green: 0.4, blue: 0.6))
             
@@ -445,7 +478,7 @@ struct AronKodeshView: View {
                         endPoint: .bottom
                     )
                 )
-                .frame(width: 140, height: 24)
+                .frame(width: metrics.aronBoxWidth, height: metrics.aronBoxHeight)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(Color.white.opacity(colorScheme == .dark ? 0.2 : 0.6), lineWidth: 1)
@@ -746,7 +779,7 @@ struct SelectionPanelView: View {
                 .fill(.ultraThinMaterial)
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.08), radius: 10, x: 0, y: -2)
         )
-        .padding(.horizontal, 16)
+        .padding(.horizontal, metrics.contentHorizontalInset)
         .padding(.bottom, 4)
         .onChange(of: isReserving) { oldValue, newValue in
             // Track when we start reserving

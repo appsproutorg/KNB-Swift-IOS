@@ -384,6 +384,36 @@ class FirestoreManager: ObservableObject {
     }
     
     // MARK: - Kiddush Sponsorship Methods
+    private func decodeTierAmount(from data: [String: Any]) -> Int {
+        if let value = data["tierAmount"] as? Int {
+            return value
+        }
+        if let value = data["tierAmount"] as? Int64 {
+            return Int(value)
+        }
+        if let value = data["tierAmount"] as? Double {
+            return Int(value)
+        }
+        if let value = data["tierAmount"] as? NSNumber {
+            return value.intValue
+        }
+        if let value = data["tierAmount"] as? String, let parsed = Int(value) {
+            return parsed
+        }
+        if let tierName = data["tierName"] as? String {
+            let normalized = tierName.lowercased()
+            if normalized.contains("platinum") {
+                return 700
+            }
+            if normalized.contains("silver") || normalized.contains("co-sponsored") {
+                return 360
+            }
+            if normalized.contains("gold") {
+                return 500
+            }
+        }
+        return 500
+    }
     
     // Start listening to Kiddush sponsorships
     func startListeningToSponsorships() {
@@ -417,7 +447,7 @@ class FirestoreManager: ObservableObject {
                     let isAnonymous = data["isAnonymous"] as? Bool ?? false
                     let isPaid = data["isPaid"] as? Bool ?? false
                     let tierName = data["tierName"] as? String ?? "Gold Kiddush"
-                    let tierAmount = data["tierAmount"] as? Int ?? 500
+                    let tierAmount = self.decodeTierAmount(from: data)
                     
                     return KiddushSponsorship(
                         id: id,
@@ -463,7 +493,7 @@ class FirestoreManager: ObservableObject {
                 let isAnonymous = data["isAnonymous"] as? Bool ?? false
                 let isPaid = data["isPaid"] as? Bool ?? false
                 let tierName = data["tierName"] as? String ?? "Gold Kiddush"
-                let tierAmount = data["tierAmount"] as? Int ?? 500
+                let tierAmount = decodeTierAmount(from: data)
                 
                 return KiddushSponsorship(
                     id: id,
@@ -666,7 +696,7 @@ class FirestoreManager: ObservableObject {
                 let isAnonymous = data["isAnonymous"] as? Bool ?? false
                 let isPaid = data["isPaid"] as? Bool ?? false
                 let tierName = data["tierName"] as? String ?? "Gold Kiddush"
-                let tierAmount = data["tierAmount"] as? Int ?? 500
+                let tierAmount = decodeTierAmount(from: data)
                 
                 return KiddushSponsorship(
                     id: id,
@@ -1775,5 +1805,3 @@ class FirestoreManager: ObservableObject {
         return seatReservations.filter { $0.reservedBy == userEmail }
     }
 }
-
-

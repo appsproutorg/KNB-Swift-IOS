@@ -1224,6 +1224,12 @@ struct MinchaView: View {
                                 english: "Be pleased, Adonoy, our God, with Your people, Israel, and their prayer; and restore the service to the Holy of Holies in Your abode, and the fire-offerings of Israel; and accept their prayer, lovingly and willingly. And may You always find pleasure with the service of Your people, Israel. And may our eyes behold Your merciful return to Zion. Blessed are You, Adonoy, Who returns His Divine Presence to Zion.",
                                 showEnglish: showEnglish
                             )
+
+                            PrayerBlock(
+                                hebrew: "אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ יַעֲלֶה וְיָבֹא וְיַגִּֽיעַ וְיֵרָאֶה וְיֵרָצֶה וְיִשָּׁמַע וְיִפָּקֵד וְיִזָּכֵר זִכְרוֹנֵֽנוּ וּפִקְדוֹנֵֽנוּ וְזִכְרוֹן אֲבוֹתֵֽינוּ וְזִכְרוֹן מָשִֽׁיחַ בֶּן דָּוִד עַבְדֶּֽךָ וְזִכְרוֹן יְרוּשָׁלַֽיִם עִיר קָדְשֶֽׁךָ וְזִכְרוֹן כָּל עַמְּ֒ךָ בֵּית יִשְׂרָאֵל לְפָנֶֽיךָ, לִפְלֵיטָה לְטוֹבָה לְחֵן וּלְחֶֽסֶד וּלְרַחֲמִים וּלְחַיִּים טוֹבִים וּלְשָׁלוֹם בְּיוֹם לר\"ח: רֹאשׁ הַחֹֽדֶשׁ הַזֶּה. לפסח: חַג הַמַּצּוֹת הַזֶּה. לסכות: חַג הַסֻּכּוֹת הַזֶּה. זָכְרֵֽנוּ יְהֹוָה אֱלֹהֵֽינוּ בּוֹ לְטוֹבָה, וּפָקְדֵֽנוּ בוֹ לִבְרָכָה, וְהוֹשִׁיעֵֽנוּ בוֹ לְחַיִּים טוֹבִים, וּבִדְבַר יְשׁוּעָה וְרַחֲמִים חוּס וְחָנֵּֽנוּ, וְרַחֵם עָלֵֽינוּ וְהוֹשִׁיעֵֽנוּ, כִּי אֵלֶֽיךָ עֵינֵֽינוּ, כִּי אֵל מֶֽלֶךְ חַנּוּן וְרַחוּם אָֽתָּה:",
+                                english: "Our God and God of our fathers, may there ascend, come, and reach, appear, be desired, and heard, counted and recalled our remembrance and reckoning; the remembrance of our fathers; the remembrance of the Messiah the son of David, Your servant; the remembrance of Jerusalem, city of Your Sanctuary; and the remembrance of Your entire people, the House of Israel, before You for survival, for well-being, for favor, kindliness, compassion, for good life and peace on this day of: Rosh Chodesh: this Rosh Chodesh. Pesach: this Festival of Matzos. Sukkos: this Festival of Sukkos. Remember us, Adonoy our God, on this day for well-being; be mindful of us on this day for blessing; and deliver us for good life. In accord with the promise of deliverance and compassion, spare us and favor us, have compassion on us and deliver us; for our eyes are directed to You, because You are the Almighty Who is King, Gracious, and Merciful.",
+                                showEnglish: showEnglish
+                            )
                             
                             PrayerBlock(
                                 hebrew: "מוֹדִים אֲנַֽחְנוּ לָךְ שָׁאַתָּה הוּא יְהֹוָה אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ לְעוֹלָם וָעֶד צוּר חַיֵּֽינוּ מָגֵן יִשְׁעֵֽנוּ אַתָּה הוּא לְדוֹר וָדוֹר נֽוֹדֶה לְּךָ וּנְסַפֵּר תְּהִלָּתֶֽךָ עַל־חַיֵּֽינוּ הַמְּ֒סוּרִים בְּיָדֶֽךָ וְעַל נִשְׁמוֹתֵֽינוּ הַפְּ֒קוּדוֹת לָךְ וְעַל נִסֶּֽיךָ שֶׁבְּכָל יוֹם עִמָּֽנוּ וְעַל נִפְלְ֒אוֹתֶֽיךָ וְטוֹבוֹתֶֽיךָ שֶׁבְּ֒כָל עֵת עֶֽרֶב וָבֹֽקֶר וְצָהֳרָֽיִם הַטּוֹב כִּי לֹא כָלוּ רַחֲמֶֽיךָ וְהַמְ֒רַחֵם כִּי לֹא תַֽמּוּ חֲסָדֶֽיךָ מֵעוֹלָם קִוִּֽינוּ לָךְ:",
@@ -1405,15 +1411,11 @@ struct MaarivView: View {
                                 showEnglish: showEnglish
                             )
 
-                            InstructionText(text: "Weekday, Maariv, Blessings of the Shema, First Blessing before Shema", showEnglish: showEnglish)
-
                             PrayerBlock(
                                 hebrew: "בָּרוּךְ אַתָּה יְהֹוָה אֱלֹהֵֽינוּ מֶֽלֶךְ הָעוֹלָם אֲשֶׁר בִּדְבָרוֹ מַעֲרִיב עֲרָבִים בְּחָכְמָה פּוֹתֵֽחַ שְׁעָרִים וּבִתְבוּנָה מְשַׁנֶּה עִתִּים וּמַחֲלִיף אֶת־הַזְּ֒מַנִּים וּמְסַדֵּר אֶת־הַכּוֹכָבִים בְּמִשְׁמְ֒רוֹתֵיהֶם בָּרָקִֽיעַ כִּרְצוֹנוֹ: בּוֹרֵא יוֹם וָלָֽיְלָה גּוֹלֵל אוֹר מִפְּ֒נֵי חֽשֶׁךְ וְחֽשֶׁךְ מִפְּ֒נֵי אוֹר וּמַעֲבִיר יוֹם וּמֵבִיא לָֽיְלָה וּמַבְדִּיל בֵּין יוֹם וּבֵין לָֽיְלָה יְהֹוָה צְבָאוֹת שְׁמוֹ: אֵל חַי וְקַיָּם תָּמִיד יִמְלֹךְ עָלֵֽינוּ לְעוֹלָם וָעֶד: בָּרוּךְ אַתָּה יְהֹוָה הַמַּעֲרִיב עֲרָבִים:",
                                 english: "Blessed are You, Adonoy, our God, King of the Universe, With His word He brings on evenings, with wisdom He opens the gates (of heaven); and with understanding changes the times and alternates the seasons, and arranges the stars in their watches, in the sky, according to His will. He creates day and night, He rolls the light away from before darkness, and darkness from before light; He causes day to pass and brings night, and separates between day and night; Adonoy of Hosts is His Name. The Almighty, Who is living and enduring will always reign over us forever and ever. Blessed are You, Adonoy, Who brings on evening.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Blessings of the Shema, Second Blessing before Shema", showEnglish: showEnglish)
 
                             PrayerBlock(
                                 hebrew: "אַהֲבַת עוֹלָם בֵּית יִשְׂרָאֵל עַמְּ֒ךָ אָהָֽבְתָּ תּוֹרָה וּמִצְוֹת חֻקִּים וּמִשְׁפָּטִים אוֹתָֽנוּ לִמַּֽדְתָּ: עַל כֵּן יְהֹוָה אֱלֹהֵֽינוּ בְּשָׁכְבֵֽנוּ וּבְקוּמֵֽנוּ נָשִֽׂיחַ בְּחֻקֶּֽיךָ וְנִשְׂמַח בְּדִבְרֵי תוֹרָתֶֽךָ וּבְמִצְוֹתֶֽיךָ לְעוֹלָם וָעֶד: כִּי הֵם חַיֵּֽינוּ וְאֹֽרֶךְ יָמֵֽינוּ וּבָהֶם נֶהְגֶּה יוֹמָם וָלָֽיְלָה: וְאַהֲבָתְ֒ךָ אַל תָּסִיר מִמֶּֽנּוּ לְעוֹלָמִים: בָּרוּךְ אַתָּה יְהֹוָה אוֹהֵב עַמּוֹ יִשְׂרָאֵל:",
@@ -1421,29 +1423,10 @@ struct MaarivView: View {
                                 showEnglish: showEnglish
                             )
 
-                            InstructionText(text: "Weekday, Maariv, Blessings of the Shema, Shema", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "יחיד אומר",
-                                english: "The following three words should be said when praying without a minyan:",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "אֵל מֶֽלֶךְ נֶאֱמָן:",
-                                english: "(Almighty, faithful King)",
-                                showEnglish: showEnglish
-                            )
 
                             PrayerBlock(
                                 hebrew: "שְׁמַע יִשְׂרָאֵל יְהֹוָה אֱלֹהֵֽינוּ יְהֹוָה אֶחָד:",
                                 english: "Hear, Israel: Adonoy is our God, Adonoy is One.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יש להפסיק מעט בין אחד לברוך כי עיקר קבול עול מלכות שמים היא פסוק ראשון. ויאמר בלחש:",
-                                english: "The following three lines are to be said silently:",
                                 showEnglish: showEnglish
                             )
 
@@ -1472,34 +1455,8 @@ struct MaarivView: View {
                             )
 
                             PrayerBlock(
-                                hebrew: "יש לצרף אֱלֹהֵיכֶם לאֱמֶת",
-                                english: "You must be careful to connect the last words of Shema, Adonoy your God, with the word emet without pause or interruption so that these three words form one sentence, meaning “Adonoy your God is true” (Maseches Berachos 13a).",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
                                 hebrew: "אֱ֯מֶת",
                                 english: "is true",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "שליח ציבור:",
-                                english: "The chazan repeats:",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יְהֹוָה אֱלֹהֵיכֶם֯ אֱ֯מֶת:",
-                                english: "Adonoy, your God, is true.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Blessings of the Shema, First Blessing after Shema", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "אמת ואמונה אינה פותחת בברוך דהויא סמוכה לחבירתה דק\"ש לא הוי הפסק (טור או\"ח רלו)",
-                                english: "This is the first of the two berachos that follow the Shema.",
                                 showEnglish: showEnglish
                             )
 
@@ -1521,13 +1478,6 @@ struct MaarivView: View {
                                 showEnglish: showEnglish
                             )
 
-                            InstructionText(text: "Weekday, Maariv, Blessings of the Shema, Second Blessing after Shema", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "אומר השכיבנו וחותם שומר את עמו ישראל לעד מפני שלילה צריכה שימור מן המזיקין. ואע\"ג דקי\"ל כרבי יוחנן דאמר שצריך לסמוך אף גאולה של ערבית לתפלת ערבית השכיבנו לא הוי הפסק דכיון דתקינו ליה רבנן כגאולה אריכתא (טור או\"ח רלו)",
-                                english: "This is the second of the benedictions that follow the Sh’ma.",
-                                showEnglish: showEnglish
-                            )
 
                             PrayerBlock(
                                 hebrew: "הַשְׁכִּיבֵֽנוּ יְהֹוָה אֱלֹהֵֽינוּ לְשָׁלוֹם וְהַעֲמִידֵֽנוּ מַלְכֵּֽנוּ לְחַיִּים וּפְרוֹשׂ עָלֵֽינוּ סֻכַּת שְׁלוֹמֶֽךָ וְתַקְּ֒נֵֽנוּ בְּעֵצָה טוֹבָה מִלְּ֒פָנֶֽיךָ וְהוֹשִׁיעֵֽנוּ לְמַֽעַן שְׁמֶֽךָ וְהָגֵן בַּעֲדֵֽנוּ וְהָסֵר מֵעָלֵֽינוּ אוֹיֵב דֶּֽבֶר וְחֶֽרֶב וְרָעָב וְיָגוֹן וְהָסֵר שָׂטָן מִלְּפָנֵֽינוּ וּמֵאַחֲרֵֽינוּ וּבְצֵל כְּנָפֶֽיךָ תַּסְתִּירֵֽנוּ כִּי אֵל שׁוֹמְ֒רֵֽנוּ וּמַצִּילֵֽנוּ אָֽתָּה כִּי אֵל מֶֽלֶךְ חַנּוּן וְרַחוּם אָֽתָּה וּשְׁמוֹר צֵאתֵֽנוּ וּבוֹאֵֽנוּ לְחַיִּים וּלְשָׁלוֹם מֵעַתָּה וְעַד עוֹלָם: בָּרוּךְ אַתָּה יְהֹוָה שׁוֹמֵר עַמּוֹ יִשְׂרָאֵל לָעַד:",
@@ -1535,523 +1485,165 @@ struct MaarivView: View {
                                 showEnglish: showEnglish
                             )
 
-                            InstructionText(text: "Weekday, Maariv, Blessings of the Shema, Third Blessing after Shema", showEnglish: showEnglish)
-
                             PrayerBlock(
-                                hebrew: "מה שנוהגין להפסיק בפסוקים ויראו עינינו וקדיש לפי שבימים ראשונים היו בתי כנסיות שלהם בשדות והיו יראים להתאחר שם עד זמן תפלת ערבית ותיקנו לומר פסוקים אלו שיש בהם י\"ח אזכרות כנגד י\"ח ברכות שיש בתפלת ערבית ונפטרין בקדיש ועתה שחזרו להתפלל ערבית בבתי כנסיות לא נתבטל מנהג הראשון ומ\"מ אין להפסיק בדברים אחרים ויש מן הגדולים שנהגו שלא לאמרם (טור או\"ח רלו)",
-                                english: "The following prayer was originally a compilation of eighteen verses instituted during the Gaonic era as a substitute for the Shemoneh Esrei. According to Avudraham, the Shemoneh Esrei was omitted because of decrees issued against the Jews that banned them from participating in the Evening Service. These eighteen verses, adopted in place of the Shemoneh Esrei, have remained a part of the Maariv service. Some Halachic commentaries maintain that these verses should not be included in Maariv, because they constitute an interruption between the final blessing after Shema and the Shemoneh Esrei.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בָּרוּךְ יְהֹוָה לְעוֹלָם אָמֵן וְאָמֵן: בָּרוּךְ יְהֹוָה מִצִּיּוֹן שֹׁכֵן יְרוּשָׁלָֽםִ הַלְ֒לוּיָהּ: בָּרוּךְ יְהֹוָה אֱלֹהִים אֱלֹהֵי יִשְׂרָאֵל עֹשֵׂה נִפְלָאוֹת לְבַדּוֹ: וּבָרוּךְ שֵׁם כְּבוֹדוֹ לְעוֹלָם וְיִמָּלֵא כְבוֹדוֹ אֶת־כָּל־הָאָֽרֶץ אָמֵן וְאָמֵן: יְהִי כְבוֹד יְהֹוָה לְעוֹלָם יִשְׂמַח יְהֹוָה בְּמַעֲשָׂיו: יְהִי שֵׁם יְהֹוָה מְבֹרָךְ מֵעַתָּה וְעַד־עוֹלָם: כִּי לֹא יִטּשׁ יְהֹוָה אֶת־עַמּוֹ בַּעֲבוּר שְׁמוֹ הַגָּדוֹל כִּי הוֹאִיל יְהֹוָה לַעֲשׂוֹת אֶתְכֶם לוֹ לְעָם: וַיַּרְא כָּל־הָעָם וַיִּפְּ֒לוּ עַל פְּנֵיהֶם וַיֹּאמְ֒רוּ יְהֹוָה הוּא הָאֱלֹהִים יְהֹוָה הוּא הָאֱלֹהִים: וְהָיָה יְהֹוָה לְמֶֽלֶךְ עַל כָּל־הָאָֽרֶץ בַּיּוֹם הַהוּא יִהְיֶה יְהֹוָה אֶחָד וּשְׁמוֹ אֶחָד: יְהִי־חַסְדְּ֒ךָ יְהֹוָה עָלֵֽינוּ כַּאֲשֶׁר יִחַֽלְנוּ לָךְ: הוֹשִׁיעֵֽנוּ יְהֹוָה אֱלֹהֵֽינוּ וְקַבְּ֒צֵֽנוּ מִן־הַגּוֹיִם לְהוֹדוֹת לְשֵׁם קָדְשֶֽׁךָ לְהִשְׁתַּבֵּֽחַ בִּתְהִלָּתֶֽךָ: כָּל־גּוֹיִם אֲשֶׁר עָשִֽׂיתָ יָבֹֽאוּ וְיִשְׁתַּחֲווּ לְפָנֶֽיךָ אֲדֹנָי וִיכַבְּ֒דוּ לִשְׁמֶֽךָ: כִּי־גָדוֹל אַתָּה וְעֹשֵׂה נִפְלָאוֹת אַתָּה אֱלֹהִים לְבַדֶּֽךָ: וַאֲנַֽחְנוּ עַמְּ֒ךָ וְצֹאן מַרְעִיתֶֽךָ נוֹדֶה לְּךָ לְעוֹלָם לְדוֹר וָדוֹר נְסַפֵּר תְּהִלָּתֶֽךָ: בָּרוּךְ יְהֹוָה בַּיּוֹם בָּרוּךְ יְהֹוָה בַּלָּֽיְלָה בָּרוּךְ יְהֹוָה בְּשָׁכְבֵֽנוּ בָּרוּךְ יְהֹוָה בְּקוּמֵֽנוּ: כִּי בְיָדְ֒ךָ נַפְשׁוֹת הַחַיִּים וְהַמֵּתִים אֲשֶׁר בְּיָדוֹ נֶֽפֶשׁ כָּל־חָי וְרֽוּחַ כָּל־בְּשַׂר־אִישׁ: בְּיָדְ֒ךָ אַפְקִיד רוּחִי פָּדִֽיתָה אוֹתִי יְהֹוָה אֵל אֱמֶת: אֱלֹהֵֽינוּ שֶׁבַּשָּׁמַֽיִם יַחֵד שִׁמְךָ וְקַיֵּם מַלְכוּתְ֒ךָ תָּמִיד וּמְלֹךְ עָלֵֽינוּ לְעוֹלָם וָעֶד:",
-                                english: "Blessed is Adonoy forever, Amein and Amein. Blessed is Adonoy from Zion Who dwells in Jerusalem, Praise God. Blessed is Adonoy, God, God of Israel Who alone performs wonders. Blessed is the Name of His glory forever and may His glory fill the whole earth, Amein and Amein. The Glory of Adonoy will endure forever. Adonoy will rejoice in His works. The Name of Adonoy will be blessed from now forever. For Adonoy will not cast off His people, for the sake of His great Name, because Adonoy has determined to make you His people. And all the people saw it and they fell on their faces, and proclaimed, Adonoy, He is God. Adonoy, He is God. And Adonoy will be King over the whole earth. On that day Adonoy will be One and His Name One. Adonoy, may Your kindness be upon us as we have hoped for You. Deliver us, Adonoy, our God, gather us from the nations to give thanks to Your Holy Name, to be extolled in Your praise. All the nations which You have made will come and bow down before You, my Master, and they will give honor to Your Name. For You are great and do wondrous things, You alone are God. And we, Your people, the sheep of Your pasture, will give thanks to You forever, from generation to generation we will recount Your praise. Blessed is Adonoy by day, Blessed is Adonoy by night, Blessed is Adonoy when we lie down, Blessed is Adonoy when we rise. For in Your hand are the souls of the living and the dead; for in His hand is the soul of every living thing, and the spirit of every human being. In Your hand, I commit my spirit; You have liberated me Adonoy, Almighty of truth. Our God in heaven, reveal the unity of Your Name, preserve Your kingdom always and reign over us forever and ever.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יִרְאוּ עֵינֵֽינוּ וְיִשְׂמַח לִבֵּֽנוּ וְתָגֵל נַפְשֵֽׁנוּ בִּישׁוּעָתְ֒ךָ בֶּאֱמֶת בֶּאֱמֹר לְצִיּוֹן מָלַךְ אֱלֹהָֽיִךְ: יְהֹוָה מֶֽלֶךְ יְהֹוָה מָלָךְ יְהֹוָה יִמְלֹךְ לְעוֹלָם וָעֶד: כִּי הַמַּלְכוּת שֶׁלְּ֒ךָ הִיא וּלְעֽוֹלְ֒מֵי עַד תִּמְלֹךְ בְּכָבוֹד כִּי אֵין לָֽנוּ מֶֽלֶךְ אֶלָּא אָֽתָּה: בָּרוּךְ אַתָּה יְהֹוָה הַמֶּֽלֶךְ בִּכְבוֹדוֹ תָּמִיד יִמְלוֹךְ עָלֵֽינוּ לְעוֹלָם וָעֶד וְעַל כָּל מַעֲשָׂיו:",
-                                english: "May our eyes behold, our heart rejoice, and our soul exalt in Your true deliverance, when it will be said to Zion: Your God has begun His reign. Adonoy is King, Adonoy was King, Adonoy will reign forever and ever. For the kingdom is Yours and to all eternity, You will reign in glory. For we have no king except You. Blessed are You, the King in His glory, will always reign over us forever and ever, and over all His creation.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Blessings of the Shema, Half Kaddish", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "ואומר שליח צבור חצי קדיש:",
-                                english: "The Chazzan recites the following half-Kaddish",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יִתְגַּדַּל וְיִתְקַדַּשׁ שְׁמֵהּ רַבָּא (אָמֵן)",
-                                english: "Exalted and sanctified be His great Name",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בְּעָלְ֒מָֽא דִּי־בְרָא כִרְעוּתֵהּ וְיַמְלִיךְ מַלְכוּתֵהּ בְּחַיֵּיכוֹן וּבְיוֹמֵיכוֹן וּבְחַיֵּי דְכָל־בֵּית יִשְׂרָאֵל בַּעֲגָלָא וּבִזְמַן קָרִיב וְאִמְרוּ אָמֵן:",
-                                english: "In the world which He created according to His will and may He rule His kingdom. In your lifetime and in your days, and in the lifetime of the entire House of Israel, speedily and in the near future, and say Amein.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יְהֵא שְׁמֵהּ רַבָּא מְבָרַךְ לְעָלַם וּלְעָלְ֒מֵי עָלְ֒מַיָּא",
-                                english: "May His great Name be blessed forever and for all eternity.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יִתְבָּרַךְ וְיִשְׁתַּבַּח וְיִתְפָּאַר וְיִתְרוֹמַם וְיִתְנַשֵּׂא וְיִתְהַדָּר וְיִתְעַלֶּה וְיִתְהַלָּל שְׁמֵהּ דְקוּדְשָׁא בְּרִיךְ הוּא",
-                                english: "Blessed and praised, glorified, and exalted and uplifted, honored and elevated and extolled be the Name of the Holy One, blessed is He.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "לְעֵֽלָּא מִן־כָּל־ (בעשי\"ת לְעֵֽלָּא לְעֵֽלָּא מִכָּל) בִּרְכָתָֽא וְשִׁירָתָֽא תֻּשְׁבְּ֒חָתָֽא וְנֶחָמָתָֽא דַּאֲמִירָן בְּעָלְ֒מָֽא וְאִמְרוּ אָמֵן:",
-                                english: "Above all the blessings and hymns, praises and consolations which we utter in the world, and say Amein.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Patriarchs", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "המתפלל צריך שיכוין בליבו פירוש המילות שהוא מוציא בשפתיו. ואם אינו יכול לכוין פירוש המילות לכל הפחות צריך שיחשוב בשעת התפילה בדברים המכניעים את הלב ומכוונים את לבו לאביו שבשמים. יכוין רגליו זה אצל זה כאילו אינן אלא אחת. ויזהר להתפלל בלחש. ולא ירמוז בעיניו ולא יקרוץ בשפתיו ולא יראה באצבעותיו ואינו פוסק אפילו לקדיש וקדושה (קיצשו\"ע יח)",
-                                english: "Fundamentals of Kuzari, (Metsudah Publications, 1979) pages 269, 271, 273. When reciting Shemoneh Esrei, you must adhere to these rules: 1. Before beginning the prayer, take three steps backwards and then return to your former position. Upon completing the prayer, take three steps backwards and return. 2. Keep your feet together. 3. Concentrate on the meaning of the words you are uttering. Remove all distracting thoughts and worries from your mind. 4. You may not interrupt Shemoneh Esrei by talking, not even by answering Amein. If you should hear Kedushah, Kaddish, or Barechu while saying the Shemoneh Esrei, you should remain silent and listen to the Chazzan’s words. 5. At the beginning and end of the first blessing, at the beginning and end of the blessing that begins: We are thankful to You, and ends with The Beneficent is Your Name, we half-kneel and bow in the following manner: At the word Blessed, bend your knees; at the word You, bend forward until the vertebrae of your spinal cord are loosened; at Adonoy, return to your upright position in keeping with the verse, Adonoy straightens the bent (Psalms 146:8). 6. Each individual recites Shemoneh Esrei in silence. Only the prayer leader, the Chazzan, ever recites it aloud, and then only after the entire congregation, himself included, has recited it silently.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "אֲדֹנָי שְׂפָתַי תִּפְתָּח וּפִי יַגִּיד תְּהִלָּתֶֽךָ:",
+                                hebrew: "אֲדֹנָי שְׂפָתַי תִּפְתָּח וּפִי יַגִּיד תְּהִלָּתֶֽךָ:",
                                 english: "My Master, open my lips, and my mouth will declare Your praise.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "בָּרוּךְ אַתָּה יְהֹוָה אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ אֱלֹהֵי אַבְרָהָם אֱלֹהֵי יִצְחָק וֵאלֹהֵי יַעֲקֹב הָאֵל הַגָּדוֹל הַגִּבּוֹר וְהַנּוֹרָא אֵל עֶלְיוֹן גּוֹמֵל חֲסָדִים טוֹבִים וְקוֹנֵה הַכֹּל וְזוֹכֵר חַסְדֵי אָבוֹת וּמֵבִיא גוֹאֵל לִבְנֵי בְנֵיהֶם לְמַֽעַן שׁמוֹ בְּאַהֲבָה:",
-                                english: "Blessed are You, Adonoy, our God, and God of our fathers, God of Abraham, God of Isaac, and God of Jacob, the Almighty, the Great, the Powerful, the Awesome, most high Almighty, Who bestows beneficent kindness, Who possesses everything, Who remembers the piety of the Patriarchs, and Who brings a redeemer to their children’s children, for the sake of His Name, with love.",
+                                hebrew: "בָּרוּךְ אַתָּה יְהֹוָה אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ אֱלֹהֵי אַבְרָהָם אֱלֹהֵי יִצְחָק וֵאלֹהֵי יַעֲקֹב הָאֵל הַגָּדוֹל הַגִּבּוֹר וְהַנּוֹרָא אֵל עֶלְיוֹן גּוֹמֵל חֲסָדִים טוֹבִים וְקוֹנֵה הַכֹּל וְזוֹכֵר חַסְדֵי אָבוֹת וּמֵבִיא גוֹאֵל לִבְנֵי בְנֵיהֶם לְמַֽעַן שְׁמוֹ בְּאַהֲבָה:",
+                                english: "Blessed are You, Adonoy, our God, and God of our fathers, God of Abraham, God of Isaac, and God of Jacob, the Almighty, the Great, the Powerful, the Awesome, most high Almighty, Who bestows beneficent kindness, Who possesses everything, Who remembers the piety of the Patriarchs, and Who brings a redeemer to their children's children, for the sake of His Name, with love.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "בעשי\"ת: זָכְרֵֽנוּ לְחַיִּים מֶֽלֶךְ חָפֵץ בַּחַיִּים וְכָתְבֵֽנוּ בְּסֵֽפֶר הַחַיִּים לְמַעֲנְךָ אֱלֹהִים חַיִּים:",
-                                english: "During the Ten Days of Penitence add: Remember us for life King, Who desires life; and inscribe us in the Book of Life, for Your sake, Living God.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "אם לא אמר זכרנו ונזכר לאחר שכבר אמר בא\"י אינו חוזר אבל אם נזכר קודם שאמר השם אף שאמר ברוך אתה אומר זכרנו כו' מלך עוזר כסדר. הטועה ומזכיר זכרנו בשאר ימות השנה אם נזכר קודם שאמר וכתבנו פוסק ומתחיל מלך עוזר וגו' אבל אם אמר וכתבנו חוזר לראש התפלה. (דה\"ח)",
-                                english: "If you forgot to say this, see page 000.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "מֶֽלֶךְ עוֹזֵר וּמוֹשִֽׁיעַ וּמָגֵן: בָּרוּךְ אַתָּה יְהֹוָה מָגֵן אַבְרָהָם:",
+                                hebrew: "מֶֽלֶךְ עוֹזֵר וּמוֹשִֽׁיעַ וּמָגֵן: בָּרוּךְ אַתָּה יְהֹוָה מָגֵן אַבְרָהָם:",
                                 english: "King, Helper, and Deliverer and Shield. Blessed are You, Adonoy, Shield of Abraham.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Divine Might", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "אַתָּה גִבּוֹר לְעוֹלָם אֲדֹנָי מְחַיֶּה מֵתִים אַתָּה רַב לְהוֹשִֽיעַ:",
+                                hebrew: "אַתָּה גִבּוֹר לְעוֹלָם אֲדֹנָי מְחַיֶּה מֵתִים אַתָּה רַב לְהוֹשִֽׁיעַ:",
                                 english: "You are mighty forever, my Master; You are the Resurrector of the dead the Powerful One to deliver us.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "בקיץ: מוֹרִיד הַטָּל",
-                                english: "From the Musaf of the first day of Pesach until the Musaf of Shemini Atzeres one should say: He causes the dew to descend.",
+                                hebrew: "מַשִּׁיב הָרֽוּחַ וּמוֹרִיד הַגֶּֽשֶׁם: מְכַלְכֵּל חַיִּים בְּחֶֽסֶד מְחַיֵּה מֵתִים בְּרַחֲמִים רַבִּים סוֹמֵךְ נוֹפְ֒לִים וְרוֹפֵא חוֹלִים וּמַתִּיר אֲסוּרִים וּמְקַיֵּם אֱמוּנָתוֹ לִישֵׁנֵי עָפָר, מִי כָמֽוֹךָ בַּֽעַל גְּבוּרוֹת וּמִי דּֽוֹמֶה לָּךְ מֶֽלֶךְ מֵמִית וּמְחַיֶּה וּמַצְמִֽיחַ יְשׁוּעָה:",
+                                english: "Causer of the wind to blow and of the rain to fall. Sustainer of the living with kindliness, Resurrector of the dead with great mercy, Supporter of the fallen, and Healer of the sick, and Releaser of the imprisoned, and Fulfiller of His faithfulness to those who sleep in the dust. Who is like You, Master of mighty deeds, and who can be compared to You? King Who causes death and restores life, and causes deliverance to sprout forth.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "בחורף: מַשִּׁיב הָרֽוּחַ וּמוֹרִיד הַגֶּֽשֶׁם:",
-                                english: "From the Musaf of Shemini Atzeres until the Musaf of the first day of Pesach you should say: Causer of the wind to blow and of the rain to fall.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "טעה ולא אמר בחורף משיב הרוח ומוריד הגשם אם נזכר קודם שאמר הברכה מחיה המתים אומרו במקום שנזכר. אבל אם לא נזכר עד לאחר שסיים הברכה מחיה המתים צריך לחזור לראש התפלה. ואם נסתפק לו אם אמר משיב הרוח או לא אמר. אם הוא לאחר שלושים יום חזקתו שגם עתה התפלל כראוי. אבל בתוך שלושים יום צריך לחזור ולהתפלל (קיצור שו\"ע יט)",
-                                english: "If you neglected to say this, and became aware of your omission before saying the blessing Mechayeh HaMeitim, you must say it at that time. If you reminded yourself after saying V’Ne’eman Atah, you must repeat it and then complete the blessing of Mechayeh HaMeitim. If you became aware of your omission after starting the blessing Atah Kadosh, even if you only said the word You, say the Shemoneh Esrei from the beginning. If during the first thirty days after Shemini Atzeres you are in doubt whether you said it, you must assume that you did not say it. After thirty days, however, since you have become accustomed to saying it, you may assume that you recited the proper phrase and you need not repeat the Shemoneh Esrei.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "מְכַלְכֵּל חַיִּים בְּחֶֽסֶד מְחַיֵּה מֵתִים בְּרַחֲמִים רַבִּים סוֹמֵךְ נוֹפְ֒לִים וְרוֹפֵא חוֹלִים וּמַתִּיר אֲסוּרִים וּמְקַיֵּם אֱמוּנָתוֹ לִישֵׁנֵי עָפָר, מִי כָמֽוֹךָ בַּֽעַל גְּבוּרוֹת וּמִי דּֽוֹמֶה לָּךְ מֶֽלֶךְ מֵמִית וּמְחַיֶּה וּמַצְמִֽיחַ יְשׁוּעָה:",
-                                english: "Sustainer of the living with kindliness, Resurrector of the dead with great mercy, Supporter of the fallen, and Healer of the sick, and Releaser of the imprisoned, and Fulfiller of His faithfulness to those who sleep in the dust. Who is like You, Master of mighty deeds, and who can be compared to You? King Who causes death and restores life, and causes deliverance to sprout forth.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בעשי\"ת: מִי כָמֽוֹךָ אַב הָרַחֲמִים זוֹכֵר יְצוּרָיו לְחַיִּים בְּרַחֲמִים:",
-                                english: "During the Ten Days of Penitence add: Who is like You merciful Father, Who remembers His creatures for life, in His mercy.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "אם שכח לומר מי כמוך דינו כמו בזכרנו.",
-                                english: "If you forgot to say this, the same law applies as above concerning “Remember us for life.”",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "וְנֶאֱמָן אַתָּה לְהַחֲיוֹת מֵתִים: בָּרוּךְ אַתָּה יְהֹוָה מְחַיֵּה הַמֵּתִים:",
+                                hebrew: "וְנֶאֱמָן אַתָּה לְהַחֲיוֹת מֵתִים: בָּרוּךְ אַתָּה יְהֹוָה מְחַיֵּה הַמֵּתִים:",
                                 english: "And You are faithful to restore the dead to life. Blessed are You, Adonoy, Resurrector of the dead.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Holiness of God", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "בחזרת הש\"ץ אומרים כאן קדושה:",
-                                english: "If you forgot to say this, the same law applies as above concerning “Remember us for life.”",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "אַתָּה קָדוֹשׁ וְשִׁמְךָ קָדוֹשׁ וּקְדוֹשִׁים בְּכָל־יוֹם יְהַלְלֽוּךָ סֶּֽלָה. בָּרוּךְ אַתָּה יְהֹוָה הָאֵל הַקָּדוֹשׁ:",
+                                hebrew: "אַתָּה קָדוֹשׁ וְשִׁמְךָ קָדוֹשׁ וּקְדוֹשִׁים בְּכָל־יוֹם יְהַלְ֒לֽוּךָ סֶּֽלָה. בָּרוּךְ אַתָּה יְהֹוָה הָאֵל הַקָּדוֹשׁ:",
                                 english: "You are holy and Your Name is holy and holy beings praise You every day, forever. Blessed are You, Adonoy, the Almighty, the Holy One.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "בעשי\"ת מסיים: בָּרוּךְ אַתָּה יְהֹוָה הַמֶּֽלֶךְ הַקָּדוֹשׁ:",
-                                english: "During the Ten Days of Penitence: Blessed are You, Adonoy, the King, the Holy One.",
+                                hebrew: "אַתָּה חוֹנֵן לְאָדָם דַּֽעַת וּמְלַמֵּד לֶאֱנוֹשׁ בִּינָה: חָנֵּֽנוּ מֵאִתְּ֒ךָ דֵּעָה בִּינָה וְהַשְׂכֵּל: בָּרוּךְ אַתָּה יְהֹוָה חוֹנֵן הַדָּֽעַת:",
+                                english: "You favor man with perception and teach mankind understanding. Grant us knowledge, understanding and intellect from You. Blessed are You, Adonoy, Grantor of perception.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "אם טעה וסיים האל הקדוש אם נזכר בתוך כדי דיבור ואמר המלך הקדוש יצא ואם לאו צריך לחזור לראש התפלה וה\"ה אם מסופק אם אמר צריך לחזור לראש. ובימות השנה אם אמר המלך הקדוש אינו חוזר.",
-                                english: "If you mistakenly said, “the Almighty” instead of “the King,” or if you are in doubt—if you realized your error after a lapse of time sufficient to utter a three word greeting (Shalom Aleichem Rebbe), or if you had already started the next blessing, you must say the Shmoneh Esrei from the beginning. If you became aware of your error before that, you should immediately say “the King the Holy One” and continue your prayers.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Knowledge", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "אַתָּה חוֹנֵן לְאָדָם דַּֽעַת וּמְלַמֵּד לֶאֱנוֹשׁ בִּינָה:",
-                                english: "You favor man with perception and teach mankind understanding.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "אַתָּה חוֹנַנְתָּֽנוּ לְמַדַּע תּוֹרָתֶֽךָ. וַתְּ֒לַמְּ֒דֵֽנוּ לַעֲשׂוֹת חֻקֵּי רְצוֹנֶֽךָ. וַתַּבְדֵּל יְהֹוָה אֱלֹהֵֽינוּ בֵּין קֹֽדֶשׁ לְחֹל בֵּין אוֹר לְחֽשֶׁךְ בֵּין יִשְׂרָאֵל לָעַמִּים בֵּין יוֹם הַשְּׁ֒בִיעִי לְשֵֽׁשֶׁת יְמֵי הַמַּעֲשֶׂה. אָבִֽינוּ מַלְכֵּֽנוּ הָחֵל עָלֵֽינוּ הַיָּמִים הַבָּאִים לִקְרָאתֵֽנוּ לְשָׁלוֹם חֲשׂוּכִים מִכָּל חֵטְא וּמְנֻקִּים מִכָּל עָוֹן וּמְדֻבָּקִים בְּיִרְאָתֶֽךָ: וְ...",
-                                english: "You have favored us with the ability to know Your Torah and taught us to fulfill the statutes of Your will. You made a distinction, Adonoy, our God, between sacred and unhallowed, between light and darkness, between Israel and the peoples, between the seventh day and the six work days. Our Father, our King, commence for us the days that approach us, in peace, devoid of all sin, and cleansed of all iniquity, and devoted to the fear of You.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "חָנֵּֽנוּ מֵאִתְּךָ דֵּעָה בִּינָה וְהַשְׂכֵּל: בָּרוּךְ אַתָּה יְהֹוָה חוֹנֵן הַדָּֽעַת:",
-                                english: "Grant us knowledge, understanding and intellect from You. Blessed are You, Adonoy, Grantor of perception.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Repentance", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "הֲשִׁיבֵֽנוּ אָבִֽינוּ לְתוֹרָתֶֽךָ וְקָרְ֒בֵֽנוּ מַלְכֵּֽנוּ לַעֲבוֹדָתֶֽךָ וְהַחֲזִירֵֽנוּ בִּתְשׁוּבָה שְׁלֵמָה לְפָנֶֽיךָ: בָּרוּךְ אַתָּה יְהֹוָה הָרוֹצֶה בִּתְשׁוּבָה:",
+                                hebrew: "הֲשִׁיבֵֽנוּ אָבִֽינוּ לְתוֹרָתֶֽךָ וְקָרְ֒בֵֽנוּ מַלְכֵּֽנוּ לַעֲבוֹדָתֶֽךָ וְהַחֲזִירֵֽנוּ בִּתְשׁוּבָה שְׁלֵמָה לְפָנֶֽיךָ: בָּרוּךְ אַתָּה יְהֹוָה הָרוֹצֶה בִּתְשׁוּבָה:",
                                 english: "Cause us to return, our Father, to Your Torah and bring us near, our King, to Your service; and bring us back in whole-hearted repentance before You Blessed are You, Adonoy, Who desires penitence.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Forgiveness", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "סְלַח לָֽנוּ אָבִֽינוּ כִּי חָטָֽאנוּ מְחַל לָֽנוּ מַלְכֵּֽנוּ כִּי פָשָֽׁעְנוּ כִּי מוֹחֵל וְסוֹלֵֽחַ אָֽתָּה: בָּרוּךְ אַתָּה יְהֹוָה חַנּוּן הַמַּרְבֶּה לִסְלֽוֹחַ:",
+                                hebrew: "סְלַח לָֽנוּ אָבִֽינוּ כִּי חָטָֽאנוּ מְחַל לָֽנוּ מַלְכֵּֽנוּ כִּי פָשָֽׁעְנוּ כִּי מוֹחֵל וְסוֹלֵֽחַ אָֽתָּה: בָּרוּךְ אַתָּה יְהֹוָה חַנּוּן הַמַּרְבֶּה לִסְלֽוֹחַ:",
                                 english: "Pardon us, our Father, for we have sinned, forgive us, our King, for we have transgressed; for You forgive and pardon. Blessed are You, Adonoy, Gracious One, Who pardons abundantly.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Redemption", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "רְאֵה בְעָנְיֵֽנוּ וְרִיבָה רִיבֵֽנוּ וּגְאָלֵֽנוּ מְהֵרָה לְמַֽעַן שְׁמֶֽךָ כִּי גּוֹאֵל חָזָק אָֽתָּה: בָּרוּךְ אַתָּה יְהֹוָה גּוֹאֵל יִשְׂרָאֵל:",
-                                english: "Look upon our affliction, and defend our cause, and redeem us speedily for the sake of Your Name, because You are a Mighty Redeemer. Blessed are You, Adonoy, Redeemer of Israel.",
+                                hebrew: "רְאֵה בְעָנְיֵֽנוּ וְרִיבָה רִיבֵֽנוּ וּגְאָלֵֽנוּ מְהֵרָה לְמַֽעַן שְׁמֶֽךָ כִּי גּוֹאֵל חָזָק אָֽתָּה: בָּרוּךְ אַתָּה יְהֹוָה גּוֹאֵל יִשְׂרָאֵל:",
+                                english: "Look upon our affliction, and defend our cause: and redeem us speedily for the sake of Your Name; because You are a Mighty Redeemer. Blessed are You, Adonoy, Redeemer of Israel.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Healing", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "רְפָאֵֽנוּ יְהֹוָה וְנֵרָפֵא הוֹשִׁיעֵֽנוּ וְנִוָּשֵֽׁעָה כִּי תְהִלָּתֵֽנוּ אָֽתָּה וְהַעֲלֵה רְפוּאָה שְׁלֵמָה לְכָל מַכּוֹתֵֽינוּ כִּי אֵל מֶֽלֶךְ רוֹפֵא נֶאֱמָן וְרַחֲמָן אָֽתָּה: בָּרוּךְ אַתָּה יְהֹוָה רוֹפֵא חוֹלֵי עַמּוֹ יִשְׂרָאֵל:",
+                                hebrew: "רְפָאֵֽנוּ יְהֹוָה וְנֵרָפֵא הוֹשִׁיעֵֽנוּ וְנִוָּשֵֽׁעָה כִּי תְהִלָּתֵֽנוּ אָֽתָּה וְהַעֲלֵה רְפוּאָה שְׁלֵמָה לְכָל מַכּוֹתֵֽינוּ כִּי אֵל מֶֽלֶךְ רוֹפֵא נֶאֱמָן וְרַחֲמָן אָֽתָּה: בָּרוּךְ אַתָּה יְהֹוָה רוֹפֵא חוֹלֵי עַמּוֹ יִשְׂרָאֵל:",
                                 english: "Heal us, Adonoy, and we will be healed, deliver us and we will be delivered; for You are our praise. Grant a complete healing to all our affliction because You are the Almighty, King, Who is a faithful and merciful Healer. Blessed are You, Adonoy, Healer of the sick of His people Israel.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Prosperity", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "בָּרֵךְ עָלֵֽינוּ יְהֹוָה אֱלֹהֵֽינוּ אֶת־הַשָּׁנָה הַזֹּאת וְאֶת־כָּל־מִינֵי תְבוּאָתָהּ לְטוֹבָה, וְתֵן",
-                                english: "Bless for us, Adonoy our God, this year and all the varieties of its produce for good; and bestow",
+                                hebrew: "בָּרֵךְ עָלֵֽינוּ יְהֹוָה אֱלֹהֵֽינוּ אֶת־הַשָּׁנָה הַזֹּאת וְאֶת־כָּל־מִינֵי תְבוּאָתָהּ לְטוֹבָה, וְתֵן בְּרָכָה / טַל וּמָטָר לִבְרָכָה עַל פְּנֵי הָאֲדָמָה וְשַׂבְּ֒עֵֽנוּ מִטּוּבֶֽךָ וּבָרֵךְ שְׁנָתֵֽנוּ כַּשָּׁנִים הַטּוֹבוֹת: בָּרוּךְ אַתָּה יְהֹוָה מְבָרֵךְ הַשָּׁנִים:",
+                                english: "Bless for us, Adonoy our God, this year and all the varieties of its produce for good; and bestow blessing / dew and rain for a blessing upon the face of the earth; satisfy us from Your bounty and bless our year, like the good years. Blessed are You, Adonoy, Blesser of the years.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "בימות החמה: בְּרָכָה",
-                                english: "From the first day of Pesach until the evening service on December 4, or, on a civil leap year, December 5, we say the following line. blessing",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בימות הגשמים: טַל וּמָטָר לִבְרָכָה",
-                                english: "From the evening service on December 4, or, on a civil leap year, December 5, until the First day of Pesach, we say the following line. dew and rain for a blessing",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "עַל פְּנֵי הָאֲדָמָה וְשַׂבְּעֵֽנוּ מִטּוּבֶֽךָ וּבָרֵךְ שְׁנָתֵֽנוּ כַּשָּׁנִים הַטּוֹבוֹת: בָּרוּךְ אַתָּה יְהֹוָה מְבָרֵךְ הַשָּׁנִים:",
-                                english: "Upon the face of the earth; satisfy us from Your bounty and bless our year, like the good years. Blessed are You, Adonoy, Blesser of the years.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "אם שכח לומר טַל וּמָטָר ונזכר קודם שהתחיל תְּקַע אומרו במקום שנזכר. התחיל לומר תְּקַע יאמרנה בשׁוֹמֵֽעַ תְּפִלָּה. ואם לא נזכר בש\"ת יאמרנה בין ש\"ת לרְצֵה. שכח גם שם אם נזכר קודם שעקר רגליו חוזר לברכת השנים ויתחיל בָּרֵךְ עָלֵֽינוּ ויתפלל כסדר. ואם עקר רגליו חוזר לראש התפלה.",
-                                english: "If you forgot to say this and became aware of your omission before concluding the blessing, you may say it at that time and conclude the blessing. If you became aware of your omission after saying the blessing, continue the prayers, and before concluding the 16th blessing Shomea Tefilah, say: “bestow dew and rain for blessing, for You heed.” If you reminded yourself after concluding the blessing Shomea Tefilah, but before you started Retzeh, you may say: “bestow dew and rain,” and then continue with Retzeh. If you remembered after that you must go back and say the 9th blessing, Barech Aleinu, and continue from there. But if you became aware of your omission after concluding the entire Shemoneh Esrei you must repeat the entire Shemoneh Esrei.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Gathering the Exiles", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "תְּקַע בְּשׁוֹפָר גָּדוֹל לְחֵרוּתֵֽנוּ וְשָׂא נֵס לְקַבֵּץ גָּלֻיּוֹתֵֽינוּ וְקַבְּצֵֽנוּ יַֽחַד מֵאַרְבַּע כַּנְפוֹת הָאָֽרֶץ: בָּרוּךְ אַתָּה יְהֹוָה מְקַבֵּץ נִדְחֵי עַמּוֹ יִשְׂרָאֵל:",
+                                hebrew: "תְּקַע בְּשׁוֹפָר גָּדוֹל לְחֵרוּתֵֽנוּ וְשָׂא נֵס לְקַבֵּץ גָּלֻיּוֹתֵֽינוּ וְקַבְּ֒צֵֽנוּ יַֽחַד מֵאַרְבַּע כַּנְפוֹת הָאָֽרֶץ: בָּרוּךְ אַתָּה יְהֹוָה מְקַבֵּץ נִדְחֵי עַמּוֹ יִשְׂרָאֵל:",
                                 english: "Sound the great shofar for our liberty, and raise a banner to gather our exiles, and gather us together from the four corners of the earth. Blessed are You, Adonoy, Gatherer of the dispersed of His people Israel.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Justice", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "הָשִֽׁיבָה שׁוֹפְטֵֽינוּ כְּבָרִאשׁוֹנָה וְיוֹעֲצֵֽינוּ כְּבַתְּחִלָּה וְהָסֵר מִמֶּֽנּוּ יָגוֹן וַאֲנָחָה וּמְלוֹךְ עָלֵֽינוּ אַתָּה יְהֹוָה לְבַדְּךָ בְּחֶֽסֶד וּבְרַחֲמִים וְצַדְּקֵֽנוּ בַּמִשְׁפָּט: בָּרוּךְ אַתָּה יְהֹוָה מֶֽלֶךְ אֹהֵב צְדָקָה וּמִשְׁפָּט:",
-                                english: "Restore our judges as before and our counselors as at first. Remove sorrow and sighing from us, and reign over us You, Adonoy, alone with kindness and compassion; and make us righteous with justice. Blessed are You, Adonoy, King, Lover of righteousness and justice.",
+                                hebrew: "הָשִֽׁיבָה שׁוֹפְ֒טֵֽינוּ כְּבָרִאשׁוֹנָה וְיוֹעֲצֵֽינוּ כְּבַתְּ֒חִלָּה וְהָסֵר מִמֶּֽנּוּ יָגוֹן וַאֲנָחָה וּמְלוֹךְ עָלֵֽינוּ אַתָּה יְהֹוָה לְבַדְּ֒ךָ בְּחֶֽסֶד וּבְרַחֲמִים וְצַדְּ֒קֵֽנוּ בַּמִשְׁפָּט: בָּרוּךְ אַתָּה יְהֹוָה מֶֽלֶךְ אֹהֵב צְדָקָה וּמִשְׁפָּט:",
+                                english: "Restore our judges as before and our counselors as at first. Remove sorrow and sighing from us, and reign over us You, Adonoy, alone with kindness and compassion; and make us righteous with justice, Blessed are You, Adonoy, King, Lover of righteousness and justice.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "בעשי\"ת יסיים: בָּרוּךְ אַתָּה יְהֹוָה הַמֶּֽלֶךְ הַמִּשְׁפָּט:",
-                                english: "During the Ten Days of Penitence: Blessed are You, Adonoy, the King of Justice.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בכל השנה אם אמר המלך המשפט יצא וא\"צ לחזור. ובעשי\"ת אם טעה ואמר מלך אוהב צדקה ומשפט אם נזכר תוך כדי דבור אומר המלך המשפט. ואם לאחר כ\"ד לא יאמר ואין מחזירין אותו.",
-                                english: "If you mistakenly said, “King, Lover of righteousness and justice,” instead of “the King of Justice” and became aware of your mistake within the time it takes to utter the three word greeting (Sholom Aleichem Rebbe), you should immediately say “the King of Justice.” If you remembered after that interval, you may continue the Shemoneh Esrei since the word “King” was mentioned in the regular blessing.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Against Enemies", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "וְלַמַּלְשִׁינִים אַל תְּהִי תִקְוָה וְכָל הָרִשְׁעָה כְּרֶֽגַע תֹּאבֵד וְכָל אֹיְבֶֽיךָ מְהֵרָה יִכָּרֵֽתוּ וְהַזֵּדִים מְהֵרָה תְעַקֵּר וּתְשַׁבֵּר וּתְמַגֵּר וְתַכְנִֽיעַ בְּמְהֵרָה בְיָמֵֽינוּ: בָּרוּךְ אַתָּה יְהֹוָה שׁוֹבֵר אֹיְבִים וּמַכְנִֽיעַ זֵדִים:",
+                                hebrew: "וְלַמַּלְשִׁינִים אַל תְּהִי תִקְוָה וְכָל הָרִשְׁעָה כְּרֶֽגַע תֹּאבֵד וְכָל אֹיְבֶֽיךָ מְהֵרָה יִכָּרֵֽתוּ וְהַזֵּדִים מְהֵרָה תְעַקֵּר וּתְשַׁבֵּר וּתְמַגֵּר וְתַכְנִֽיעַ בִּמְהֵרָה בְיָמֵֽינוּ: בָּרוּךְ אַתָּה יְהֹוָה שׁוֹבֵר אֹיְ֒בִים וּמַכְנִֽיעַ זֵדִים:",
                                 english: "Let there be no hope for informers and may all wickedness instantly perish; may all the enemies of Your people be swiftly cut off, and may You quickly uproot, crush, rout and subdue the insolent, speedily in our days. Blessed are You, Adonoy, Crusher of enemies and Subduer of the insolent.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, The Righteous", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "עַל־הַצַּדִּיקִים וְעַל־הַחֲסִידִים וְעַל־זִקְנֵי עַמְּךָ בֵּית יִשְׂרָאֵל וְעַל פְּלֵיטַת סוֹפְרֵיהֶם וְעַל גֵּרֵי הַצֶּֽדֶק וְעָלֵֽינוּ יֶהֱמוּ רַחֲמֶֽיךָ יְהֹוָה אֱלֹהֵֽינוּ וְתֵן שָׂכָר טוֹב לְכָל הַבּוֹטְחִים בְּשִׁמְךָ בֶּאֱמֶת וְשִׂים חֶלְקֵֽנוּ עִמָּהֶם לְעוֹלָם וְלֹא נֵבוֹשׁ כִּי בְךָ בָּטָֽחְנוּ: בָּרוּךְ אַתָּה יְהֹוָה מִשְׁעָן וּמִבְטָח לַצַּדִּיקִים:",
+                                hebrew: "עַל־הַצַּדִּיקִים וְעַל־הַחֲסִידִים וְעַל־זִקְנֵי עַמְּ֒ךָ בֵּית יִשְׂרָאֵל וְעַל פְּלֵיטַת סוֹפְ֒רֵיהֶם וְעַל גֵּרֵי הַצֶּֽדֶק וְעָלֵֽינוּ יֶהֱמוּ רַחֲמֶֽיךָ יְהֹוָה אֱלֹהֵֽינוּ וְתֵן שָׂכָר טוֹב לְכָל הַבּוֹטְ֒חִים בְּשִׁמְךָ בֶּאֱמֶת וְשִׂים חֶלְקֵֽנוּ עִמָּהֶם לְעוֹלָם וְלֹא נֵבוֹשׁ כִּי בְךָ בָּטָֽחְנוּ: בָּרוּךְ אַתָּה יְהֹוָה מִשְׁעָן וּמִבְטָח לַצַּדִּיקִים:",
                                 english: "May Your mercy be aroused, Adonoy our God, upon the righteous, upon the pious, upon the elders of Your people, Israel, upon the remnant of their scholars, upon the true proselytes and upon us. Grant bountiful reward to all who trust in Your Name in truth; and place our lot among them, and may we never be put to shame, for we have put our trust in You. Blessed are You, Adonoy, Support and Trust of the righteous.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Rebuilding Jerusalem", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "וְלִירוּשָׁלַֽיִם עִירְךָ בְּרַחֲמִים תָּשׁוּב וְתִשְׁכּוֹן בְּתוֹכָהּ כַּאֲשֶׁר דִּבַּֽרְתָּ וּבְנֵה אוֹתָהּ בְּקָרוֹב בְּיָמֵֽינוּ בִּנְיַן עוֹלָם וְכִסֵּא דָוִד מְהֵרָה לְתוֹכָהּ תָּכִין: בָּרוּךְ אַתָּה יְהֹוָה בּוֹנֵה יְרוּשָׁלָֽיִם:",
+                                hebrew: "וְלִירוּשָׁלַֽיִם עִירְ֒ךָ בְּרַחֲמִים תָּשׁוּב וְתִשְׁכּוֹן בְּתוֹכָהּ כַּאֲשֶׁר דִּבַּֽרְתָּ וּבְנֵה אוֹתָהּ בְּקָרוֹב בְּיָמֵֽינוּ בִּנְיַן עוֹלָם וְכִסֵּא דָוִד מְהֵרָה לְתוֹכָהּ תָּכִין: בָּרוּךְ אַתָּה יְהֹוָה בּוֹנֵה יְרוּשָׁלָֽיִם:",
                                 english: "And return in mercy to Jerusalem, Your city, and dwell therein as You have spoken; and rebuild it soon, in our days, as an everlasting structure, and may You speedily establish the throne of David therein. Blessed are You, Adonoy, Builder of Jerusalem.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Kingdom of David", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "אֶת־צֶֽמַח דָּוִד עַבְדְּךָ מְהֵרָה תַצְמִֽיחַ וְקַרְנוֹ תָּרוּם בִּישׁוּעָתֶֽךָ כִּי לִישׁוּעָתְךָ קִוִּֽינוּ כָּל הַיּוֹם: בָּרוּךְ אַתָּה יְהֹוָה מַצְמִֽיחַ קֶֽרֶן יְשׁוּעָה:",
+                                hebrew: "אֶת־צֶֽמַח דָּוִד עַבְדְּ֒ךָ מְהֵרָה תַצְמִֽיחַ וְקַרְנוֹ תָּרוּם בִּישׁוּעָתֶֽךָ כִּי לִישׁוּעָתְ֒ךָ קִוִּֽינוּ כָּל הַיּוֹם: בָּרוּךְ אַתָּה יְהֹוָה מַצְמִֽיחַ קֶֽרֶן יְשׁוּעָה:",
                                 english: "Speedily cause the sprout of David, Your servant, to flourish and exalt his power with Your deliverance. We hope all day for Your deliverance. Blessed are You, Adonoy, Who causes the power of salvation to sprout.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Response to Prayer", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "שְׁמַע קוֹלֵֽנוּ יְהֹוָה אֱלֹהֵֽינוּ חוּס וְרַחֵם עָלֵֽינוּ וְקַבֵּל בְּרַחֲמִים וּבְרָצוֹן אֶת־תְּפִלָּתֵֽנוּ כִּי אֵל שׁוֹמֵֽעַ תְּפִלּוֹת וְתַחֲנוּנִים אָֽתָּה וּמִלְּפָנֶֽיךָ מַלְכֵּֽנוּ רֵיקָם אַל־תְּשִׁיבֵֽנוּ כִּי אַתָּה שׁוֹמֵֽעַ תְּפִלַּת עַמְּךָ יִשְׂרָאֵל בְּרַחֲמִים: בָּרוּךְ אַתָּה יְהֹוָה שׁוֹמֵֽעַ תְּפִלָּה:",
+                                hebrew: "שְׁמַע קוֹלֵֽנוּ יְהֹוָה אֱלֹהֵֽינוּ חוּס וְרַחֵם עָלֵֽינוּ וְקַבֵּל בְּרַחֲמִים וּבְרָצוֹן אֶת־תְּפִלָּתֵֽנוּ כִּי אֵל שׁוֹמֵֽעַ תְּפִלּוֹת וְתַחֲנוּנִים אָֽתָּה וּמִלְּפָנֶֽיךָ מַלְכֵּֽנוּ רֵיקָם אַל־תְּשִׁיבֵֽנוּ כִּי אַתָּה שׁוֹמֵֽעַ תְּפִלַּת עַמְּךָ יִשְׂרָאֵל בְּרַחֲמִים: בָּרוּךְ אַתָּה יְהֹוָה שׁוֹמֵֽעַ תְּפִלָּה:",
                                 english: "Hear our voice, Adonoy, our God; spare us and have compassion on us, and accept our prayers compassionately and willingly, for You are Almighty Who hears prayers and supplications; and do not turn us away empty-handed from Your Presence, our King, for You hear the prayers of Your people, Israel, with compassion. Blessed are You, Adonoy, Who hears prayers.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Temple Service", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "רְצֵה יְהֹוָה אֱלֹהֵֽינוּ בְּעַמְּךָ יִשְׂרָאֵל וּבִתְפִלָּתָם וְהָשֵׁב אֶת הָעֲבוֹדָה לִדְבִיר בֵּיתֶֽךָ וְאִשֵּׁי יִשְׂרָאֵל וּתְפִלָּתָם בְּאַהֲבָה תְקַבֵּל בְּרָצוֹן וּתְהִי לְרָצוֹן תָּמִיד עֲבוֹדַת יִשְׂרָאֵל עַמֶּֽךָ:",
-                                english: "Be pleased, Adonoy, our God, with Your people, Israel, and their prayer; and restore the service to the Holy of Holies in Your abode, and the fire-offerings of Israel; and accept their prayer, lovingly and willingly. And may You always find pleasure with the service of Your people, Israel.",
+                                hebrew: "רְצֵה יְהֹוָה אֱלֹהֵֽינוּ בְּעַמְּ֒ךָ יִשְׂרָאֵל וּבִתְפִלָּתָם וְהָשֵׁב אֶת הָעֲבוֹדָה לִדְבִיר בֵּיתֶֽךָ וְאִשֵּׁי יִשְׂרָאֵל וּתְפִלָּתָם בְּאַהֲבָה תְקַבֵּל בְּרָצוֹן וּתְהִי לְרָצוֹן תָּמִיד עֲבוֹדַת יִשְׂרָאֵל עַמֶּֽךָ: וְתֶחֱזֶֽינָה עֵינֵֽינוּ בְּשׁוּבְ֒ךָ לְצִיּוֹן בְּרַחֲמִים: בָּרוּךְ אַתָּה יְהֹוָה הַמַּחֲזִיר שְׁכִינָתוֹ לְצִיּוֹן:",
+                                english: "Be pleased, Adonoy, our God, with Your people, Israel, and their prayer; and restore the service to the Holy of Holies in Your abode, and the fire-offerings of Israel; and accept their prayer, lovingly and willingly. And may You always find pleasure with the service of Your people, Israel. And may our eyes behold Your merciful return to Zion. Blessed are You, Adonoy, Who returns His Divine Presence to Zion.",
                                 showEnglish: showEnglish
                             )
 
                             PrayerBlock(
-                                hebrew: "בראש חדש ובחול המועד אומרים זה:",
-                                english: "On regular weekdays continue, “And may our eyes”. On Rosh Chodesh and on Chol HaMoed, the following prayer is added:",
+                                hebrew: "אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ יַעֲלֶה וְיָבֹא וְיַגִּֽיעַ וְיֵרָאֶה וְיֵרָצֶה וְיִשָּׁמַע וְיִפָּקֵד וְיִזָּכֵר זִכְרוֹנֵֽנוּ וּפִקְדוֹנֵֽנוּ וְזִכְרוֹן אֲבוֹתֵֽינוּ וְזִכְרוֹן מָשִֽׁיחַ בֶּן דָּוִד עַבְדֶּֽךָ וְזִכְרוֹן יְרוּשָׁלַֽיִם עִיר קָדְשֶֽׁךָ וְזִכְרוֹן כָּל עַמְּ֒ךָ בֵּית יִשְׂרָאֵל לְפָנֶֽיךָ, לִפְלֵיטָה לְטוֹבָה לְחֵן וּלְחֶֽסֶד וּלְרַחֲמִים וּלְחַיִּים טוֹבִים וּלְשָׁלוֹם בְּיוֹם לר\"ח: רֹאשׁ הַחֹֽדֶשׁ הַזֶּה. לפסח: חַג הַמַּצּוֹת הַזֶּה. לסכות: חַג הַסֻּכּוֹת הַזֶּה. זָכְרֵֽנוּ יְהֹוָה אֱלֹהֵֽינוּ בּוֹ לְטוֹבָה, וּפָקְדֵֽנוּ בוֹ לִבְרָכָה, וְהוֹשִׁיעֵֽנוּ בוֹ לְחַיִּים טוֹבִים, וּבִדְבַר יְשׁוּעָה וְרַחֲמִים חוּס וְחָנֵּֽנוּ, וְרַחֵם עָלֵֽינוּ וְהוֹשִׁיעֵֽנוּ, כִּי אֵלֶֽיךָ עֵינֵֽינוּ, כִּי אֵל מֶֽלֶךְ חַנּוּן וְרַחוּם אָֽתָּה:",
+                                english: "Our God and God of our fathers, may there ascend, come, and reach, appear, be desired, and heard, counted and recalled our remembrance and reckoning; the remembrance of our fathers; the remembrance of the Messiah the son of David, Your servant; the remembrance of Jerusalem, city of Your Sanctuary; and the remembrance of Your entire people, the House of Israel, before You for survival, for well-being, for favor, kindliness, compassion, for good life and peace on this day of: Rosh Chodesh: this Rosh Chodesh. Pesach: this Festival of Matzos. Sukkos: this Festival of Sukkos. Remember us, Adonoy our God, on this day for well-being; be mindful of us on this day for blessing; and deliver us for good life. In accord with the promise of deliverance and compassion, spare us and favor us, have compassion on us and deliver us; for our eyes are directed to You, because You are the Almighty Who is King, Gracious, and Merciful.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ. יַעֲלֶה וְיָבֹא וְיַגִּֽיעַ וְיֵרָאֶה וְיֵרָצֶה וְיִשָּׁמַע וְיִפָּקֵד וְיִזָּכֵר זִכְרוֹנֵֽנוּ וּפִקְדוֹנֵֽנוּ וְזִכְרוֹן אֲבוֹתֵֽינוּ. וְזִכְרוֹן מָשִֽׁיחַ בֶּן דָּוִד עַבְדֶּֽךָ. וְזִכְרוֹן יְרוּשָׁלַֽיִם עִיר קָדְשֶֽׁךָ. וְזִכְרוֹן כָּל עַמְּ֒ךָ בֵּית יִשְׂרָאֵל לְפָנֶֽיךָ. לִפְלֵיטָה לְטוֹבָה לְחֵן וּלְחֶֽסֶד וּלְרַחֲמִים לְחַיִּים וְלְשָׁלוֹם. בְּיוֹם לר\"ח: רֹאשׁ הַחֹֽדֶשׁ הַזֶּה: לפסח: חַג הַמַּצּוֹת הַזֶּה: לסכות: חַג הַסֻּכּוֹת הַזֶּה: זָכְרֵֽנוּ יְהֹוָה אֱלֹהֵֽינוּ בּוֹ לְטוֹבָה. וּפָקְדֵֽנוּ בוֹ לִבְרָכָה. וְהוֹשִׁיעֵֽנוּ בוֹ לְחַיִּים. וּבִדְבַר יְשׁוּעָה וְרַחֲמִים חוּס וְחָנֵּֽנוּ וְרַחֵם עָלֵֽינוּ וְהוֹשִׁיעֵֽנוּ. כִּי אֵלֶֽיךָ עֵינֵֽינוּ כִּי אֵל מֶֽלֶךְ חַנּוּן וְרַחוּם אָֽתָּה:",
-                                english: "Our God and God of our fathers, may there ascend, come, and reach, appear, be desired, and heard, counted and recalled our remembrance and reckoning; the remembrance of our fathers; the remembrance of the Messiah the son of David, Your servant; the remembrance of Jerusalem, city of Your Sanctuary and the remembrance of Your entire people, the House of Israel, before You for survival, for well-being, for favor, kindliness, compassion, for life and peace on this day of the: Rosh Chodesh/Festival of Matzos/Festival of Sukkos. Remember us Adonoy, our God, on this day for well-being; be mindful of us on this day for blessing, and deliver us for life. In accord with the promise of deliverance and compassion, spare us and favor us, have compassion on us and deliver us; for our eyes are directed to You, because You are the Almighty Who is King, Gracious, and Merciful.",
+                                hebrew: "מוֹדִים אֲנַֽחְנוּ לָךְ שָׁאַתָּה הוּא יְהֹוָה אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ לְעוֹלָם וָעֶד צוּר חַיֵּֽינוּ מָגֵן יִשְׁעֵֽנוּ אַתָּה הוּא לְדוֹר וָדוֹר נֽוֹדֶה לְּךָ וּנְסַפֵּר תְּהִלָּתֶֽךָ עַל־חַיֵּֽינוּ הַמְּ֒סוּרִים בְּיָדֶֽךָ וְעַל נִשְׁמוֹתֵֽינוּ הַפְּ֒קוּדוֹת לָךְ וְעַל נִסֶּֽיךָ שֶׁבְּכָל יוֹם עִמָּֽנוּ וְעַל נִפְלְ֒אוֹתֶֽיךָ וְטוֹבוֹתֶֽיךָ שֶׁבְּ֒כָל עֵת עֶֽרֶב וָבֹֽקֶר וְצָהֳרָֽיִם הַטּוֹב כִּי לֹא כָלוּ רַחֲמֶֽיךָ וְהַמְ֒רַחֵם כִּי לֹא תַֽמּוּ חֲסָדֶֽיךָ מֵעוֹלָם קִוִּֽינוּ לָךְ:",
+                                english: "We are thankful to You that You Adonoy are our God and the God of our fathers forever; Rock of our lives, You are the Shield of our deliverance in every generation. We will give thanks to You and recount Your praise, for our lives which are committed into Your hand, and for our souls which are entrusted to You, and for Your miracles of every day with us, and for Your wonders and benefactions at all times— evening, morning and noon. (You are) The Beneficent One— for Your compassion is never withheld; And (You are) the Merciful One— for Your kindliness never ceases; we have always placed our hope in You.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "וְתֶחֱזֶֽינָה עֵינֵֽינוּ בְּשׁוּבְ֒ךָ לְצִיּוֹן בְּרַחֲמִים: בָּרוּךְ אַתָּה יְהֹוָה הַמַּחֲזִיר שְׁכִינָתוֹ לְצִיּוֹן:",
-                                english: "And may our eyes behold Your merciful return to Zion. Blessed are You, Adonoy, Who returns His Divine Presence to Zion.",
+                                hebrew: "וְעַל־כֻּלָּם יִתְבָּרַךְ וְיִתְרוֹמַם שִׁמְךָ מַלְכֵּֽנוּ תָּמִיד לְעוֹלָם וָעֶד: וְכֹל הַחַיִּים יוֹדֽוּךָ סֶּֽלָה וִיהַלְ֒לוּ אֶת־שִׁמְךָ בֶּאֱמֶת הָאֵל יְשׁוּעָתֵֽנוּ וְעֶזְרָתֵֽנוּ סֶֽלָה: בָּרוּךְ אַתָּה יְהֹוָה הַטּוֹב שִׁמְךָ וּלְךָ נָאֶה לְהוֹדוֹת:",
+                                english: "And for all the foregoing may Your Name, our King, constantly be blessed and extolled, forever and ever. And all the living shall thank You forever and praise Your Name with sincerity — the Almighty, Who is our deliverance and our help forever. Blessed are You, Adonoy; Your Name is The Beneficent and You it is fitting to praise.",
                                 showEnglish: showEnglish
                             )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Thanksgiving", showEnglish: showEnglish)
-
+                            
                             PrayerBlock(
-                                hebrew: "כשאומר מודים כורע ראשו וגופו כאגמון עד שיתפקקו כל חוליות שבשדרה. וכשהוא כורע יכרע במהירות בפעם אחת וכשהוא זוקף זוקף בנחת ראשו תחלה ואחר כך גופו שלא תהא עליו כמשאוי (שו\"ע או\"ח סי' קיג)",
-                                english: "At the words, We are thankful, bend forward; at Adonoy return to an upright position.",
+                                hebrew: "שָׁלוֹם רָב עַל יִשְׂרָאֵל עַמְּ֒ךָ תָּשִׂים לְעוֹלָם כִּי אַתָּה הוּא מֶֽלֶךְ אָדוֹן לְכָל־הַשָּׁלוֹם וְטוֹב בְּעֵינֶֽיךָ לְבָרֵךְ אֶת־עַמְּ֒ךָ יִשְׂרָאֵל בְּכָל־עֵת וּבְכָל־שָׁעָה בִּשְׁלוֹמֶֽךָ: בָּרוּךְ אַתָּה יְהֹוָה הַמְבָרֵךְ אֶת־עַמּוֹ יִשְׂרָאֵל בַּשָּׁלוֹם:",
+                                english: "Bestow abundant peace upon Israel, Your people, forever. For You are King, the Master of all peace. And may it be good in Your sight to bless us and to bless Your people Israel, at all times and at every moment with Your peace. Blessed are You, Adonoy, Who blesses His people Israel with peace.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "מוֹדִים אֲנַֽחְנוּ לָךְ שָׁאַתָּה הוּא יְהֹוָה אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ לְעוֹלָם וָעֶד צוּר חַיֵּֽינוּ מָגֵן יִשְׁעֵֽנוּ אַתָּה הוּא לְדוֹר וָדוֹר נֽוֹדֶה לְּךָ וּנְסַפֵּר תְּהִלָּתֶֽךָ עַל־חַיֵּֽינוּ הַמְּ֒סוּרִים בְּיָדֶֽךָ וְעַל נִשְׁמוֹתֵֽינוּ הַפְּקוּדוֹת לָךְ וְעַל נִסֶּֽיךָ שֶׁבְּכָל יוֹם עִמָּֽנוּ וְעַל נִפְלְ֒אוֹתֶֽיךָ וְטוֹבוֹתֶֽיךָ שֶׁבְּכָל עֵת עֶֽרֶב וָבֹֽקֶר וְצָהֳרָֽיִם הַטּוֹב כִּי לֹא כָלוּ רַחֲמֶֽיךָ וְהַמְרַחֵם כִּי לֹא תַֽמּוּ חֲסָדֶֽיךָ מֵעוֹלָם קִוִּֽינוּ לָךְ:",
-                                english: "We are thankful to You that You Adonoy are our God and the God of our fathers forever; Rock of our lives, You are the Shield of our deliverance in every generation. We will give thanks to You and recount Your praise, for our lives which are committed into Your hand, and for our souls which are entrusted to You, and for Your miracles of every day with us, and for Your wonders and benefactions at all times, evening, morning and noon. You are the Beneficent One, for Your compassion is never withheld. You are the Merciful One, for Your kindliness never ceases; we have always placed our hope in You.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בחנוכה ופורים אומרים על הנסים. שכח לומר על הנסים ונזכר קודם שאמר השם מברכת הטוב שמך אפילו אמר ברוך אתה חוזר ואומר על הנסים. אבל אם כבר סיים הברכה או שאמר ברוך א\"י אינו חוזר (דה\"ח תרפ\"ב ותרצ\"ג).",
-                                english: "On Chanukah and Purim the following prayer is added. If you omitted it, you need not repeat the Shemoneh Esrei. If, however, you became aware of your omission before concluding the blessing, you should say it at that time, and conclude by saying, “And for all the foregoing.”",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "עַל הַנִּסִּים וְעַל הַפֻּרְקָן וְעַל הַגְּ֒בוּרוֹת וְעַל הַתְּ֒שׁוּעוֹת וְעַל הַמִּלְחָמוֹת שֶׁעָשִֽׂיתָ לַאֲבוֹתֵֽינוּ בַּיָּמִים הָהֵם בִּזְּ֒מַן הַזֶּה:",
-                                english: "We thank You for the miracles, for the redemption, for the mighty deeds, for the deliverances and for the wars that You performed for our fathers in those days at this season.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בחנוכה: בִּימֵי מַתִּתְיָֽהוּ בֶּן יוֹחָנָן כֹּהֵן גָּדוֹל חַשְׁמוֹנָאִי וּבָנָיו כְּשֶׁעָמְ֒דָה מַלְכוּת יָוָן הָרְ֒שָׁעָה עַל־עַמְּ֒ךָ יִשְׂרָאֵל לְהַשְׁכִּיחָם תּוֹרָתֶֽךָ וּלְהַעֲבִירָם מֵחֻקֵּי רְצוֹנֶֽךָ, וְאַתָּה בְּרַחֲמֶֽיךָ הָרַבִּים עָמַֽדְתָּ לָהֶם בְּעֵת צָרָתָם רַֽבְתָּ אֶת־רִיבָם דַּֽנְתָּ אֶת־דִּינָם נָקַֽמְתָּ אֶת־נִקְמָתָם מָסַֽרְתָּ גִבּוֹרִים בְּיַד חַלָּשִׁים וְרַבִּים בְּיַד מְעַטִּים וּטְמֵאִים בְּיַד טְהוֹרִים וּרְשָׁעִים בְּיַד צַדִּיקִים וְזֵדִים בְּיַד עוֹסְ֒קֵי תוֹרָתֶֽךָ וּלְךָ עָשִֽׂיתָ שֵׁם גָּדוֹל וְקָדוֹשׁ בְּעוֹלָמֶֽךָ וּלְעַמְּ֒ךָ יִשְׂרָאֵל עָשִֽׂיתָ תְּשׁוּעָה גְדוֹלָה וּפֻרְקָן כְּהַיּוֹם הַזֶּה וְאַחַר־כֵּן בָּֽאוּ בָנֶֽיךָ לִדְבִיר בֵּיתֶֽךָ וּפִנּוּ אֶת־הֵיכָלֶֽךָ וְטִהֲרוּ אֶת־מִקְדָּשֶֽׁךָ וְהִדְלִֽיקוּ נֵרוֹת בְּחַצְרוֹת קָדְשֶֽׁךָ וְקָבְ֒עוּ שְׁמוֹנַת יְמֵי חֲנֻכָּה אֵֽלּוּ לְהוֹדוֹת וּלְהַלֵּל לְשִׁמְךָ הַגָּדוֹל:",
-                                english: "On Chanukah: In the days of Matisyahu, son of Yochanan the High Priest, the Hasmonean and his sons, when the evil Greek kingdom rose up against Your people Israel to make them forget Your Torah and to turn them away from the statutes of Your will. You, in Your abundant mercy, stood by them in their time of distress, You defended their cause, You judged their grievances, You avenged them. You delivered the mighty into the hands of the weak, many into the hands of the few, defiled people into the hands of the undefiled, the wicked into the hands of the righteous, and insolent sinners into the hands of diligent students of Your Torah. And You made Yourself a great and sanctified name in Your world. And for Your people, Israel, You performed a great deliverance and redemption unto this very day. Afterwards, Your sons entered the Holy of Holies of Your Abode, cleaned Your Temple, purified Your Sanctuary, and kindled lights in the Courtyards of Your Sanctuary, and designated these eight days of Chanukah to thank and praise Your great Name.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בפורים: בִּימֵי מָרְדְּ֒כַי וְאֶסְתֵּר בְּשׁוּשַׁן הַבִּירָה כְּשֶׁעָמַד עֲלֵיהֶם הָמָן הָרָשָׁע בִּקֵּשׁ לְהַשְׁמִיד לַהֲרוֹג וּלְאַבֵּד אֶת־כָּל־הַיְּהוּדִים מִנַּֽעַר וְעַד־זָקֵן טַף וְנָשִׁים בְּיוֹם אֶחָד בִּשְׁלוֹשָׁה עָשָׂר לְחֹֽדֶשׁ שְׁנֵים־עָשָׂר הוּא־חֹֽדֶשׁ אֲדָר וּשְׁלָלָם לָבוֹז: וְאַתָּה בְּרַחֲמֶֽיךָ הָרַבִּים הֵפַֽרְתָּ אֶת־עֲצָתוֹ וְקִלְקַֽלְתָּ אֶת־מַחֲשַׁבְתּוֹ וַהֲשֵׁבֽוֹתָ לּוֹ גְּמוּלוֹ בְּרֹאשׁוֹ וְתָלוּ אוֹתוֹ וְאֶת־בָּנָיו עַל־הָעֵץ (וְעָשִׂיתָ עמָּהֶם נֵס וָפֶלֶא וְנוֹדֶה לְשִׁמְךָ הַגָּדוֹל סֶלָה):",
-                                english: "On Purim: In the days of Mordechai and Esther in Shushan the Capital, when the evil Haman rose up against them, he sought to destroy, to kill, and to annihilate all the Jews, young and old, infants and women, in one day, the thirteenth day of the twelfth month, which is the month of Adar, and to plunder their wealth. And You, in Your abundant mercy, annulled his counsel, frustrated his intention, and brought his evil plan upon his own head, and they hanged him and his sons upon the gallows. And You made a miracle and a wonder for them, and we are thankful to Your great name forever.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "וְעַל־כֻּלָּם יִתְבָּרַךְ וְיִתְרוֹמַם שִׁמְךָ מַלְכֵּֽנוּ תָּמִיד לְעוֹלָם וָעֶד:",
-                                english: "And for all the foregoing may Your Name, our King, constantly be blessed and extolled, forever and ever.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בעשי\"ת: וּכְתוֹב לְחַיִּים טוֹבִים כָּל בְּנֵי בְרִיתֶֽךָ:",
-                                english: "During the Ten Days of Penitence, add: Inscribe for a good life all the children of Your covenant.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "אם שכח לומר וכתוב אם נזכר קודם שאמר השם מברכת הטוב חוזר ואם לא נזכר עד לאחר שאמר השם אינו חוזר כמו שנתבאר לעיל אצל זכרנו ומי כמוך. (דה\"ח סי' תקפ\"ב)",
-                                english: "If you forget to say this, you need not go back and repeat it. If you became aware of the omission before concluding the blessing, you can say it at that time.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "וְכֹל הַחַיִּים יוֹדֽוּךָ סֶּֽלָה וִיהַלְ֒לוּ אֶת־שִׁמְךָ בֶּאֱמֶת הָאֵל יְשׁוּעָתֵֽנוּ וְעֶזְרָתֵֽנוּ סֶֽלָה: בָּרוּךְ אַתָּה יְהֹוָה הַטּוֹב שִׁמְךָ וּלְךָ נָאֶה לְהוֹדוֹת:",
-                                english: "And all the living shall thank You forever and praise Your Name with sincerity. The Almighty, Who is our deliverance and our help forever. Blessed are You, Adonoy; Your Name is The Beneficent and You it is fitting to praise.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Peace", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "שָׁלוֹם רָב עַל יִשְׂרָאֵל עַמְּ֒ךָ תָּשִׂים לְעוֹלָם כִּי אַתָּה הוּא מֶֽלֶךְ אָדוֹן לְכָל־הַשָּׁלוֹם וְטוֹב בְּעֵינֶֽיךָ לְבָרֵךְ אֶת־עַמְּ֒ךָ יִשְׂרָאֵל בְּכָל־עֵת וּבְכָל־שָׁעָה בִּשְׁלוֹמֶֽךָ.",
-                                english: "Bestow abundant peace upon Israel, Your people, forever. For You are King, the Master of all peace. And may it be good in Your sight to bless us and to bless Your people Israel, at all times and at every moment with Your peace.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בעשי\"ת: בְּסֵֽפֶר חַיִּים בְּרָכָה וְשָׁלוֹם וּפַרְנָסָה טוֹבָה נִזָּכֵר וְנִכָּתֵב לְפָנֶֽיךָ אֲנַֽחְנוּ וְכָל עַמְּךָ בֵּית יִשְׂרָאֵל לְחַיִּים טוֹבִים וּלְשָׁלוֹם: (בָּרוּךְ אַתָּה יְהֹוָה עֹשֶׂה הַשָּׁלוֹם:)",
-                                english: "During the Ten Days of Penitence continue here: May we be remembered and inscribed before You in the book of life, blessing, peace and abundant maintenance; we and all Your people, the House of Israel, for a good life and peace.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "ואם לא אמר בְּסֵֽפֶר חַיִּים כיון שסיים הברכה או רק בא\"י אינו חוזר. ונ\"ל דבזה ראוי לומר בספר תיכף כשסיים המברך את עמו ישראל בשלום קודם יהיו לרצון כיון שכבר גמר התפלה. (דהא לר\"ת לעולם אומרים בסוף ברכה אפילו בדבר שאין מחזירין אלא דהחולקים סוברים כיון דא\"צ לחזור א\"כ הוי הפסק באמצע תפלה מה שאין כן כאן.) (חיי אדם כלל כ\"ד סעי' כ\"ה)",
-                                english: "If you forget to say this you need not go back and repeat it.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בָּרוּךְ אַתָּה יְהֹוָה הַמְבָרֵךְ אֶת־עַמּוֹ יִשְׂרָאֵל בַּשָּׁלוֹם:",
-                                english: "Blessed are You, Adonoy, Who blesses His people Israel with peace.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Amidah, Concluding Passage", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "יִהְיוּ לְרָצוֹן אִמְ֒רֵי פִי וְהֶגְיוֹן לִבִּי לְפָנֶֽיךָ יְהֹוָה צוּרִי וְגוֹאֲלִי:",
+                                hebrew: "יִהְיוּ לְרָצוֹן אִמְרֵי פִי וְהֶגְיוֹן לִבִּי לְפָנֶֽיךָ יְהֹוָה צוּרִי וְגוֹאֲלִי:",
                                 english: "May the words of my mouth and the thoughts of my heart be acceptable before You, Adonoy, my Rock and my Redeemer.",
                                 showEnglish: showEnglish
                             )
-
+                            
                             PrayerBlock(
-                                hebrew: "אֱלֹהַי נְצוֹר לְשׁוֹנִי מֵרָע וּשְׂפָתַי מִדַּבֵּר מִרְמָה. וְלִמְקַלְלַי נַפְשִׁי תִדּוֹם וְנַפְשִׁי כֶּעָפָר לַכֹּל תִּהְיֶה. פְּתַח לִבִּי בְּתוֹרָתֶֽךָ וּבְמִצְוֹתֶֽיךָ תִּרְדֹּף נַפְשִׁי. וְכֹל הַחוֹשְׁבִים עָלַי רָעָה מְהֵרָה הָפֵר עֲצָתָם וְקַלְקֵל מַחֲשַׁבְתָּם: עֲשֵׂה לְמַֽעַן שְׁמֶֽךָ עֲשֵׂה לְמַֽעַן יְמִינֶֽךָ עֲשֵׂה לְמַֽעַן קְדֻשָּׁתֶֽךָ עֲשֵׂה לְמַֽעַן תּוֹרָתֶֽךָ. לְמַֽעַן יֵחָלְצוּן יְדִידֶֽיךָ הוֹשִֽׁיעָה יְמִינְ֒ךָ וַעֲנֵֽנִי: יִהְיוּ לְרָצוֹן אִמְרֵי פִי וְהֶגְיוֹן לִבִּי לְפָנֶֽיךָ יְהֹוָה צוּרִי וְגוֹאֲלִי:",
-                                english: "My God, guard my tongue from evil and my lips from speaking deceitfully. May my soul be unresponsive to those who curse me; and let my soul be like dust to all. Open my heart to Your Torah and let my soul pursue Your commandments. And all who plan evil against me, quickly annul their counsel and frustrate their intention. Act for the sake of Your right hand. Act for the sake of Your holiness. Act for the sake of Your Torah. In order that Your loved ones be released, deliver with Your right hand and answer me. May the words of my mouth and the thoughts of my heart be acceptable before You Adonoy, my Rock and my Redeemer.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "עֹשֶׂה (בעשי\"ת הַשָּׁלוֹם) שָׁלוֹם בִּמְרוֹמָיו הוּא יַעֲשֶׂה שָׁלוֹם עָלֵֽינוּ וְעַל כָּל־יִשְׂרָאֵל וְאִמְרוּ אָמֵן:",
-                                english: "He Who makes peace in His high heavens may He make peace upon us and upon all Israel and say Amein.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יְהִי רָצוֹן מִלְּ֒פָנֶֽיךָ יְהֹוָה אֱלֹהֵֽינוּ וֵאלֹהֵי אֲבוֹתֵֽינוּ שֶׁיִּבָּנֶה בֵּית הַמִּקְדָּשׁ בִּמְהֵרָה בְיָמֵֽינוּ וְתֵן חֶלְקֵֽנוּ בְּתוֹרָתֶֽךָ: וְשָׁם נַעֲבָדְ֒ךָ בְּיִרְאָה כִּימֵי עוֹלָם וּכְשָׁנִים קַדְמוֹנִיּוֹת: וְעָרְ֒בָה לַיהוָֹה מִנְחַת יְהוּדָה וִירוּשָׁלָֽםִ כִּימֵי עוֹלָם וּכְשָׁנִים קַדְמוֹנִיּוֹת:",
-                                english: "May it be Your will, Adonoy, our God, and the God of our Fathers that the Holy Temple be rebuilt speedily in our days, and grant us our share in Your Torah. And there we will serve You reverently as in the days of old, and in earlier years. And let Adonoy be pleased with the offerings of Judah and Jerusalem as in the days of old and in earlier years.",
-                                showEnglish: showEnglish
-                            )
-
-                            InstructionText(text: "Weekday, Maariv, Kaddish Shalem", showEnglish: showEnglish)
-
-                            PrayerBlock(
-                                hebrew: "בחול אומר החזן קדיש שלם. במוצאי שבת אומר חצי קדיש ואחר כך אומרים הקהל וִיהִי נֹֽעַם וְאַתָּה קָדוֹשׁ:",
-                                english: "On weekday nights, the Chazzan continues with Whole-Kaddish. On Saturday night, the Chazzan says Half-Kaddish, and the Congregation continues with Vihi Noam and Ve’Atah Kadosh below. If a Festival occurs on a weekday of the new week, the Chazzan instead says Whole-Kaddish and Vihi Noam/Ve’Atah Kadosh are omitted. On Purim, the Megillah is read here, followed by Vihi Noam and Ve’Atah Kadosh below. On Tisha B’Av, Eichah and Kinos are said, followed by Ve’Atah Kadosh.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יִתְגַּדַּל וְיִתְקַדַּשׁ שְׁמֵהּ רַבָּא (אָמֵן)",
-                                english: "Exalted and sanctified be His great Name",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "בְּעָלְ֒מָֽא דִּי־בְרָא כִרְעוּתֵהּ וְיַמְלִיךְ מַלְכוּתֵהּ בְּחַיֵּיכוֹן וּבְיוֹמֵיכוֹן וּבְחַיֵּי דְכָל־בֵּית יִשְׂרָאֵל בַּעֲגָלָא וּבִזְמַן קָרִיב וְאִמְרוּ אָמֵן:",
-                                english: "In the world which He created according to His will and may He rule His kingdom. In your lifetime and in your days, and in the lifetime of the entire House of Israel, speedily and in the near future, and say Amein.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יְהֵא שְׁמֵהּ רַבָּא מְבָרַךְ לְעָלַם וּלְעָלְ֒מֵי עָלְ֒מַיָּא",
-                                english: "May His great Name be blessed forever and for all eternity.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יִתְבָּרַךְ וְיִשְׁתַּבַּח וְיִתְפָּאַר וְיִתְרוֹמַם וְיִתְנַשֵּׂא וְיִתְהַדָּר וְיִתְעַלֶּה וְיִתְהַלָּל שְׁמֵהּ דְקוּדְשָׁא בְּרִיךְ הוּא",
-                                english: "Blessed and praised, glorified, and exalted and uplifted, honored and elevated and extolled be the Name of the Holy One, blessed is He.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "לְעֵֽלָּא מִן־כָּל־ (בעשי\"ת לְעֵֽלָּא לְעֵֽלָּא מִכָּל) בִּרְכָתָֽא וְשִׁירָתָֽא תֻּשְׁבְּ֒חָתָֽא וְנֶחָמָתָֽא דַּאֲמִירָן בְּעָלְ֒מָֽא וְאִמְרוּ אָמֵן:",
-                                english: "Above all the blessings and hymns, praises and consolations which we utter in the world, and say Amein.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "תִּתְקַבֵּל צְלוֹתְ֒הוֹן וּבָעוּתְ֒הוֹן דְּכָל בֵּית יִשְׂרָאֵל קֳדָם אֲבוּהוֹן דִּי בִשְׁ֒מַיָּא וְאִמְרוּ אָמֵן:",
-                                english: "May there be acceptance of the prayers and supplications of the entire House of Israel before their Father in heaven. And say, Amein.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "יְהֵא שְׁלָמָֽא רַבָּֽא מִן־שְׁמַיָּֽא וְחַיִּים עָלֵֽינוּ וְעַל־כָּל־יִשְׂרָאֵל וְאִמְרוּ אָמֵן:",
-                                english: "May there be abundant peace from heaven and life for us and for all Israel, and say Amein.",
-                                showEnglish: showEnglish
-                            )
-
-                            PrayerBlock(
-                                hebrew: "עוֹשֶׂה שָׁלוֹם (בעשי\"ת הַשָּׁלוֹם) בִּמְרוֹמָיו הוּא יַעֲשֶׂה שָׁלוֹם עָלֵֽינוּ וְעַל כָּל יִשְׂרָאֵל וְאִמְרוּ אָמֵן:",
-                                english: "He Who makes peace in His high heavens may He, make peace for us and for all Israel, and say, Amen.",
+                                hebrew: "אֱלֹהַי נְצוֹר לְשׁוֹנִי מֵרָע וּשְׂפָתַי מִדַּבֵּר מִרְמָה. וְלִמְקַלְ֒לַי נַפְשִׁי תִדּוֹם וְנַפְשִׁי כֶּעָפָר לַכֹּל תִּהְיֶה. פְּתַח לִבִּי בְּתוֹרָתֶֽךָ וּבְמִצְוֹתֶֽיךָ תִּרְדֹּף נַפְשִׁי. וְכֹל הַחוֹשְׁ֒בִים עָלַי רָעָה מְהֵרָה הָפֵר עֲצָתָם וְקַלְקֵל מַחֲשַׁבְתָּם: עֲשֵׂה לְמַֽעַן שְׁמֶֽךָ עֲשֵׂה לְמַֽעַן יְמִינֶֽךָ עֲשֵׂה לְמַֽעַן קְדֻשָּׁתֶֽךָ עֲשֵׂה לְמַֽעַן תּוֹרָתֶֽךָ. לְמַֽעַן יֵחָלְ֒צוּן יְדִידֶֽיךָ הוֹשִֽׁיעָה יְמִינְ֒ךָ וַעֲנֵֽנִי: יִהְיוּ לְרָצוֹן אִמְרֵי פִי וְהֶגְיוֹן לִבִּי לְפָנֶֽיךָ יְהֹוָה צוּרִי וְגוֹאֲלִי: עֹשֶׂה שָׁלוֹם בִּמְרוֹמָיו הוּא יַעֲשֶׂה שָׁלוֹם עָלֵֽינוּ וְעַל כָּל־יִשְׂרָאֵל וְאִמְרוּ אָמֵן:",
+                                english: "My God, guard my tongue from evil and my lips from speaking deceitfully. May my soul be unresponsive to those who curse me; and let my soul be like dust to all. Open my heart to Your Torah and let my soul pursue Your commandments. And all who plan evil against me, quickly annul their counsel and frustrate their intention. Act for the sake of Your right hand. Act for the sake of Your holiness. Act for the sake of Your Torah. In order that Your loved ones be released, deliver [with] Your right hand and answer me. May the words of my mouth and the thoughts of my heart be acceptable before You Adonoy, my Rock and my Redeemer. He Who makes peace in His high heavens may He make peace upon us and upon all Israel and say Amein.",
                                 showEnglish: showEnglish
                             )
 
