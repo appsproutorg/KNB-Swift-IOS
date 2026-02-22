@@ -15,6 +15,18 @@ struct MoreMenuView: View {
     @EnvironmentObject var navigationManager: NavigationManager
     
     @State private var selectedOption: MenuOption?
+
+    private var timeBasedGreeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12:
+            return "Good morning"
+        case 12..<17:
+            return "Good afternoon"
+        default:
+            return "Good evening"
+        }
+    }
     
     enum MenuOption: String, Identifiable {
         case account = "Account"
@@ -95,7 +107,7 @@ struct MoreMenuView: View {
                             
                             // Greeting
                             VStack(spacing: 8) {
-                                Text("Hello, \(currentUser?.name ?? "there")")
+                                Text("\(timeBasedGreeting), \(currentUser?.name ?? "there")")
                                     .font(.system(size: 28, weight: .bold, design: .rounded))
                                     .foregroundStyle(.primary)
                                 
