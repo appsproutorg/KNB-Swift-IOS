@@ -95,11 +95,66 @@ struct SponsorshipFormView: View {
         if sponsorship.isAnonymous && !isSponsoredByCurrentUser {
             return "Anonymous Sponsor"
         }
+        if sponsorship.sponsorName == "Reserved" {
+            let extracted = extractSponsorName(from: sponsorship.occasion)
+            if !extracted.isEmpty {
+                return extracted
+            }
+        }
         return sponsorship.sponsorName
     }
 
     private var displayedAmount: Int {
         existingSponsorship?.tierAmount ?? selectedTier.amount
+    }
+
+    private var shouldShowAmountCard: Bool {
+        guard existingSponsorship != nil else { return true }
+        return isSponsoredByCurrentUser
+    }
+
+    private func extractSponsorName(from occasion: String) -> String {
+        let source = occasion.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !source.isEmpty else { return "" }
+
+        let lower = source.lowercased()
+        let prefixes = [
+            "kiddush is sponsored by ",
+            "kiddush is sponosored by ",
+            "sponsored by ",
+            "sponosored by ",
+        ]
+
+        var startOffset: Int?
+        for prefix in prefixes {
+            if let range = lower.range(of: prefix) {
+                startOffset = lower.distance(from: lower.startIndex, to: range.upperBound)
+                break
+            }
+        }
+
+        guard let startOffset, startOffset < source.count else {
+            return ""
+        }
+
+        let startIndex = source.index(source.startIndex, offsetBy: startOffset)
+        let remaining = String(source[startIndex...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if remaining.isEmpty { return "" }
+
+        let separators = [" on occasion of ", " in honor of ", "."]
+        let remainingLower = remaining.lowercased()
+        var cutIndex = remaining.endIndex
+        for separator in separators {
+            if let range = remainingLower.range(of: separator) {
+                let offset = remainingLower.distance(from: remainingLower.startIndex, to: range.lowerBound)
+                let candidate = remaining.index(remaining.startIndex, offsetBy: offset)
+                if candidate < cutIndex {
+                    cutIndex = candidate
+                }
+            }
+        }
+
+        return String(remaining[..<cutIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
     var formattedDate: String {
@@ -281,37 +336,58 @@ struct SponsorshipFormView: View {
                             .padding(.horizontal)
                         }
                         
-                        // Already Sponsored Banner with glassy design
+                        // Already Sponsored Banner with stronger sponsor + reason emphasis
                         if let sponsorship = existingSponsorship {
-                            VStack(spacing: 10) {
-                                HStack {
+                            VStack(alignment: .leading, spacing: 14) {
+                                HStack(alignment: .top, spacing: 10) {
                                     Image(systemName: "checkmark.seal.fill")
                                         .font(.system(size: 28))
                                         .foregroundStyle(.green)
-                                    
-                                    VStack(alignment: .leading, spacing: 5) {
+                                        .padding(.top, 2)
+
+                                    VStack(alignment: .leading, spacing: 4) {
                                         Text("Already Sponsored")
-                                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                                            .font(.system(size: 20, weight: .bold, design: .rounded))
                                             .foregroundStyle(.green)
-                                        
-                                        Text("Sponsored by: \(sponsorDisplayText)")
-                                            .font(.system(size: 14, design: .rounded))
-                                            .foregroundStyle(.secondary)
-                                        
+
                                         if isSponsoredByCurrentUser {
-                                            Text("(This is your sponsorship)")
-                                                .font(.system(size: 12, design: .rounded))
+                                            Text("This is your sponsorship")
+                                                .font(.system(size: 12, weight: .semibold, design: .rounded))
                                                 .foregroundStyle(.blue)
+                                                .padding(.horizontal, 10)
+                                                .padding(.vertical, 4)
+                                                .background(.blue.opacity(0.12))
+                                                .clipShape(Capsule())
                                         }
-                                        
-                                        Text("Occasion: \(sponsorship.occasion)")
-                                            .font(.system(size: 13, design: .rounded))
-                                            .foregroundStyle(.secondary)
                                     }
-                                    
+
                                     Spacer()
                                 }
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Sponsored By")
+                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                    Text(sponsorDisplayText)
+                                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.primary)
+                                        .lineLimit(2)
+                                }
+
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text("Sponsorship Reason")
+                                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                    Text(sponsorship.occasion)
+                                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.primary)
+                                        .multilineTextAlignment(.leading)
+                                        .lineSpacing(2)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
                                 .padding(16)
+                                .background(.green.opacity(0.09))
+                                .cornerRadius(12)
                                 .background(
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 16)
@@ -328,48 +404,50 @@ struct SponsorshipFormView: View {
                             .padding(.horizontal)
                         }
                         
-                        // Price Card with modern glassy design
-                        VStack(spacing: 8) {
-                            Text("Sponsorship Amount")
-                                .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                            
-                            Text("$\(displayedAmount)")
-                                .font(.system(size: 48, weight: .bold, design: .rounded))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [.green, .green.opacity(0.7)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                            
-                            Text(existingSponsorship == nil ? "Payment details will be sent via email" : "Recorded sponsorship amount")
-                                .font(.system(size: 13, design: .rounded))
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(24)
-                        .background(
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 22)
-                                    .fill(.green.opacity(0.05))
-                                RoundedRectangle(cornerRadius: 22)
-                                    .fill(.ultraThinMaterial)
-                                RoundedRectangle(cornerRadius: 22)
-                                    .stroke(
+                        if shouldShowAmountCard {
+                            // Price Card with modern glassy design
+                            VStack(spacing: 8) {
+                                Text("Sponsorship Amount")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                                
+                                Text("$\(displayedAmount)")
+                                    .font(.system(size: 48, weight: .bold, design: .rounded))
+                                    .foregroundStyle(
                                         LinearGradient(
-                                            colors: [.green.opacity(0.3), .green.opacity(0.1)],
+                                            colors: [.green, .green.opacity(0.7)],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
-                                        ),
-                                        lineWidth: 1.5
+                                        )
                                     )
+                                
+                                Text(existingSponsorship == nil ? "Payment details will be sent via email" : "Recorded sponsorship amount")
+                                    .font(.system(size: 13, design: .rounded))
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
                             }
-                        )
-                        .shadow(color: .green.opacity(0.1), radius: 15, x: 0, y: 8)
-                        .padding(.horizontal)
+                            .frame(maxWidth: .infinity)
+                            .padding(24)
+                            .background(
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 22)
+                                        .fill(.green.opacity(0.05))
+                                    RoundedRectangle(cornerRadius: 22)
+                                        .fill(.ultraThinMaterial)
+                                    RoundedRectangle(cornerRadius: 22)
+                                        .stroke(
+                                            LinearGradient(
+                                                colors: [.green.opacity(0.3), .green.opacity(0.1)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            ),
+                                            lineWidth: 1.5
+                                        )
+                                }
+                            )
+                            .shadow(color: .green.opacity(0.1), radius: 15, x: 0, y: 8)
+                            .padding(.horizontal)
+                        }
                         
                         // Sponsorship Tier Selection
                         VStack(alignment: .leading, spacing: 10) {
