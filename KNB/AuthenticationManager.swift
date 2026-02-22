@@ -9,6 +9,9 @@ import Foundation
 import Combine
 import FirebaseAuth
 import FirebaseFirestore
+import FirebaseCore
+import GoogleSignIn
+import UIKit
 
 @MainActor
 class AuthenticationManager: ObservableObject {
@@ -85,6 +88,38 @@ class AuthenticationManager: ObservableObject {
             return true
         } catch {
             errorMessage = getSignInErrorMessage(from: error)
+            return false
+        }
+    }
+
+    // MARK: - Google Sign In
+    func signInWithGoogle(presenting viewController: UIViewController) async -> Bool {
+        guard let clientID = FirebaseApp.app()?.options.clientID else {
+            errorMessage = "Google Sign-In is not configured correctly."
+            return false
+        }
+
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+
+        do {
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: viewController)
+
+            guard let idToken = result.user.idToken?.tokenString else {
+                errorMessage = "Could not get Google ID token."
+                return false
+            }
+
+            let accessToken = result.user.accessToken.tokenString
+            let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
+            let authResult = try await Auth.auth().signIn(with: credential)
+
+            loadUserData(from: authResult.user)
+            await storeFCMTokenIfAvailable()
+
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = getGoogleSignInErrorMessage(from: error)
             return false
         }
     }
@@ -264,5 +299,14 @@ class AuthenticationManager: ObservableObject {
             return "Unable to send password reset email. Please try again."
         }
     }
-}
 
+    private func getGoogleSignInErrorMessage(from error: Error) -> String {
+        let nsError = error as NSError
+        let message = nsError.localizedDescription.lowercased()
+        if message.contains("cancel") {
+            return "Google sign in was canceled."
+        }
+
+        return "Unable to sign in with Google. Please try again."
+    }
+}

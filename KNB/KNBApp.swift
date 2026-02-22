@@ -11,6 +11,7 @@ import FirebaseMessaging
 import FirebaseFirestore
 import UserNotifications
 import FirebaseAuth
+import GoogleSignIn
 
 
 class AppDelegate: NSObject, UIApplicationDelegate {
@@ -57,6 +58,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
         print("❌ Failed to register for remote notifications: \(error.localizedDescription)")
     }
+
+    func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        return GIDSignIn.sharedInstance.handle(url)
+    }
 }
 
 @main
@@ -80,6 +85,9 @@ struct KNBApp: App {
                     if let userEmail = Auth.auth().currentUser?.email {
                         PushRegistrationManager.shared.syncFCMToken(for: userEmail)
                     }
+                }
+                .onOpenURL { url in
+                    _ = GIDSignIn.sharedInstance.handle(url)
                 }
         }
     }

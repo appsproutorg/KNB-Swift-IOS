@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct LoginView: View {
     @State private var email = ""
@@ -178,6 +179,55 @@ struct LoginView: View {
                         }
                         .disabled(isLoading)
                         .padding(.top, 4)
+
+                        if !isSignUp {
+                            HStack {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.35))
+                                    .frame(height: 1)
+                                Text("or")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.8))
+                                    .padding(.horizontal, 6)
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.35))
+                                    .frame(height: 1)
+                            }
+                            .padding(.top, 2)
+
+                            Button(action: handleGoogleSignIn) {
+                                HStack(spacing: 12) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.white)
+                                            .frame(width: 26, height: 26)
+                                        Text("G")
+                                            .font(.system(size: 14, weight: .bold))
+                                            .foregroundStyle(Color(red: 0.23, green: 0.48, blue: 0.96))
+                                    }
+
+                                    if isLoading {
+                                        ProgressView()
+                                            .tint(.white)
+                                    } else {
+                                        Text("Continue with Google")
+                                            .font(.system(size: 16, weight: .semibold))
+                                    }
+                                }
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .fill(Color.white.opacity(0.22))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .stroke(Color.white.opacity(0.45), lineWidth: 1)
+                                        )
+                                )
+                            }
+                            .disabled(isLoading)
+                        }
                         
                         // Toggle link
                         Button(action: { 
@@ -314,6 +364,45 @@ struct LoginView: View {
                 name = ""
             }
         }
+    }
+
+    func handleGoogleSignIn() {
+        guard let rootViewController = topViewController() else {
+            authManager.errorMessage = "Unable to open Google sign in right now."
+            return
+        }
+
+        isLoading = true
+
+        Task {
+            let success = await authManager.signInWithGoogle(presenting: rootViewController)
+            isLoading = false
+
+            if success {
+                email = ""
+                password = ""
+                name = ""
+            }
+        }
+    }
+
+    private func topViewController() -> UIViewController? {
+        let activeScene = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }
+
+        guard let scene = activeScene ?? (UIApplication.shared.connectedScenes.first as? UIWindowScene) else {
+            return nil
+        }
+        guard let root = scene.windows.first(where: { $0.isKeyWindow })?.rootViewController else {
+            return nil
+        }
+
+        var top = root
+        while let presented = top.presentedViewController {
+            top = presented
+        }
+        return top
     }
 }
 
