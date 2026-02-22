@@ -17,6 +17,17 @@ service cloud.firestore {
       return isSuperAdmin() || 
              (isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.isAdmin == true);
     }
+
+    // Shared Kiddush calendar (public read-only)
+    match /kiddushCalendar/{isoDate} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Sync metadata must stay private
+    match /kiddushMeta/{docId} {
+      allow read, write: if false;
+    }
     
     // Honors collection
     match /honors/{honorId} {
@@ -111,4 +122,3 @@ service cloud.firestore {
     }
   }
 }
-

@@ -1,5 +1,9 @@
 const functions = require("firebase-functions");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
+const crypto = require("node:crypto");
+const cheerio = require("cheerio");
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -340,3 +344,550 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
         throw new functions.https.HttpsError('internal', 'Failed to send notification.');
     }
 });
+
+const KIDDUSH_CALENDAR_URL = "https://www.heritagecongregation.com/website/index.php";
+const KIDDUSH_COLLECTION = "kiddushCalendar";
+const KIDDUSH_META_DOC_PATH = "kiddushMeta/sync";
+const KIDDUSH_SYNC_TIMEZONE = "America/Chicago";
+const KIDDUSH_SYNC_USER_AGENT = "KNB-KiddushCalendarSync/1.0 (+Firebase Functions)";
+const KIDDUSH_HTTP_TIMEOUT_MS = 15000;
+
+const MONTH_INDEX_MAP = {
+    january: 0,
+    february: 1,
+    march: 2,
+    april: 3,
+    may: 4,
+    june: 5,
+    july: 6,
+    august: 7,
+    september: 8,
+    october: 9,
+    november: 10,
+    december: 11,
+};
+
+function normalizeWhitespace(value) {
+    return (value || "").replace(/\s+/g, " ").trim();
+}
+
+function skipWhitespace(input, startIndex) {
+    let index = startIndex;
+    while (index < input.length) {
+        const char = input[index];
+        if (char !== " " && char !== "\n" && char !== "\r" && char !== "\t") {
+            break;
+        }
+        index += 1;
+    }
+    return index;
+}
+
+function readSingleQuotedJsArg(input, startIndex) {
+    if (input[startIndex] !== "'") {
+        return null;
+    }
+
+    let index = startIndex + 1;
+    let raw = "";
+
+    while (index < input.length) {
+        const char = input[index];
+        if (char === "\\") {
+            if (index + 1 >= input.length) {
+                return null;
+            }
+            raw += char + input[index + 1];
+            index += 2;
+            continue;
+        }
+        if (char === "'") {
+            return { raw, nextIndex: index + 1 };
+        }
+        raw += char;
+        index += 1;
+    }
+
+    return null;
+}
+
+function decodeSingleQuotedJsValue(raw) {
+    let decoded = "";
+    for (let i = 0; i < raw.length; i += 1) {
+        const char = raw[i];
+        if (char !== "\\") {
+            decoded += char;
+            continue;
+        }
+
+        if (i + 1 >= raw.length) {
+            decoded += "\\";
+            continue;
+        }
+
+        const escaped = raw[i + 1];
+        i += 1;
+
+        if (escaped === "'") {
+            decoded += "'";
+        } else if (escaped === "\"") {
+            decoded += "\"";
+        } else if (escaped === "\\") {
+            decoded += "\\";
+        } else if (escaped === "n") {
+            decoded += "\n";
+        } else if (escaped === "r") {
+            decoded += "\r";
+        } else if (escaped === "t") {
+            decoded += "\t";
+        } else {
+            decoded += escaped;
+        }
+    }
+
+    return decoded;
+}
+
+function parseSponsorTextFromOnclick(onclickValue) {
+    if (!onclickValue) {
+        return null;
+    }
+
+    const openCall = "open_view_popup(";
+    const callStart = onclickValue.indexOf(openCall);
+    if (callStart === -1) {
+        return null;
+    }
+
+    let index = callStart + openCall.length;
+    const firstArg = readSingleQuotedJsArg(onclickValue, index);
+    if (!firstArg) {
+        return null;
+    }
+
+    index = skipWhitespace(onclickValue, firstArg.nextIndex);
+    if (onclickValue[index] !== ",") {
+        return null;
+    }
+    index = skipWhitespace(onclickValue, index + 1);
+
+    const secondArg = readSingleQuotedJsArg(onclickValue, index);
+    if (!secondArg) {
+        return null;
+    }
+
+    const decodedSponsor = decodeSingleQuotedJsValue(secondArg.raw);
+    const sponsorText = normalizeWhitespace(decodedSponsor);
+    return sponsorText || null;
+}
+
+function parseMonthDay(dateText) {
+    const cleaned = normalizeWhitespace(dateText).replace(",", "");
+    const match = cleaned.match(/^([A-Za-z]+)\s+(\d{1,2})$/);
+    if (!match) {
+        return null;
+    }
+
+    const monthName = match[1].toLowerCase();
+    const monthIndex = MONTH_INDEX_MAP[monthName];
+    const day = Number(match[2]);
+
+    if (monthIndex === undefined || Number.isNaN(day) || day < 1 || day > 31) {
+        return null;
+    }
+
+    return {
+        monthIndex,
+        day,
+        displayDate: `${match[1]} ${day}`,
+    };
+}
+
+function toIsoDate(year, monthIndex, day) {
+    const monthIso = String(monthIndex + 1).padStart(2, "0");
+    const dayIso = String(day).padStart(2, "0");
+    return `${year}-${monthIso}-${dayIso}`;
+}
+
+function getChicagoTodayParts(now = new Date()) {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: KIDDUSH_SYNC_TIMEZONE,
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+    });
+
+    const parts = formatter.formatToParts(now);
+    const output = {};
+    for (const part of parts) {
+        if (part.type === "year" || part.type === "month" || part.type === "day") {
+            output[part.type] = Number(part.value);
+        }
+    }
+
+    return {
+        year: output.year,
+        month: output.month,
+        day: output.day,
+    };
+}
+
+function inferStartYear(firstMonthIndex, firstDay, todayParts) {
+    const todayUtc = Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day);
+    const candidateYears = [todayParts.year - 1, todayParts.year, todayParts.year + 1];
+
+    let chosenYear = candidateYears[0];
+    let smallestDistance = Number.POSITIVE_INFINITY;
+
+    for (const candidateYear of candidateYears) {
+        const candidateUtc = Date.UTC(candidateYear, firstMonthIndex, firstDay);
+        const distance = Math.abs(candidateUtc - todayUtc);
+        if (distance < smallestDistance) {
+            smallestDistance = distance;
+            chosenYear = candidateYear;
+        }
+    }
+
+    return chosenYear;
+}
+
+function normalizeKiddushRows(parsedRows, todayParts) {
+    const rowsWithMonthDay = [];
+
+    for (const row of parsedRows) {
+        const parsedDate = parseMonthDay(row.dateText);
+        if (!parsedDate) {
+            throw new Error(`Unsupported Kiddush date format: "${row.dateText}"`);
+        }
+
+        rowsWithMonthDay.push({
+            ...row,
+            ...parsedDate,
+        });
+    }
+
+    if (!rowsWithMonthDay.length) {
+        return [];
+    }
+
+    let year = inferStartYear(
+        rowsWithMonthDay[0].monthIndex,
+        rowsWithMonthDay[0].day,
+        todayParts
+    );
+    let previousMonthIndex = rowsWithMonthDay[0].monthIndex;
+    let previousDay = rowsWithMonthDay[0].day;
+
+    return rowsWithMonthDay.map((row, index) => {
+        if (
+            index > 0 &&
+            (row.monthIndex < previousMonthIndex ||
+                (row.monthIndex === previousMonthIndex && row.day < previousDay))
+        ) {
+            year += 1;
+        }
+
+        previousMonthIndex = row.monthIndex;
+        previousDay = row.day;
+
+        return {
+            isoDate: toIsoDate(year, row.monthIndex, row.day),
+            displayDate: row.displayDate,
+            parsha: row.parshaText,
+            status: row.status,
+            sponsorText: row.status === "reserved" ? row.sponsorText || null : null,
+        };
+    });
+}
+
+function canonicalizeDataset(rows) {
+    return rows
+        .map((row) => ({
+            isoDate: row.isoDate,
+            displayDate: row.displayDate,
+            parsha: row.parsha,
+            status: row.status,
+            sponsorText: row.sponsorText ?? null,
+        }))
+        .sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+}
+
+function computeDatasetHash(dataset) {
+    return crypto
+        .createHash("sha256")
+        .update(JSON.stringify(dataset))
+        .digest("hex");
+}
+
+function isSameCalendarDocument(existingDoc, incomingDoc) {
+    if (!existingDoc) {
+        return false;
+    }
+
+    const existingSponsor =
+        existingDoc.sponsorText === undefined || existingDoc.sponsorText === null
+            ? null
+            : normalizeWhitespace(String(existingDoc.sponsorText));
+
+    const incomingSponsor =
+        incomingDoc.sponsorText === undefined || incomingDoc.sponsorText === null
+            ? null
+            : normalizeWhitespace(String(incomingDoc.sponsorText));
+
+    return (
+        normalizeWhitespace(String(existingDoc.isoDate || "")) === incomingDoc.isoDate &&
+        normalizeWhitespace(String(existingDoc.displayDate || "")) === incomingDoc.displayDate &&
+        normalizeWhitespace(String(existingDoc.parsha || "")) === incomingDoc.parsha &&
+        normalizeWhitespace(String(existingDoc.status || "")) === incomingDoc.status &&
+        existingSponsor === incomingSponsor
+    );
+}
+
+async function fetchKiddushCalendarHtml() {
+    const response = await fetch(KIDDUSH_CALENDAR_URL, {
+        method: "GET",
+        headers: {
+            "User-Agent": KIDDUSH_SYNC_USER_AGENT,
+            Accept: "text/html,application/xhtml+xml",
+        },
+        signal: AbortSignal.timeout(KIDDUSH_HTTP_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status} while fetching source calendar`);
+    }
+
+    return response.text();
+}
+
+function parseKiddushCalendarTable(html) {
+    const $ = cheerio.load(html);
+    const table = $("#ContactDetails").first();
+
+    if (!table.length) {
+        return {
+            tableFound: false,
+            rows: [],
+        };
+    }
+
+    const rows = [];
+
+    table.find("tr").each((_, rowElement) => {
+        const cells = $(rowElement).find("td");
+        if (cells.length < 3) {
+            return;
+        }
+
+        const dateText = normalizeWhitespace($(cells[0]).text());
+        const parshaText = normalizeWhitespace($(cells[1]).text());
+        if (!dateText || !parshaText) {
+            return;
+        }
+
+        const statusCell = $(cells[2]);
+        const reservedAnchor = statusCell
+            .find("a")
+            .filter((__, anchorElement) => {
+                const anchorText = normalizeWhitespace($(anchorElement).text()).toLowerCase();
+                return anchorText.includes("reserved");
+            })
+            .first();
+
+        if (reservedAnchor.length) {
+            const onclickValue = reservedAnchor.attr("onclick") || "";
+            const sponsorText = parseSponsorTextFromOnclick(onclickValue);
+            if (!sponsorText) {
+                throw new Error(
+                    `Reserved row for "${dateText}" is missing a parseable sponsor text`
+                );
+            }
+            rows.push({
+                dateText,
+                parshaText,
+                status: "reserved",
+                sponsorText,
+            });
+            return;
+        }
+
+        const statusText = normalizeWhitespace(statusCell.text()).toLowerCase();
+        if (statusText.includes("available")) {
+            rows.push({
+                dateText,
+                parshaText,
+                status: "available",
+                sponsorText: null,
+            });
+        }
+    });
+
+    return {
+        tableFound: true,
+        rows,
+    };
+}
+
+exports.syncKiddushCalendar = onSchedule(
+    {
+        schedule: "every 30 minutes",
+        region: "us-central1",
+        timeZone: KIDDUSH_SYNC_TIMEZONE,
+        memory: "256MiB",
+        timeoutSeconds: 60,
+    },
+    async () => {
+        logger.info("Starting Kiddush calendar sync.");
+
+        let html;
+        try {
+            html = await fetchKiddushCalendarHtml();
+        } catch (error) {
+            logger.error("Kiddush sync failed while fetching source HTML.", {
+                error: error.message,
+            });
+            return;
+        }
+
+        let parsedResult;
+        try {
+            parsedResult = parseKiddushCalendarTable(html);
+        } catch (error) {
+            logger.error("Kiddush sync failed while parsing HTML.", {
+                error: error.message,
+            });
+            return;
+        }
+
+        if (!parsedResult.tableFound) {
+            logger.error("Kiddush sync aborted: table #ContactDetails was not found.");
+            return;
+        }
+
+        if (!parsedResult.rows.length) {
+            logger.error("Kiddush sync aborted: parsed zero rows from #ContactDetails.");
+            return;
+        }
+
+        let dataset;
+        try {
+            const todayParts = getChicagoTodayParts();
+            const normalizedRows = normalizeKiddushRows(parsedResult.rows, todayParts);
+            if (!normalizedRows.length) {
+                logger.error("Kiddush sync aborted: date normalization produced zero rows.");
+                return;
+            }
+
+            dataset = canonicalizeDataset(normalizedRows);
+
+            const seenIsoDates = new Set();
+            for (const row of dataset) {
+                if (seenIsoDates.has(row.isoDate)) {
+                    throw new Error(`Duplicate isoDate found in parsed dataset: ${row.isoDate}`);
+                }
+                seenIsoDates.add(row.isoDate);
+            }
+        } catch (error) {
+            logger.error("Kiddush sync failed during normalization.", {
+                error: error.message,
+            });
+            return;
+        }
+        const datasetHash = computeDatasetHash(dataset);
+        const metaRef = db.doc(KIDDUSH_META_DOC_PATH);
+
+        let previousHash = null;
+        try {
+            const metaSnap = await metaRef.get();
+            previousHash = metaSnap.exists ? metaSnap.data().hash || null : null;
+        } catch (error) {
+            logger.error("Kiddush sync failed while reading existing sync metadata.", {
+                error: error.message,
+            });
+            return;
+        }
+
+        let existingDocsSnapshot;
+        try {
+            existingDocsSnapshot = await db.collection(KIDDUSH_COLLECTION).get();
+        } catch (error) {
+            logger.error("Kiddush sync failed while reading existing calendar docs.", {
+                error: error.message,
+            });
+            return;
+        }
+
+        const existingById = new Map();
+        existingDocsSnapshot.forEach((doc) => {
+            existingById.set(doc.id, doc.data());
+        });
+
+        const incomingById = new Map();
+        for (const row of dataset) {
+            incomingById.set(row.isoDate, row);
+        }
+
+        const batch = db.batch();
+        let upsertCount = 0;
+        let deleteCount = 0;
+
+        for (const row of dataset) {
+            const existingDoc = existingById.get(row.isoDate);
+            if (!isSameCalendarDocument(existingDoc, row)) {
+                batch.set(
+                    db.collection(KIDDUSH_COLLECTION).doc(row.isoDate),
+                    {
+                        ...row,
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    { merge: true }
+                );
+                upsertCount += 1;
+            }
+        }
+
+        for (const [docId] of existingById) {
+            if (!incomingById.has(docId)) {
+                batch.delete(db.collection(KIDDUSH_COLLECTION).doc(docId));
+                deleteCount += 1;
+            }
+        }
+
+        const hashChanged = previousHash !== datasetHash;
+        const hasContentChanges = upsertCount > 0 || deleteCount > 0;
+        const driftCorrection = !hashChanged && hasContentChanges;
+
+        if (!hashChanged && !hasContentChanges) {
+            logger.info("Kiddush calendar unchanged and already in sync, skipping Firestore writes.", {
+                rows: dataset.length,
+                hash: datasetHash,
+            });
+            return;
+        }
+
+        batch.set(
+            metaRef,
+            {
+                hash: datasetHash,
+                lastSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+        );
+
+        try {
+            await batch.commit();
+            logger.info("Kiddush calendar sync committed.", {
+                rows: dataset.length,
+                upserts: upsertCount,
+                deletes: deleteCount,
+                hash: datasetHash,
+                hashChanged,
+                driftCorrection,
+            });
+        } catch (error) {
+            logger.error("Kiddush sync failed while committing Firestore batch.", {
+                error: error.message,
+            });
+        }
+    }
+);

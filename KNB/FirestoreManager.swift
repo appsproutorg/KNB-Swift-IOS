@@ -30,6 +30,9 @@ class FirestoreManager: ObservableObject {
     private var sponsorshipsListener: ListenerRegistration?
     private var socialPostsListener: ListenerRegistration?
     private var seatReservationsListener: ListenerRegistration?
+
+    private let scrapedKiddushCollection = "kiddushCalendar"
+    private let scrapedSponsorEmailPlaceholder = "website@heritagecongregation.com"
     
 
     
@@ -414,18 +417,104 @@ class FirestoreManager: ObservableObject {
         }
         return 500
     }
+
+    private func chicagoIsoFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "America/Chicago")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }
+
+    private func parseSponsorName(from sponsorText: String) -> String {
+        let lower = sponsorText.lowercased()
+        let prefixes = [
+            "kiddush is sponsored by ",
+            "kiddush is sponosored by ", // source typo appears on website
+            "sponsored by ",
+            "sponosored by ",
+        ]
+
+        var startOffset: Int?
+        for prefix in prefixes {
+            if let range = lower.range(of: prefix) {
+                startOffset = lower.distance(from: lower.startIndex, to: range.upperBound)
+                break
+            }
+        }
+
+        guard let startOffset else {
+            return "Reserved"
+        }
+
+        guard startOffset < sponsorText.count else {
+            return "Reserved"
+        }
+
+        let startIndex = sponsorText.index(sponsorText.startIndex, offsetBy: startOffset)
+        let remaining = String(sponsorText[startIndex...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        if remaining.isEmpty {
+            return "Reserved"
+        }
+
+        let separators = [" on occasion of ", " in honor of ", "."]
+        let remainingLower = remaining.lowercased()
+        var cutIndex = remaining.endIndex
+        for separator in separators {
+            if let separatorRange = remainingLower.range(of: separator) {
+                let offset = remainingLower.distance(from: remainingLower.startIndex, to: separatorRange.lowerBound)
+                let candidate = remaining.index(remaining.startIndex, offsetBy: offset)
+                if candidate < cutIndex {
+                    cutIndex = candidate
+                }
+            }
+        }
+
+        let name = String(remaining[..<cutIndex]).trimmingCharacters(in: .whitespacesAndNewlines)
+        return name.isEmpty ? "Reserved" : name
+    }
+
+    private func mapScrapedCalendarDocToSponsorship(docId: String, data: [String: Any]) -> KiddushSponsorship? {
+        let status = (data["status"] as? String ?? "").lowercased()
+        guard status == "reserved" else {
+            return nil
+        }
+
+        let isoDate = (data["isoDate"] as? String) ?? docId
+        let formatter = chicagoIsoFormatter()
+        guard let date = formatter.date(from: isoDate) else {
+            return nil
+        }
+
+        let sponsorText = (data["sponsorText"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let sponsorName = sponsorText.isEmpty ? "Reserved" : parseSponsorName(from: sponsorText)
+        let updatedAt = (data["updatedAt"] as? Timestamp)?.dateValue() ?? Date()
+
+        return KiddushSponsorship(
+            id: UUID(),
+            date: date,
+            sponsorName: sponsorName,
+            sponsorEmail: scrapedSponsorEmailPlaceholder,
+            occasion: sponsorText.isEmpty ? "Reserved" : sponsorText,
+            tierName: "Website Reserved",
+            tierAmount: 0,
+            isAnonymous: false,
+            timestamp: updatedAt,
+            isPaid: true
+        )
+    }
     
     // Start listening to Kiddush sponsorships
     func startListeningToSponsorships() {
         sponsorshipsListener?.remove()
         
-        sponsorshipsListener = db.collection("kiddush_sponsorships")
-            .order(by: "date")
+        sponsorshipsListener = db.collection(scrapedKiddushCollection)
+            .whereField("status", isEqualTo: "reserved")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self else { return }
                 
                 if let error = error {
-                    print("Error listening to sponsorships: \(error.localizedDescription)")
+                    print("Error listening to scraped Kiddush calendar: \(error.localizedDescription)")
                     return
                 }
                 
@@ -433,35 +522,10 @@ class FirestoreManager: ObservableObject {
                 
                 self.kiddushSponsorships = documents.compactMap { doc -> KiddushSponsorship? in
                     let data = doc.data()
-                    
-                    guard let idString = data["id"] as? String,
-                          let id = UUID(uuidString: idString),
-                          let date = (data["date"] as? Timestamp)?.dateValue(),
-                          let sponsorName = data["sponsorName"] as? String,
-                          let sponsorEmail = data["sponsorEmail"] as? String,
-                          let occasion = data["occasion"] as? String,
-                          let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
-                        return nil
-                    }
-                    
-                    let isAnonymous = data["isAnonymous"] as? Bool ?? false
-                    let isPaid = data["isPaid"] as? Bool ?? false
-                    let tierName = data["tierName"] as? String ?? "Gold Kiddush"
-                    let tierAmount = self.decodeTierAmount(from: data)
-                    
-                    return KiddushSponsorship(
-                        id: id,
-                        date: date,
-                        sponsorName: sponsorName,
-                        sponsorEmail: sponsorEmail,
-                        occasion: occasion,
-                        tierName: tierName,
-                        tierAmount: tierAmount,
-                        isAnonymous: isAnonymous,
-                        timestamp: timestamp,
-                        isPaid: isPaid
-                    )
-                }
+                    return self.mapScrapedCalendarDocToSponsorship(docId: doc.documentID, data: data)
+                }.sorted { $0.date < $1.date }
+
+                print("✅ Loaded \(self.kiddushSponsorships.count) reserved dates from scraped Kiddush calendar")
             }
     }
     
@@ -473,41 +537,14 @@ class FirestoreManager: ObservableObject {
     // Fetch all Kiddush sponsorships
     func fetchKiddushSponsorships() async {
         do {
-            let snapshot = try await db.collection("kiddush_sponsorships")
-                .order(by: "date")
+            let snapshot = try await db.collection(scrapedKiddushCollection)
+                .whereField("status", isEqualTo: "reserved")
                 .getDocuments()
             
             kiddushSponsorships = snapshot.documents.compactMap { doc -> KiddushSponsorship? in
                 let data = doc.data()
-                
-                guard let idString = data["id"] as? String,
-                      let id = UUID(uuidString: idString),
-                      let date = (data["date"] as? Timestamp)?.dateValue(),
-                      let sponsorName = data["sponsorName"] as? String,
-                      let sponsorEmail = data["sponsorEmail"] as? String,
-                      let occasion = data["occasion"] as? String,
-                      let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
-                    return nil
-                }
-                
-                let isAnonymous = data["isAnonymous"] as? Bool ?? false
-                let isPaid = data["isPaid"] as? Bool ?? false
-                let tierName = data["tierName"] as? String ?? "Gold Kiddush"
-                let tierAmount = decodeTierAmount(from: data)
-                
-                return KiddushSponsorship(
-                    id: id,
-                    date: date,
-                    sponsorName: sponsorName,
-                    sponsorEmail: sponsorEmail,
-                    occasion: occasion,
-                    tierName: tierName,
-                    tierAmount: tierAmount,
-                    isAnonymous: isAnonymous,
-                    timestamp: timestamp,
-                    isPaid: isPaid
-                )
-            }
+                return mapScrapedCalendarDocToSponsorship(docId: doc.documentID, data: data)
+            }.sorted { $0.date < $1.date }
         } catch {
             print("Error fetching sponsorships: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
@@ -587,13 +624,16 @@ class FirestoreManager: ObservableObject {
         do {
             let calendar = Calendar.chicago
             let startOfDay = calendar.startOfDay(for: date)
-            
-            let snapshot = try await db.collection("kiddush_sponsorships")
-                .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: startOfDay))
-                .whereField("date", isLessThan: Timestamp(date: calendar.date(byAdding: .day, value: 1, to: startOfDay)!))
-                .getDocuments()
-            
-            return snapshot.documents.isEmpty
+            let formatter = chicagoIsoFormatter()
+            let docId = formatter.string(from: startOfDay)
+
+            let snapshot = try await db.collection(scrapedKiddushCollection).document(docId).getDocument()
+            guard let data = snapshot.data() else {
+                return false
+            }
+
+            let status = (data["status"] as? String ?? "").lowercased()
+            return status == "available"
         } catch {
             print("Error checking date availability: \(error.localizedDescription)")
             return false
