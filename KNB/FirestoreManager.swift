@@ -7,6 +7,7 @@
 
 import Foundation
 import FirebaseFirestore
+import FirebaseStorage
 import Combine
 import SwiftUI
 
@@ -15,6 +16,7 @@ class FirestoreManager: ObservableObject {
     private var db: Firestore {
         return Firestore.firestore()
     }
+    private let storage = Storage.storage()
     @Published var honors: [Honor] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -814,25 +816,42 @@ class FirestoreManager: ObservableObject {
     }
     
     // Delete a specific sponsorship by date
-    func deleteSponsorshipByDate(_ date: Date) async {
+    func deleteSponsorshipByDate(_ date: Date) async -> Bool {
         do {
             let calendar = Calendar.chicago
             let startOfDay = calendar.startOfDay(for: date)
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.timeZone = TimeZone(identifier: "America/Chicago")
+            let docId = "sponsorship_\(formatter.string(from: startOfDay))"
+
+            let ref = db.collection("kiddush_sponsorships").document(docId)
+            let doc = try await ref.getDocument()
+
+            if doc.exists {
+                try await ref.delete()
+                print("✅ Deleted sponsorship: \(docId)")
+                return true
+            }
+
+            // Fallback for legacy docs with non-deterministic IDs.
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-            
             let snapshot = try await db.collection("kiddush_sponsorships")
                 .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: startOfDay))
                 .whereField("date", isLessThan: Timestamp(date: endOfDay))
                 .getDocuments()
-            
-            print("🗑️ Found \(snapshot.documents.count) sponsorship(s) for \(startOfDay)")
-            
-            for doc in snapshot.documents {
-                try await doc.reference.delete()
-                print("   ✅ Deleted sponsorship: \(doc.documentID)")
+
+            print("🗑️ Found \(snapshot.documents.count) fallback sponsorship(s) for \(startOfDay)")
+            for fallbackDoc in snapshot.documents {
+                try await fallbackDoc.reference.delete()
+                print("   ✅ Deleted sponsorship: \(fallbackDoc.documentID)")
             }
+
+            return !snapshot.documents.isEmpty
         } catch {
             print("❌ Error deleting sponsorship: \(error.localizedDescription)")
+            errorMessage = "Failed to delete sponsorship: \(error.localizedDescription)"
+            return false
         }
     }
     
@@ -945,7 +964,6 @@ class FirestoreManager: ObservableObject {
     func startListeningToSocialPosts(sortBy: SocialPostSortOption = .newest) {
         socialPostsListener?.remove()
         
-        // Query all posts, then filter for top-level posts (parentPostId is null or missing)
         let query: Query
         switch sortBy {
         case .newest:
@@ -971,69 +989,13 @@ class FirestoreManager: ObservableObject {
                 return
             }
             
-            let allPosts = documents.compactMap { doc -> SocialPost? in
-                let data = doc.data()
-                
-                guard let id = data["id"] as? String,
-                      let authorName = data["authorName"] as? String,
-                      let authorEmail = data["authorEmail"] as? String,
-                      let content = data["content"] as? String,
-                      let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
-                    return nil
-                }
-                
-                let likes = data["likes"] as? [String] ?? []
-                let likeCount = data["likeCount"] as? Int ?? 0
-                let replyCount = data["replyCount"] as? Int ?? 0
-                let parentPostId = data["parentPostId"] as? String
-                let editedAt = (data["editedAt"] as? Timestamp)?.dateValue()
-                
-                return SocialPost(
-                    id: id,
-                    authorName: authorName,
-                    authorEmail: authorEmail,
-                    content: content,
-                    timestamp: timestamp,
-                    likes: likes,
-                    likeCount: likeCount,
-                    replyCount: replyCount,
-                    parentPostId: parentPostId,
-                    editedAt: editedAt
-                )
+            let allPosts = documents.compactMap { self.parseSocialPost(from: $0.data()) }
+            let topLevelPosts = allPosts.filter { $0.parentPostId == nil }
+            let sorted = self.sortTopLevelSocialPosts(topLevelPosts, sortBy: sortBy)
+            
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                self.socialPosts = sorted
             }
-            
-            // Filter to only top-level posts (no parentPostId)
-            let filteredPosts = allPosts.filter { $0.parentPostId == nil }
-            
-            // Only pin admin posts when sorting by newest
-            if sortBy == .newest {
-                // Separate admin posts and regular posts
-                // Separate admin posts and regular posts
-                let adminPosts = filteredPosts.filter { self.adminEmails.contains($0.authorEmail) }
-                let regularPosts = filteredPosts.filter { !self.adminEmails.contains($0.authorEmail) }
-                
-                // Sort admin posts by newest
-                let sortedAdminPosts = adminPosts.sorted { $0.timestamp > $1.timestamp }
-                
-                // Sort regular posts by newest
-                let sortedRegularPosts = regularPosts.sorted { $0.timestamp > $1.timestamp }
-                
-                // Combine: admin posts first, then regular posts
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    self.socialPosts = sortedAdminPosts + sortedRegularPosts
-                }
-            } else {
-                // Sort all posts together by most liked
-                withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                    self.socialPosts = filteredPosts.sorted {
-                        if $0.likeCount != $1.likeCount {
-                            return $0.likeCount > $1.likeCount
-                        }
-                        return $0.timestamp > $1.timestamp
-                    }
-                }
-            }
-            
             self.lastUpdated = Date()
             print("✅ Loaded \(self.socialPosts.count) social posts")
         }
@@ -1048,7 +1010,6 @@ class FirestoreManager: ObservableObject {
     // Fetch social posts (one-time fetch)
     func fetchSocialPosts(sortBy: SocialPostSortOption = .newest) async {
         do {
-            // Query all posts, then filter for top-level posts
             let query: Query
             switch sortBy {
             case .newest:
@@ -1061,64 +1022,10 @@ class FirestoreManager: ObservableObject {
             }
             
             let snapshot = try await query.getDocuments()
+            let allPosts = snapshot.documents.compactMap { parseSocialPost(from: $0.data()) }
+            let topLevelPosts = allPosts.filter { $0.parentPostId == nil }
             
-            let allPosts = snapshot.documents.compactMap { doc -> SocialPost? in
-                let data = doc.data()
-                
-                guard let id = data["id"] as? String,
-                      let authorName = data["authorName"] as? String,
-                      let authorEmail = data["authorEmail"] as? String,
-                      let content = data["content"] as? String,
-                      let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
-                    return nil
-                }
-                
-                let likes = data["likes"] as? [String] ?? []
-                let likeCount = data["likeCount"] as? Int ?? 0
-                let replyCount = data["replyCount"] as? Int ?? 0
-                let parentPostId = data["parentPostId"] as? String
-                
-                return SocialPost(
-                    id: id,
-                    authorName: authorName,
-                    authorEmail: authorEmail,
-                    content: content,
-                    timestamp: timestamp,
-                    likes: likes,
-                    likeCount: likeCount,
-                    replyCount: replyCount,
-                    parentPostId: parentPostId
-                )
-            }
-            
-            // Filter to only top-level posts (no parentPostId)
-            let filteredPosts = allPosts.filter { $0.parentPostId == nil }
-            
-            // Only pin admin posts when sorting by newest
-            if sortBy == .newest {
-                // Separate admin posts and regular posts
-                // Separate admin posts and regular posts
-                let adminPosts = filteredPosts.filter { self.adminEmails.contains($0.authorEmail) }
-                let regularPosts = filteredPosts.filter { !self.adminEmails.contains($0.authorEmail) }
-                
-                // Sort admin posts by newest
-                let sortedAdminPosts = adminPosts.sorted { $0.timestamp > $1.timestamp }
-                
-                // Sort regular posts by newest
-                let sortedRegularPosts = regularPosts.sorted { $0.timestamp > $1.timestamp }
-                
-                // Combine: admin posts first, then regular posts
-                socialPosts = sortedAdminPosts + sortedRegularPosts
-            } else {
-                // Sort all posts together by most liked
-                socialPosts = filteredPosts.sorted {
-                    if $0.likeCount != $1.likeCount {
-                        return $0.likeCount > $1.likeCount
-                    }
-                    return $0.timestamp > $1.timestamp
-                }
-            }
-            
+            socialPosts = sortTopLevelSocialPosts(topLevelPosts, sortBy: sortBy)
             print("✅ Fetched \(socialPosts.count) social posts")
         } catch {
             print("❌ Error fetching social posts: \(error.localizedDescription)")
@@ -1127,14 +1034,19 @@ class FirestoreManager: ObservableObject {
     }
     
     // Create a new social post
-    func createSocialPost(content: String, author: User) async -> Bool {
+    func createSocialPost(content: String, author: User, mediaUploads: [SocialPostMediaUpload] = []) async -> Bool {
         guard content.count <= 140 else {
             errorMessage = "Post must be 140 characters or less"
             return false
         }
+        guard mediaUploads.count <= 4 else {
+            errorMessage = "You can attach up to 4 images."
+            return false
+        }
         
-        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Post cannot be empty"
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty || !mediaUploads.isEmpty else {
+            errorMessage = "Post must include text or at least one image."
             return false
         }
         
@@ -1142,10 +1054,21 @@ class FirestoreManager: ObservableObject {
             let post = SocialPost(
                 authorName: author.name,
                 authorEmail: author.email,
-                content: content.trimmingCharacters(in: .whitespacesAndNewlines)
+                content: trimmedContent
             )
             
-            try await db.collection("social_posts").document(post.id).setData([
+            let uploadedMediaItems: [SocialPostMedia]
+            if mediaUploads.isEmpty {
+                uploadedMediaItems = []
+            } else {
+                uploadedMediaItems = try await uploadSocialPostMediaItems(
+                    postId: post.id,
+                    authorEmail: author.email,
+                    mediaUploads: mediaUploads
+                )
+            }
+            
+            var postData: [String: Any] = [
                 "id": post.id,
                 "authorName": post.authorName,
                 "authorEmail": post.authorEmail,
@@ -1156,7 +1079,18 @@ class FirestoreManager: ObservableObject {
                 "replyCount": 0,
                 "parentPostId": NSNull(),
                 "editedAt": NSNull()
-            ])
+            ]
+            postData["mediaItems"] = uploadedMediaItems.map(socialMediaToMap(_:))
+            postData["media"] = uploadedMediaItems.first.map(socialMediaToMap(_:)) ?? NSNull()
+            
+            do {
+                try await db.collection("social_posts").document(post.id).setData(postData)
+            } catch {
+                for mediaPath in uploadedMediaItems.map(\.storagePath) {
+                    try? await deleteSocialPostMedia(at: mediaPath)
+                }
+                throw error
+            }
             
             print("✅ Created social post: \(post.id)")
             return true
@@ -1174,14 +1108,21 @@ class FirestoreManager: ObservableObject {
             return false
         }
         
-        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            errorMessage = "Post cannot be empty"
-            return false
-        }
-        
         do {
+            let doc = try await db.collection("social_posts").document(postId).getDocument()
+            guard let existingData = doc.data() else {
+                errorMessage = "Post not found"
+                return false
+            }
+            
+            let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedContent.isEmpty && !hasSocialMedia(in: existingData) {
+                errorMessage = "Post must include text or at least one image."
+                return false
+            }
+            
             try await db.collection("social_posts").document(postId).updateData([
-                "content": content.trimmingCharacters(in: .whitespacesAndNewlines),
+                "content": trimmedContent,
                 "editedAt": Timestamp(date: Date())
             ])
             
@@ -1207,19 +1148,14 @@ class FirestoreManager: ObservableObject {
             }
             
             var likeCount = data["likeCount"] as? Int ?? 0
-            
             let wasLiked = likes.contains(userEmail)
             
             if wasLiked {
-                // Unlike
                 likes.removeAll { $0 == userEmail }
                 likeCount = max(0, likeCount - 1)
             } else {
-                // Like
                 likes.append(userEmail)
                 likeCount += 1
-                
-
             }
             
             try await postRef.updateData([
@@ -1237,13 +1173,14 @@ class FirestoreManager: ObservableObject {
     }
     
     // Create a reply to a post
-    func createReply(parentPostId: String, content: String, author: User) async -> Bool {
+    func createReply(parentPostId: String, content: String, author: User, mediaUpload: SocialPostMediaUpload? = nil) async -> Bool {
         guard content.count <= 140 else {
             errorMessage = "Reply must be 140 characters or less"
             return false
         }
         
-        guard !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else {
             errorMessage = "Reply cannot be empty"
             return false
         }
@@ -1252,11 +1189,10 @@ class FirestoreManager: ObservableObject {
             let reply = SocialPost(
                 authorName: author.name,
                 authorEmail: author.email,
-                content: content.trimmingCharacters(in: .whitespacesAndNewlines),
+                content: trimmedContent,
                 parentPostId: parentPostId
             )
             
-            // Get parent post to verify it exists
             let parentRef = db.collection("social_posts").document(parentPostId)
             let parentDoc = try await parentRef.getDocument()
             
@@ -1265,12 +1201,20 @@ class FirestoreManager: ObservableObject {
                 return false
             }
             
-            // Use a batch write to atomically create reply and increment parent replyCount
-            let batch = db.batch()
+            var uploadedMedia: SocialPostMedia?
+            if let mediaUpload {
+                uploadedMedia = try await uploadSocialPostMedia(
+                    postId: reply.id,
+                    authorEmail: author.email,
+                    mediaUpload: mediaUpload,
+                    mediaIndex: 0
+                )
+            }
             
-            // Create the reply document
+            let batch = db.batch()
             let replyRef = db.collection("social_posts").document(reply.id)
-            batch.setData([
+            
+            var replyData: [String: Any] = [
                 "id": reply.id,
                 "authorName": reply.authorName,
                 "authorEmail": reply.authorEmail,
@@ -1279,18 +1223,26 @@ class FirestoreManager: ObservableObject {
                 "likes": [],
                 "likeCount": 0,
                 "replyCount": 0,
-                "parentPostId": parentPostId
-            ], forDocument: replyRef)
+                "parentPostId": parentPostId,
+                "editedAt": NSNull()
+            ]
+            let replyMediaItems = uploadedMedia.map { [$0] } ?? []
+            replyData["mediaItems"] = replyMediaItems.map(socialMediaToMap(_:))
+            replyData["media"] = replyMediaItems.first.map(socialMediaToMap(_:)) ?? NSNull()
             
-            // Atomically increment parent replyCount using FieldValue
+            batch.setData(replyData, forDocument: replyRef)
             batch.updateData([
                 "replyCount": FieldValue.increment(Int64(1))
             ], forDocument: parentRef)
             
-            // Commit the batch
-            try await batch.commit()
-            
-
+            do {
+                try await batch.commit()
+            } catch {
+                if let mediaPath = uploadedMedia?.storagePath {
+                    try? await deleteSocialPostMedia(at: mediaPath)
+                }
+                throw error
+            }
             
             print("✅ Created reply: \(reply.id) for post: \(parentPostId)")
             return true
@@ -1309,37 +1261,7 @@ class FirestoreManager: ObservableObject {
                 .order(by: "timestamp", descending: false)
                 .getDocuments()
             
-            let replies = snapshot.documents.compactMap { doc -> SocialPost? in
-                let data = doc.data()
-                
-                guard let id = data["id"] as? String,
-                      let authorName = data["authorName"] as? String,
-                      let authorEmail = data["authorEmail"] as? String,
-                      let content = data["content"] as? String,
-                      let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
-                    return nil
-                }
-                
-                let likes = data["likes"] as? [String] ?? []
-                let likeCount = data["likeCount"] as? Int ?? 0
-                let replyCount = data["replyCount"] as? Int ?? 0
-                let parentPostId = data["parentPostId"] as? String
-                let editedAt = (data["editedAt"] as? Timestamp)?.dateValue()
-                
-                return SocialPost(
-                    id: id,
-                    authorName: authorName,
-                    authorEmail: authorEmail,
-                    content: content,
-                    timestamp: timestamp,
-                    likes: likes,
-                    likeCount: likeCount,
-                    replyCount: replyCount,
-                    parentPostId: parentPostId,
-                    editedAt: editedAt
-                )
-            }
-            
+            let replies = snapshot.documents.compactMap { parseSocialPost(from: $0.data()) }
             print("✅ Fetched \(replies.count) replies for post: \(postId)")
             return replies
         } catch {
@@ -1351,7 +1273,6 @@ class FirestoreManager: ObservableObject {
     // Delete a social post
     func deleteSocialPost(postId: String) async -> Bool {
         do {
-            // Get the post to check if it's a reply
             let postDoc = try await db.collection("social_posts").document(postId).getDocument()
             guard let postData = postDoc.data() else {
                 errorMessage = "Post not found"
@@ -1361,35 +1282,34 @@ class FirestoreManager: ObservableObject {
             let parentPostId = postData["parentPostId"] as? String
             let isTopLevelPost = parentPostId == nil
             
-            // If this is a top-level post, get all replies first
             var replyIds: [String] = []
+            var mediaPathsToDelete = Set<String>()
+            mediaPathsToDelete.formUnion(extractSocialMediaPaths(from: postData))
+            
             if isTopLevelPost {
                 let repliesSnapshot = try await db.collection("social_posts")
                     .whereField("parentPostId", isEqualTo: postId)
                     .getDocuments()
                 replyIds = repliesSnapshot.documents.map { $0.documentID }
+                
+                for reply in repliesSnapshot.documents {
+                    mediaPathsToDelete.formUnion(extractSocialMediaPaths(from: reply.data()))
+                }
             }
             
-            // Use a batch write to atomically delete post and update parent replyCount
             let batch = db.batch()
             
-            // If this is a reply, decrement parent's replyCount atomically
             if let parentId = parentPostId {
                 let parentRef = db.collection("social_posts").document(parentId)
-                // Use FieldValue.increment to atomically decrement (with min check via rules or app logic)
                 batch.updateData([
                     "replyCount": FieldValue.increment(Int64(-1))
                 ], forDocument: parentRef)
             }
             
-            // Delete the post itself
             let postRef = db.collection("social_posts").document(postId)
             batch.deleteDocument(postRef)
-            
-            // Commit the batch
             try await batch.commit()
             
-            // If this was a top-level post, delete all replies in a separate batch
             if isTopLevelPost && !replyIds.isEmpty {
                 let repliesBatch = db.batch()
                 for replyId in replyIds {
@@ -1397,6 +1317,10 @@ class FirestoreManager: ObservableObject {
                     repliesBatch.deleteDocument(replyRef)
                 }
                 try await repliesBatch.commit()
+            }
+            
+            for mediaPath in mediaPathsToDelete {
+                try? await deleteSocialPostMedia(at: mediaPath)
             }
             
             print("✅ Deleted social post: \(postId)")
@@ -1414,9 +1338,15 @@ class FirestoreManager: ObservableObject {
             let snapshot = try await db.collection("social_posts").getDocuments()
             print("🗑️ Deleting \(snapshot.documents.count) social posts...")
             
+            let mediaPaths = Set(snapshot.documents.flatMap { extractSocialMediaPaths(from: $0.data()) })
+            
             for doc in snapshot.documents {
                 try await doc.reference.delete()
                 print("   ✅ Deleted: \(doc.documentID)")
+            }
+            
+            for mediaPath in mediaPaths {
+                try? await deleteSocialPostMedia(at: mediaPath)
             }
             
             print("✅ All social posts deleted")
@@ -1426,6 +1356,221 @@ class FirestoreManager: ObservableObject {
             errorMessage = "Failed to delete social posts: \(error.localizedDescription)"
             return false
         }
+    }
+    
+    private func sortTopLevelSocialPosts(_ posts: [SocialPost], sortBy: SocialPostSortOption) -> [SocialPost] {
+        if sortBy == .newest {
+            let adminPosts = posts.filter { adminEmails.contains($0.authorEmail) }
+            let regularPosts = posts.filter { !adminEmails.contains($0.authorEmail) }
+            let sortedAdminPosts = adminPosts.sorted { $0.timestamp > $1.timestamp }
+            let sortedRegularPosts = regularPosts.sorted { $0.timestamp > $1.timestamp }
+            return sortedAdminPosts + sortedRegularPosts
+        }
+        
+        return posts.sorted {
+            if $0.likeCount != $1.likeCount {
+                return $0.likeCount > $1.likeCount
+            }
+            return $0.timestamp > $1.timestamp
+        }
+    }
+    
+    private func parseSocialPost(from data: [String: Any]) -> SocialPost? {
+        guard let id = data["id"] as? String,
+              let authorName = data["authorName"] as? String,
+              let authorEmail = data["authorEmail"] as? String,
+              let content = data["content"] as? String,
+              let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+            return nil
+        }
+        
+        let likes = data["likes"] as? [String] ?? []
+        let likeCount = data["likeCount"] as? Int ?? 0
+        let replyCount = data["replyCount"] as? Int ?? 0
+        let parentPostId = data["parentPostId"] as? String
+        let editedAt = (data["editedAt"] as? Timestamp)?.dateValue()
+        let mediaItems = parseSocialMediaItems(from: data["mediaItems"])
+        let effectiveMediaItems: [SocialPostMedia]
+        if !mediaItems.isEmpty {
+            effectiveMediaItems = mediaItems
+        } else if let legacyMedia = parseSocialMedia(from: data["media"]) {
+            effectiveMediaItems = [legacyMedia]
+        } else {
+            effectiveMediaItems = []
+        }
+        
+        return SocialPost(
+            id: id,
+            authorName: authorName,
+            authorEmail: authorEmail,
+            content: content,
+            timestamp: timestamp,
+            likes: likes,
+            likeCount: likeCount,
+            replyCount: replyCount,
+            parentPostId: parentPostId,
+            editedAt: editedAt,
+            mediaItems: effectiveMediaItems
+        )
+    }
+    
+    private func parseSocialMedia(from rawValue: Any?) -> SocialPostMedia? {
+        guard let mediaMap = rawValue as? [String: Any] else {
+            return nil
+        }
+        return parseSocialMediaMap(mediaMap)
+    }
+    
+    private func parseSocialMediaItems(from rawValue: Any?) -> [SocialPostMedia] {
+        guard let rawItems = rawValue as? [Any] else {
+            return []
+        }
+        return rawItems.compactMap { item in
+            guard let mediaMap = item as? [String: Any] else {
+                return nil
+            }
+            return parseSocialMediaMap(mediaMap)
+        }
+    }
+    
+    private func parseSocialMediaMap(_ mediaMap: [String: Any]) -> SocialPostMedia? {
+        guard let storagePath = mediaMap["storagePath"] as? String,
+              let downloadURL = mediaMap["downloadURL"] as? String else {
+            return nil
+        }
+        
+        let width = parseIntValue(mediaMap["width"])
+        let height = parseIntValue(mediaMap["height"])
+        guard width > 0, height > 0 else {
+            return nil
+        }
+        
+        let type = mediaMap["type"] as? String ?? "image"
+        let fileSizeBytes = parseIntValue(mediaMap["fileSizeBytes"])
+        
+        return SocialPostMedia(
+            type: type,
+            storagePath: storagePath,
+            downloadURL: downloadURL,
+            width: width,
+            height: height,
+            fileSizeBytes: fileSizeBytes
+        )
+    }
+    
+    private func socialMediaToMap(_ media: SocialPostMedia) -> [String: Any] {
+        [
+            "type": media.type,
+            "storagePath": media.storagePath,
+            "downloadURL": media.downloadURL,
+            "width": media.width,
+            "height": media.height,
+            "fileSizeBytes": media.fileSizeBytes
+        ]
+    }
+    
+    private func parseIntValue(_ value: Any?) -> Int {
+        if let intValue = value as? Int {
+            return intValue
+        }
+        if let int64Value = value as? Int64 {
+            return Int(int64Value)
+        }
+        if let doubleValue = value as? Double {
+            return Int(doubleValue)
+        }
+        if let numberValue = value as? NSNumber {
+            return numberValue.intValue
+        }
+        return 0
+    }
+    
+    private func hasSocialMedia(in data: [String: Any]) -> Bool {
+        !extractSocialMediaPaths(from: data).isEmpty
+    }
+    
+    private func uploadSocialPostMedia(
+        postId: String,
+        authorEmail: String,
+        mediaUpload: SocialPostMediaUpload,
+        mediaIndex: Int
+    ) async throws -> SocialPostMedia {
+        let storagePath = "social_posts/\(postId)/image_\(mediaIndex + 1).jpg"
+        let mediaRef = storage.reference(withPath: storagePath)
+        
+        let metadata = StorageMetadata()
+        metadata.contentType = mediaUpload.contentType
+        metadata.customMetadata = [
+            "authorEmail": authorEmail,
+            "postId": postId,
+            "mediaIndex": String(mediaIndex)
+        ]
+        
+        let uploadedMetadata = try await mediaRef.putDataAsync(mediaUpload.data, metadata: metadata)
+        let downloadURL = try await mediaRef.downloadURL()
+        
+        return SocialPostMedia(
+            type: "image",
+            storagePath: storagePath,
+            downloadURL: downloadURL.absoluteString,
+            width: mediaUpload.width,
+            height: mediaUpload.height,
+            fileSizeBytes: Int(uploadedMetadata.size)
+        )
+    }
+    
+    private func uploadSocialPostMediaItems(
+        postId: String,
+        authorEmail: String,
+        mediaUploads: [SocialPostMediaUpload]
+    ) async throws -> [SocialPostMedia] {
+        var uploadedItems: [SocialPostMedia] = []
+        uploadedItems.reserveCapacity(mediaUploads.count)
+        
+        for (index, mediaUpload) in mediaUploads.enumerated() {
+            do {
+                let uploaded = try await uploadSocialPostMedia(
+                    postId: postId,
+                    authorEmail: authorEmail,
+                    mediaUpload: mediaUpload,
+                    mediaIndex: index
+                )
+                uploadedItems.append(uploaded)
+            } catch {
+                for uploaded in uploadedItems {
+                    try? await deleteSocialPostMedia(at: uploaded.storagePath)
+                }
+                throw error
+            }
+        }
+        
+        return uploadedItems
+    }
+    
+    private func deleteSocialPostMedia(at storagePath: String) async throws {
+        guard !storagePath.isEmpty else { return }
+        try await storage.reference(withPath: storagePath).delete()
+    }
+    
+    private func extractSocialMediaPaths(from data: [String: Any]) -> Set<String> {
+        var paths = Set<String>()
+        
+        if let mediaItems = data["mediaItems"] as? [Any] {
+            for item in mediaItems {
+                guard let mediaMap = item as? [String: Any] else { continue }
+                if let path = mediaMap["storagePath"] as? String, !path.isEmpty {
+                    paths.insert(path)
+                }
+            }
+        }
+        
+        if let mediaMap = data["media"] as? [String: Any],
+           let legacyPath = mediaMap["storagePath"] as? String,
+           !legacyPath.isEmpty {
+            paths.insert(legacyPath)
+        }
+        
+        return paths
     }
     
     // MARK: - User Management

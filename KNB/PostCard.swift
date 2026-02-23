@@ -131,14 +131,21 @@ struct PostCard: View {
                         }
                     }
                     
-                    // Post content - Directly below username for fluid flow
-                    Text(post.content)
-                        .font(.system(size: 16, weight: .regular))
-                        .foregroundStyle(.primary)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.top, 2)
+                    if !post.content.isEmpty {
+                        // Post content - Directly below username for fluid flow
+                        Text(post.content)
+                            .font(.system(size: 16, weight: .regular))
+                            .foregroundStyle(.primary)
+                            .lineSpacing(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 2)
+                    }
+                    
+                    if !post.mediaItems.isEmpty {
+                        SocialPostMediaGalleryView(mediaItems: post.mediaItems)
+                            .padding(.top, 8)
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
@@ -332,4 +339,3 @@ struct PostCard: View {
         }
     }
 }
-

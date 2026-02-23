@@ -157,6 +157,45 @@ struct ShabbatTime: Codable, Equatable {
 }
 
 // MARK: - Social Post Model
+struct SocialPostMedia: Codable, Equatable {
+    let type: String
+    let storagePath: String
+    let downloadURL: String
+    let width: Int
+    let height: Int
+    let fileSizeBytes: Int
+    
+    init(
+        type: String = "image",
+        storagePath: String,
+        downloadURL: String,
+        width: Int,
+        height: Int,
+        fileSizeBytes: Int
+    ) {
+        self.type = type
+        self.storagePath = storagePath
+        self.downloadURL = downloadURL
+        self.width = width
+        self.height = height
+        self.fileSizeBytes = fileSizeBytes
+    }
+}
+
+struct SocialPostMediaUpload: Equatable {
+    let data: Data
+    let width: Int
+    let height: Int
+    let contentType: String
+    
+    init(data: Data, width: Int, height: Int, contentType: String = "image/jpeg") {
+        self.data = data
+        self.width = width
+        self.height = height
+        self.contentType = contentType
+    }
+}
+
 struct SocialPost: Identifiable, Codable, Equatable {
     let id: String
     var authorName: String
@@ -168,6 +207,7 @@ struct SocialPost: Identifiable, Codable, Equatable {
     var replyCount: Int
     var parentPostId: String?  // null for top-level posts, postId for replies
     var editedAt: Date?  // Timestamp when post was edited
+    var mediaItems: [SocialPostMedia]
     
     init(
         id: String = UUID().uuidString,
@@ -179,7 +219,9 @@ struct SocialPost: Identifiable, Codable, Equatable {
         likeCount: Int = 0,
         replyCount: Int = 0,
         parentPostId: String? = nil,
-        editedAt: Date? = nil
+        editedAt: Date? = nil,
+        mediaItems: [SocialPostMedia] = [],
+        media: SocialPostMedia? = nil
     ) {
         self.id = id
         self.authorName = authorName
@@ -191,6 +233,18 @@ struct SocialPost: Identifiable, Codable, Equatable {
         self.replyCount = replyCount
         self.parentPostId = parentPostId
         self.editedAt = editedAt
+        if !mediaItems.isEmpty {
+            self.mediaItems = mediaItems
+        } else if let media {
+            self.mediaItems = [media]
+        } else {
+            self.mediaItems = []
+        }
+    }
+    
+    // Backward compatibility accessor for older callsites.
+    var media: SocialPostMedia? {
+        mediaItems.first
     }
     
     var isReply: Bool {
@@ -199,6 +253,10 @@ struct SocialPost: Identifiable, Codable, Equatable {
     
     var isEdited: Bool {
         return editedAt != nil
+    }
+    
+    var hasMedia: Bool {
+        return !mediaItems.isEmpty
     }
     
     func isLikedBy(_ userEmail: String) -> Bool {

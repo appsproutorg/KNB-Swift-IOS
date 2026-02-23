@@ -1,0 +1,36 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.email.lower() == 'admin@knb.com';
+    }
+
+    function isAdmin() {
+      return isSuperAdmin() ||
+             (isAuthenticated()
+              && firestore.get(/databases/(default)/documents/users/$(request.auth.token.email)).data.isAdmin == true);
+    }
+
+    match /social_posts/{postId}/{fileName} {
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated()
+                    && request.resource.size < 3 * 1024 * 1024
+                    && request.resource.contentType.matches('image/.*')
+                    && request.resource.metadata.authorEmail == request.auth.token.email;
+
+      allow update: if false;
+
+      allow delete: if isAuthenticated()
+                    && (resource.metadata.authorEmail == request.auth.token.email || isAdmin());
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

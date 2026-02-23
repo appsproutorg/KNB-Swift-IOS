@@ -1,43 +1,29 @@
 #!/bin/bash
 
-# Deploy Everything Script for KNB App
-# This will deploy Cloud Functions and Firestore Rules
+# Full backend deploy for KNB App
+# Deploys: Cloud Functions + Firestore rules/indexes + Storage rules
 
-echo "🚀 Starting deployment..."
+set -euo pipefail
+
+echo "🚀 Starting full Firebase backend deploy..."
 echo ""
 
-# Check if logged in
 echo "📋 Checking Firebase login status..."
-if ! firebase projects:list &>/dev/null; then
-    echo "❌ Not logged in to Firebase"
-    echo "🔐 Please run: firebase login"
-    echo "   (This will open your browser for authentication)"
-    exit 1
+if ! firebase projects:list >/dev/null 2>&1; then
+  echo "❌ Not logged in to Firebase"
+  echo "🔐 Run: firebase login"
+  exit 1
 fi
 
-echo "✅ Logged in to Firebase"
+echo "✅ Logged in"
 echo ""
 
-# Set the project
-echo "🎯 Setting Firebase project to: the-knb-app"
+echo "🎯 Using project: the-knb-app"
 firebase use the-knb-app
 
 echo ""
-echo "📦 Deploying Cloud Functions..."
-firebase deploy --only functions
+echo "📦 Deploying functions + firestore (rules/indexes) + storage rules..."
+firebase deploy --only functions,firestore,storage
 
 echo ""
-echo "📜 Deploying Firestore Rules..."
-firebase deploy --only firestore:rules
-
-echo ""
-echo "✅ Deployment complete!"
-echo ""
-echo "🎉 Your push notifications are now set up!"
-echo ""
-echo "Next steps:"
-echo "1. Test on your iPhone (not simulator!)"
-echo "2. Log in to the app"
-echo "3. Check Firestore for your FCM token"
-echo "4. Test with Firebase Console → Cloud Messaging"
-
+echo "✅ Full backend deploy complete"

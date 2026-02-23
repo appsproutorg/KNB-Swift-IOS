@@ -347,10 +347,15 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
 
 const KIDDUSH_CALENDAR_URL = "https://www.heritagecongregation.com/website/index.php";
 const KIDDUSH_COLLECTION = "kiddushCalendar";
+const KIDDUSH_APP_SPONSORSHIPS_COLLECTION = "kiddush_sponsorships";
 const KIDDUSH_META_DOC_PATH = "kiddushMeta/sync";
 const KIDDUSH_SYNC_TIMEZONE = "America/Chicago";
 const KIDDUSH_SYNC_USER_AGENT = "KNB-KiddushCalendarSync/1.0 (+Firebase Functions)";
 const KIDDUSH_HTTP_TIMEOUT_MS = 15000;
+const KIDDUSH_EMAIL_PROVIDER_URL = "https://api.sendgrid.com/v3/mail/send";
+const KIDDUSH_REQUIRED_BOOKING_RECIPIENTS = [
+    "kiddush@heritagecongregation.com",
+];
 
 const MONTH_INDEX_MAP = {
     january: 0,
@@ -369,6 +374,61 @@ const MONTH_INDEX_MAP = {
 
 function normalizeWhitespace(value) {
     return (value || "").replace(/\s+/g, " ").trim();
+}
+
+function isValidEmailAddress(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function parseRecipientEmails(rawValue) {
+    const recipients = (rawValue || "")
+        .split(/[,\n;]+/)
+        .map((email) => normalizeWhitespace(email).toLowerCase())
+        .filter((email) => email.length > 0);
+
+    return Array.from(new Set(recipients.filter(isValidEmailAddress)));
+}
+
+function escapeHtml(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function chicagoDateParts(date) {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+        timeZone: KIDDUSH_SYNC_TIMEZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    });
+
+    const parts = formatter.formatToParts(date);
+    const output = {};
+    for (const part of parts) {
+        if (part.type === "year" || part.type === "month" || part.type === "day") {
+            output[part.type] = part.value;
+        }
+    }
+
+    return output;
+}
+
+function toIsoDateFromDateInChicago(date) {
+    const parts = chicagoDateParts(date);
+    return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function formatHumanDateInChicago(date) {
+    return new Intl.DateTimeFormat("en-US", {
+        timeZone: KIDDUSH_SYNC_TIMEZONE,
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+    }).format(date);
 }
 
 function skipWhitespace(input, startIndex) {
@@ -608,6 +668,9 @@ function canonicalizeDataset(rows) {
             parsha: row.parsha,
             status: row.status,
             sponsorText: row.sponsorText ?? null,
+            source: row.source ?? "website",
+            sponsorName: row.sponsorName ?? null,
+            sponsorEmail: row.sponsorEmail ?? null,
         }))
         .sort((a, b) => a.isoDate.localeCompare(b.isoDate));
 }
@@ -639,8 +702,229 @@ function isSameCalendarDocument(existingDoc, incomingDoc) {
         normalizeWhitespace(String(existingDoc.displayDate || "")) === incomingDoc.displayDate &&
         normalizeWhitespace(String(existingDoc.parsha || "")) === incomingDoc.parsha &&
         normalizeWhitespace(String(existingDoc.status || "")) === incomingDoc.status &&
-        existingSponsor === incomingSponsor
+        existingSponsor === incomingSponsor &&
+        normalizeWhitespace(String(existingDoc.source || "website")) ===
+            normalizeWhitespace(String(incomingDoc.source || "website")) &&
+        normalizeWhitespace(String(existingDoc.sponsorName || "")) ===
+            normalizeWhitespace(String(incomingDoc.sponsorName || "")) &&
+        normalizeWhitespace(String(existingDoc.sponsorEmail || "")) ===
+            normalizeWhitespace(String(incomingDoc.sponsorEmail || ""))
     );
+}
+
+async function fetchAppSponsorshipsByIsoDate() {
+    const snapshot = await db.collection(KIDDUSH_APP_SPONSORSHIPS_COLLECTION).get();
+    const sponsorshipsByIsoDate = new Map();
+
+    snapshot.forEach((doc) => {
+        const data = doc.data() || {};
+        const dateTimestamp = data.date;
+        if (!dateTimestamp || typeof dateTimestamp.toDate !== "function") {
+            return;
+        }
+
+        const sponsorshipDate = dateTimestamp.toDate();
+        const isoDate = toIsoDateFromDateInChicago(sponsorshipDate);
+        const sponsorNameRaw = normalizeWhitespace(data.sponsorName || "Anonymous Sponsor");
+        const sponsorEmail = normalizeWhitespace(data.sponsorEmail || "");
+        const occasion = normalizeWhitespace(data.occasion || "");
+        const isAnonymous = Boolean(data.isAnonymous);
+        const visibleSponsorName = isAnonymous ? "Anonymous Sponsor" : sponsorNameRaw;
+        const sponsorText = occasion
+            ? `Kiddush is sponsored by ${visibleSponsorName} on occasion of ${occasion}`
+            : `Kiddush is sponsored by ${visibleSponsorName}`;
+
+        const timestamp = data.timestamp && typeof data.timestamp.toDate === "function"
+            ? data.timestamp.toDate().getTime()
+            : 0;
+
+        const existing = sponsorshipsByIsoDate.get(isoDate);
+        if (!existing || timestamp >= existing.timestamp) {
+            sponsorshipsByIsoDate.set(isoDate, {
+                isoDate,
+                sponsorName: visibleSponsorName,
+                sponsorEmail,
+                sponsorText,
+                timestamp,
+            });
+        }
+    });
+
+    return sponsorshipsByIsoDate;
+}
+
+function mergeWebsiteWithAppReservations(websiteDataset, appSponsorshipsByIsoDate) {
+    return websiteDataset.map((row) => {
+        const appSponsorship = appSponsorshipsByIsoDate.get(row.isoDate);
+        if (!appSponsorship) {
+            return {
+                ...row,
+                source: "website",
+                sponsorName: null,
+                sponsorEmail: null,
+            };
+        }
+
+        // Preserve official website reserved entries; override only website "available".
+        if (row.status === "reserved") {
+            return {
+                ...row,
+                source: "website",
+                sponsorName: null,
+                sponsorEmail: null,
+            };
+        }
+
+        return {
+            ...row,
+            status: "reserved",
+            sponsorText: appSponsorship.sponsorText,
+            source: "app",
+            sponsorName: appSponsorship.sponsorName,
+            sponsorEmail: appSponsorship.sponsorEmail || null,
+        };
+    });
+}
+
+async function sendKiddushBookingEmail(sponsorshipId, data) {
+    const apiKey = process.env.SENDGRID_API_KEY;
+    const notifyToRaw = process.env.KIDDUSH_BOOKING_NOTIFY_TO;
+    const notifyFrom = process.env.KIDDUSH_BOOKING_NOTIFY_FROM;
+    const notifyToList = Array.from(new Set([
+        ...parseRecipientEmails(notifyToRaw),
+        ...KIDDUSH_REQUIRED_BOOKING_RECIPIENTS,
+    ]));
+
+    if (!apiKey || notifyToList.length === 0 || !notifyFrom) {
+        logger.warn("Kiddush booking email skipped due to missing email env vars.", {
+            hasApiKey: Boolean(apiKey),
+            hasNotifyTo: notifyToList.length > 0,
+            hasNotifyFrom: Boolean(notifyFrom),
+        });
+        return false;
+    }
+
+    const shabbatDate =
+        data.date && typeof data.date.toDate === "function"
+            ? toIsoDateFromDateInChicago(data.date.toDate())
+            : "Unknown date";
+
+    const sponsorName = normalizeWhitespace(data.sponsorName || "Unknown");
+    const sponsorEmail = normalizeWhitespace(data.sponsorEmail || "Unknown");
+    const occasion = normalizeWhitespace(data.occasion || "Not provided");
+    const tierName = normalizeWhitespace(data.tierName || "Not provided");
+    const tierAmount = data.tierAmount !== undefined ? String(data.tierAmount) : "Not provided";
+    const anonymousLabel = data.isAnonymous ? "Yes" : "No";
+
+    const subject = `New Kiddush Booking - ${shabbatDate}`;
+    const textBody = [
+        "A new Kiddush booking was made in the app.",
+        "",
+        `Sponsorship ID: ${sponsorshipId}`,
+        `Shabbat Date: ${shabbatDate}`,
+        `Sponsor Name: ${sponsorName}`,
+        `Sponsor Email: ${sponsorEmail}`,
+        `Anonymous: ${anonymousLabel}`,
+        `Tier: ${tierName}`,
+        `Tier Amount: ${tierAmount}`,
+        `Occasion: ${occasion}`,
+    ].join("\n");
+
+    const rows = [
+        ["Sponsorship ID", sponsorshipId],
+        ["Shabbat Date", shabbatDate],
+        ["Sponsor Name", sponsorName],
+        ["Sponsor Email", sponsorEmail],
+        ["Anonymous", anonymousLabel],
+        ["Tier", tierName],
+        ["Tier Amount", tierAmount],
+        ["Occasion", occasion],
+    ].map(([label, value]) => `
+        <tr>
+          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#4b5563;font-weight:600;width:180px;">${escapeHtml(label)}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;">${escapeHtml(value)}</td>
+        </tr>
+    `).join("");
+
+    const htmlBody = `
+      <div style="font-family:Arial,Helvetica,sans-serif;background:#f8fafc;padding:24px;">
+        <div style="max-width:620px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+          <div style="background:#0f172a;color:#ffffff;padding:16px 20px;">
+            <div style="font-size:18px;font-weight:700;">New Kiddush Booking</div>
+            <div style="font-size:13px;opacity:0.9;margin-top:4px;">Submitted from the KNB app</div>
+          </div>
+          <div style="padding:18px 20px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px;">
+              ${rows}
+            </table>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const response = await fetch(KIDDUSH_EMAIL_PROVIDER_URL, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            personalizations: [{
+                to: notifyToList.map((email) => ({ email })),
+            }],
+            from: { email: notifyFrom },
+            subject,
+            content: [
+                { type: "text/plain", value: textBody },
+                { type: "text/html", value: htmlBody },
+            ],
+        }),
+    });
+
+    if (!response.ok) {
+        const body = await response.text();
+        logger.error("Failed to send Kiddush booking email.", {
+            status: response.status,
+            body,
+        });
+        return false;
+    }
+
+    return true;
+}
+
+function buildKiddushCalendarDocFromAppSponsorship(data) {
+    const dateTimestamp = data.date;
+    if (!dateTimestamp || typeof dateTimestamp.toDate !== "function") {
+        return null;
+    }
+
+    const sponsorshipDate = dateTimestamp.toDate();
+    const isoDate = toIsoDateFromDateInChicago(sponsorshipDate);
+    const displayDate = formatHumanDateInChicago(sponsorshipDate).replace(/,\s+\d{4}$/, "");
+    const sponsorNameRaw = normalizeWhitespace(data.sponsorName || "Anonymous Sponsor");
+    const sponsorEmail = normalizeWhitespace(data.sponsorEmail || "");
+    const occasion = normalizeWhitespace(data.occasion || "");
+    const isAnonymous = Boolean(data.isAnonymous);
+    const visibleSponsorName = isAnonymous ? "Anonymous Sponsor" : sponsorNameRaw;
+    const sponsorText = occasion
+        ? `Kiddush is sponsored by ${visibleSponsorName} on occasion of ${occasion}`
+        : `Kiddush is sponsored by ${visibleSponsorName}`;
+
+    return {
+        docId: isoDate,
+        payload: {
+            isoDate,
+            displayDate,
+            parsha: normalizeWhitespace(data.parsha || ""),
+            status: "reserved",
+            sponsorText,
+            source: "app",
+            sponsorName: visibleSponsorName,
+            sponsorEmail: sponsorEmail || null,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+    };
 }
 
 async function fetchKiddushCalendarHtml() {
@@ -728,6 +1012,174 @@ function parseKiddushCalendarTable(html) {
     };
 }
 
+async function runKiddushCalendarSync(triggerSource = "scheduled") {
+    logger.info("Starting Kiddush calendar sync.", { triggerSource });
+
+    let html;
+    try {
+        html = await fetchKiddushCalendarHtml();
+    } catch (error) {
+        logger.error("Kiddush sync failed while fetching source HTML.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    let parsedResult;
+    try {
+        parsedResult = parseKiddushCalendarTable(html);
+    } catch (error) {
+        logger.error("Kiddush sync failed while parsing HTML.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    if (!parsedResult.tableFound) {
+        logger.error("Kiddush sync aborted: table #ContactDetails was not found.", { triggerSource });
+        return;
+    }
+
+    if (!parsedResult.rows.length) {
+        logger.error("Kiddush sync aborted: parsed zero rows from #ContactDetails.", { triggerSource });
+        return;
+    }
+
+    let dataset;
+    try {
+        const todayParts = getChicagoTodayParts();
+        const normalizedRows = normalizeKiddushRows(parsedResult.rows, todayParts);
+        if (!normalizedRows.length) {
+            logger.error("Kiddush sync aborted: date normalization produced zero rows.", { triggerSource });
+            return;
+        }
+
+        const appSponsorshipsByIsoDate = await fetchAppSponsorshipsByIsoDate();
+        const mergedRows = mergeWebsiteWithAppReservations(
+            normalizedRows,
+            appSponsorshipsByIsoDate
+        );
+        dataset = canonicalizeDataset(mergedRows);
+
+        const seenIsoDates = new Set();
+        for (const row of dataset) {
+            if (seenIsoDates.has(row.isoDate)) {
+                throw new Error(`Duplicate isoDate found in parsed dataset: ${row.isoDate}`);
+            }
+            seenIsoDates.add(row.isoDate);
+        }
+    } catch (error) {
+        logger.error("Kiddush sync failed during normalization.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+    const datasetHash = computeDatasetHash(dataset);
+    const metaRef = db.doc(KIDDUSH_META_DOC_PATH);
+
+    let previousHash = null;
+    try {
+        const metaSnap = await metaRef.get();
+        previousHash = metaSnap.exists ? metaSnap.data().hash || null : null;
+    } catch (error) {
+        logger.error("Kiddush sync failed while reading existing sync metadata.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    let existingDocsSnapshot;
+    try {
+        existingDocsSnapshot = await db.collection(KIDDUSH_COLLECTION).get();
+    } catch (error) {
+        logger.error("Kiddush sync failed while reading existing calendar docs.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    const existingById = new Map();
+    existingDocsSnapshot.forEach((doc) => {
+        existingById.set(doc.id, doc.data());
+    });
+
+    const incomingById = new Map();
+    for (const row of dataset) {
+        incomingById.set(row.isoDate, row);
+    }
+
+    const batch = db.batch();
+    let upsertCount = 0;
+    let deleteCount = 0;
+
+    for (const row of dataset) {
+        const existingDoc = existingById.get(row.isoDate);
+        if (!isSameCalendarDocument(existingDoc, row)) {
+            batch.set(
+                db.collection(KIDDUSH_COLLECTION).doc(row.isoDate),
+                {
+                    ...row,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+            );
+            upsertCount += 1;
+        }
+    }
+
+    for (const [docId] of existingById) {
+        if (!incomingById.has(docId)) {
+            batch.delete(db.collection(KIDDUSH_COLLECTION).doc(docId));
+            deleteCount += 1;
+        }
+    }
+
+    const hashChanged = previousHash !== datasetHash;
+    const hasContentChanges = upsertCount > 0 || deleteCount > 0;
+    const driftCorrection = !hashChanged && hasContentChanges;
+
+    if (!hashChanged && !hasContentChanges) {
+        logger.info("Kiddush calendar unchanged and already in sync, skipping Firestore writes.", {
+            triggerSource,
+            rows: dataset.length,
+            hash: datasetHash,
+        });
+        return;
+    }
+
+    batch.set(
+        metaRef,
+        {
+            hash: datasetHash,
+            lastSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+    );
+
+    try {
+        await batch.commit();
+        logger.info("Kiddush calendar sync committed.", {
+            triggerSource,
+            rows: dataset.length,
+            upserts: upsertCount,
+            deletes: deleteCount,
+            hash: datasetHash,
+            hashChanged,
+            driftCorrection,
+        });
+    } catch (error) {
+        logger.error("Kiddush sync failed while committing Firestore batch.", {
+            triggerSource,
+            error: error.message,
+        });
+    }
+}
+
 exports.syncKiddushCalendar = onSchedule(
     {
         schedule: "every 30 minutes",
@@ -736,158 +1188,114 @@ exports.syncKiddushCalendar = onSchedule(
         memory: "256MiB",
         timeoutSeconds: 60,
     },
-    async () => {
-        logger.info("Starting Kiddush calendar sync.");
+    async () => runKiddushCalendarSync("scheduled")
+);
 
-        let html;
+exports.onKiddushSponsorshipCreate = functions.firestore
+    .document("kiddush_sponsorships/{sponsorshipId}")
+    .onCreate(async (snap, context) => {
+        const data = snap.data() || {};
+        const sponsorshipId = context.params.sponsorshipId;
+
+        if (data.bookingEmailSentAt) {
+            return;
+        }
+
         try {
-            html = await fetchKiddushCalendarHtml();
-        } catch (error) {
-            logger.error("Kiddush sync failed while fetching source HTML.", {
-                error: error.message,
-            });
-            return;
-        }
+            const calendarDoc = buildKiddushCalendarDocFromAppSponsorship(data);
+            if (calendarDoc) {
+                await db.collection(KIDDUSH_COLLECTION).doc(calendarDoc.docId).set(
+                    calendarDoc.payload,
+                    { merge: true }
+                );
+                logger.info("Mirrored app sponsorship into kiddushCalendar.", {
+                    sponsorshipId,
+                    isoDate: calendarDoc.docId,
+                });
+            } else {
+                logger.warn("Could not mirror sponsorship to kiddushCalendar: invalid date.", {
+                    sponsorshipId,
+                });
+            }
 
-        let parsedResult;
-        try {
-            parsedResult = parseKiddushCalendarTable(html);
-        } catch (error) {
-            logger.error("Kiddush sync failed while parsing HTML.", {
-                error: error.message,
-            });
-            return;
-        }
-
-        if (!parsedResult.tableFound) {
-            logger.error("Kiddush sync aborted: table #ContactDetails was not found.");
-            return;
-        }
-
-        if (!parsedResult.rows.length) {
-            logger.error("Kiddush sync aborted: parsed zero rows from #ContactDetails.");
-            return;
-        }
-
-        let dataset;
-        try {
-            const todayParts = getChicagoTodayParts();
-            const normalizedRows = normalizeKiddushRows(parsedResult.rows, todayParts);
-            if (!normalizedRows.length) {
-                logger.error("Kiddush sync aborted: date normalization produced zero rows.");
+            const emailSent = await sendKiddushBookingEmail(sponsorshipId, data);
+            if (!emailSent) {
                 return;
             }
 
-            dataset = canonicalizeDataset(normalizedRows);
+            await snap.ref.set(
+                {
+                    bookingEmailSentAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+            );
 
-            const seenIsoDates = new Set();
-            for (const row of dataset) {
-                if (seenIsoDates.has(row.isoDate)) {
-                    throw new Error(`Duplicate isoDate found in parsed dataset: ${row.isoDate}`);
-                }
-                seenIsoDates.add(row.isoDate);
-            }
+            logger.info("Kiddush booking email sent.", { sponsorshipId });
         } catch (error) {
-            logger.error("Kiddush sync failed during normalization.", {
+            logger.error("Error in onKiddushSponsorshipCreate email flow.", {
+                sponsorshipId,
                 error: error.message,
             });
+        }
+    });
+
+exports.onKiddushSponsorshipDelete = functions.firestore
+    .document("kiddush_sponsorships/{sponsorshipId}")
+    .onDelete(async (snap, context) => {
+        const data = snap.data() || {};
+        const sponsorshipId = context.params.sponsorshipId;
+
+        const calendarDoc = buildKiddushCalendarDocFromAppSponsorship(data);
+        if (!calendarDoc) {
+            logger.warn("Could not resolve isoDate for deleted sponsorship.", { sponsorshipId });
             return;
         }
-        const datasetHash = computeDatasetHash(dataset);
-        const metaRef = db.doc(KIDDUSH_META_DOC_PATH);
-
-        let previousHash = null;
-        try {
-            const metaSnap = await metaRef.get();
-            previousHash = metaSnap.exists ? metaSnap.data().hash || null : null;
-        } catch (error) {
-            logger.error("Kiddush sync failed while reading existing sync metadata.", {
-                error: error.message,
-            });
-            return;
-        }
-
-        let existingDocsSnapshot;
-        try {
-            existingDocsSnapshot = await db.collection(KIDDUSH_COLLECTION).get();
-        } catch (error) {
-            logger.error("Kiddush sync failed while reading existing calendar docs.", {
-                error: error.message,
-            });
-            return;
-        }
-
-        const existingById = new Map();
-        existingDocsSnapshot.forEach((doc) => {
-            existingById.set(doc.id, doc.data());
-        });
-
-        const incomingById = new Map();
-        for (const row of dataset) {
-            incomingById.set(row.isoDate, row);
-        }
-
-        const batch = db.batch();
-        let upsertCount = 0;
-        let deleteCount = 0;
-
-        for (const row of dataset) {
-            const existingDoc = existingById.get(row.isoDate);
-            if (!isSameCalendarDocument(existingDoc, row)) {
-                batch.set(
-                    db.collection(KIDDUSH_COLLECTION).doc(row.isoDate),
-                    {
-                        ...row,
-                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    },
-                    { merge: true }
-                );
-                upsertCount += 1;
-            }
-        }
-
-        for (const [docId] of existingById) {
-            if (!incomingById.has(docId)) {
-                batch.delete(db.collection(KIDDUSH_COLLECTION).doc(docId));
-                deleteCount += 1;
-            }
-        }
-
-        const hashChanged = previousHash !== datasetHash;
-        const hasContentChanges = upsertCount > 0 || deleteCount > 0;
-        const driftCorrection = !hashChanged && hasContentChanges;
-
-        if (!hashChanged && !hasContentChanges) {
-            logger.info("Kiddush calendar unchanged and already in sync, skipping Firestore writes.", {
-                rows: dataset.length,
-                hash: datasetHash,
-            });
-            return;
-        }
-
-        batch.set(
-            metaRef,
-            {
-                hash: datasetHash,
-                lastSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
-            },
-            { merge: true }
-        );
 
         try {
-            await batch.commit();
-            logger.info("Kiddush calendar sync committed.", {
-                rows: dataset.length,
-                upserts: upsertCount,
-                deletes: deleteCount,
-                hash: datasetHash,
-                hashChanged,
-                driftCorrection,
+            const calendarRef = db.collection(KIDDUSH_COLLECTION).doc(calendarDoc.docId);
+            const calendarSnap = await calendarRef.get();
+
+            if (!calendarSnap.exists) {
+                logger.info("No mirrored calendar doc found on sponsorship delete.", {
+                    sponsorshipId,
+                    isoDate: calendarDoc.docId,
+                });
+                return;
+            }
+
+            const existing = calendarSnap.data() || {};
+            if (normalizeWhitespace(String(existing.source || "")) !== "app") {
+                logger.info("Skipped clearing calendar doc because source is not app.", {
+                    sponsorshipId,
+                    isoDate: calendarDoc.docId,
+                    source: existing.source || null,
+                });
+                return;
+            }
+
+            await calendarRef.set(
+                {
+                    status: "available",
+                    sponsorText: null,
+                    source: "website",
+                    sponsorName: null,
+                    sponsorEmail: null,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+            );
+
+            logger.info("Cleared app-mirrored calendar sponsorship after delete.", {
+                sponsorshipId,
+                isoDate: calendarDoc.docId,
             });
+
+            // Immediately re-sync from source website so calendar always reflects latest live data.
+            await runKiddushCalendarSync("sponsorship_delete");
         } catch (error) {
-            logger.error("Kiddush sync failed while committing Firestore batch.", {
+            logger.error("Error in onKiddushSponsorshipDelete.", {
+                sponsorshipId,
                 error: error.message,
             });
         }
-    }
-);
+    });

@@ -14,8 +14,10 @@ class NetworkMonitor: ObservableObject {
     @Published var isConnected = true
     @Published var connectionType: ConnectionType = .unknown
     
-    private let monitor = NWPathMonitor()
+    private var monitor: NWPathMonitor?
     private let queue = DispatchQueue(label: "NetworkMonitor")
+    private var recheckTimer: Timer?
+    private var isMonitoring = false
     
     enum ConnectionType {
         case wifi
@@ -30,33 +32,74 @@ class NetworkMonitor: ObservableObject {
     }
     
     func startMonitoring() {
-        monitor.pathUpdateHandler = { [weak self] path in
+        guard !isMonitoring else { return }
+        isMonitoring = true
+        
+        let newMonitor = NWPathMonitor()
+        monitor = newMonitor
+        
+        newMonitor.pathUpdateHandler = { [weak self] path in
             guard let self = self else { return }
-            let isConnected = path.status == .satisfied
-            
-            let connectionType: ConnectionType
-            if path.usesInterfaceType(.wifi) {
-                connectionType = .wifi
-            } else if path.usesInterfaceType(.cellular) {
-                connectionType = .cellular
-            } else if path.usesInterfaceType(.wiredEthernet) {
-                connectionType = .ethernet
-            } else if path.status == .satisfied {
-                connectionType = .unknown
-            } else {
-                connectionType = .none
-            }
-            
-            DispatchQueue.main.async {
-                self.isConnected = isConnected
-                self.connectionType = connectionType
+            Task { @MainActor in
+                self.apply(path: path)
             }
         }
-        monitor.start(queue: queue)
+        newMonitor.start(queue: queue)
+        
+        // Fallback poll every 10s so stale state gets corrected quickly.
+        recheckTimer?.invalidate()
+        recheckTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            guard let path = self.monitor?.currentPath else { return }
+            Task { @MainActor in
+                self.apply(path: path)
+            }
+        }
+        
+        // Immediate refresh right after start.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self = self else { return }
+            guard let path = self.monitor?.currentPath else { return }
+            self.apply(path: path)
+        }
     }
     
     func stopMonitoring() {
-        monitor.cancel()
+        recheckTimer?.invalidate()
+        recheckTimer = nil
+        monitor?.cancel()
+        monitor = nil
+        isMonitoring = false
+    }
+    
+    private func apply(path: NWPath) {
+        let connected = path.status == .satisfied
+        let type = mapConnectionType(from: path)
+        
+        DispatchQueue.main.async {
+            // Publish only when needed to keep UI updates clean.
+            if self.isConnected != connected {
+                self.isConnected = connected
+            }
+            if self.connectionType != type {
+                self.connectionType = type
+            }
+        }
+    }
+    
+    private func mapConnectionType(from path: NWPath) -> ConnectionType {
+        if path.usesInterfaceType(.wifi) {
+            return .wifi
+        }
+        if path.usesInterfaceType(.cellular) {
+            return .cellular
+        }
+        if path.usesInterfaceType(.wiredEthernet) {
+            return .ethernet
+        }
+        if path.status == .satisfied {
+            return .unknown
+        }
+        return .none
     }
 }
-

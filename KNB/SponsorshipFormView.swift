@@ -62,6 +62,8 @@ struct SponsorshipFormView: View {
     @State private var isAnonymous: Bool = false
     @State private var isSubmitting = false
     @State private var showingConfirmation = false
+    @State private var showingDeleteConfirmation = false
+    @State private var isDeletingSponsorship = false
     @State private var errorMessage: String?
     @State private var hebrewDate: String?
     @State private var existingSponsorship: KiddushSponsorship?
@@ -111,6 +113,11 @@ struct SponsorshipFormView: View {
     private var shouldShowAmountCard: Bool {
         guard existingSponsorship != nil else { return true }
         return isSponsoredByCurrentUser
+    }
+
+    private var canAdminDeleteSponsorship: Bool {
+        guard existingSponsorship != nil else { return false }
+        return currentUser?.isAdmin == true
     }
 
     private func extractSponsorName(from occasion: String) -> String {
@@ -403,6 +410,26 @@ struct SponsorshipFormView: View {
                             }
                             .padding(.horizontal)
                         }
+
+                        if canAdminDeleteSponsorship {
+                            Button(role: .destructive) {
+                                showingDeleteConfirmation = true
+                            } label: {
+                                HStack(spacing: 8) {
+                                    if isDeletingSponsorship {
+                                        ProgressView()
+                                    } else {
+                                        Image(systemName: "trash.fill")
+                                    }
+                                    Text(isDeletingSponsorship ? "Deleting..." : "Delete This Sponsorship (Admin)")
+                                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                            }
+                            .disabled(isDeletingSponsorship)
+                            .padding(.horizontal)
+                        }
                         
                         if shouldShowAmountCard {
                             // Price Card with modern glassy design
@@ -626,6 +653,14 @@ struct SponsorshipFormView: View {
             } message: {
                 Text("Thank you for sponsoring Kiddush! If needed, you can tap Pay Now again.")
             }
+            .alert("Delete Sponsorship?", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    deleteExistingSponsorship()
+                }
+            } message: {
+                Text("This will remove this sponsorship. Only admins should do this.")
+            }
             .onAppear {
                 if let storedRaw = UserDefaults.standard.string(forKey: tierStorageKey),
                    let storedTier = SponsorshipTier(rawValue: storedRaw) {
@@ -697,6 +732,24 @@ struct SponsorshipFormView: View {
                 await MainActor.run {
                     isSubmitting = false
                     errorMessage = "This Shabbat has already been sponsored. Please choose another date."
+                }
+            }
+        }
+    }
+
+    func deleteExistingSponsorship() {
+        guard canAdminDeleteSponsorship else { return }
+        isDeletingSponsorship = true
+        errorMessage = nil
+
+        Task {
+            let success = await firestoreManager.deleteSponsorshipByDate(shabbatDate)
+            await MainActor.run {
+                isDeletingSponsorship = false
+                if success {
+                    existingSponsorship = nil
+                } else {
+                    errorMessage = firestoreManager.errorMessage ?? "Could not delete sponsorship."
                 }
             }
         }

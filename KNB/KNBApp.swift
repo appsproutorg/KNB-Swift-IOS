@@ -32,6 +32,10 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         settings.cacheSettings = PersistentCacheSettings(sizeBytes: 40 * 1024 * 1024 as NSNumber) // 40MB cache
         db.settings = settings
         
+        // Cache remote social images aggressively to avoid repeated downloads.
+        URLCache.shared.memoryCapacity = 60 * 1024 * 1024
+        URLCache.shared.diskCapacity = 300 * 1024 * 1024
+        
         // Set up notification delegates
         print("🔧 Setting UNUserNotificationCenter delegate to PushRegistrationManager.shared")
         UNUserNotificationCenter.current().delegate = PushRegistrationManager.shared

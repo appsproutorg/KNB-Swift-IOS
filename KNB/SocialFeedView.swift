@@ -219,7 +219,7 @@ struct SocialFeedView: View {
                     currentUser: $currentUser,
                     postToEdit: postToEdit
                 )
-                .presentationDetents([.height(280), .medium, .large])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Color(.systemBackground))
                 .onDisappear {
@@ -381,4 +381,3 @@ struct GlassSwitchView: View {
         .frame(height: 48)
     }
 }
-

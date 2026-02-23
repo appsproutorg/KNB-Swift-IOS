@@ -19,8 +19,12 @@
 		<string>The KNB App</string>
 		<key>CFBundleName</key>
 		<string>The KNB App</string>
+		<key>NSCameraUsageDescription</key>
+		<string>Camera access lets you attach photos to social posts.</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
 		<string>Location access is used to orient the compass so it can point East during prayer.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Photo library access lets you select images to share in social posts.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

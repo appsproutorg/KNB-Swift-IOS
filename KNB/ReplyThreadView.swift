@@ -300,7 +300,7 @@ struct ReplyCard: View {
                     
                     Spacer()
                     
-                    if isOwnReply {
+                    if isOwnReply || firestoreManager.currentUser?.isAdmin == true {
                         Menu {
                             Button(role: .destructive, action: {
                                 showDeleteConfirmation = true
@@ -316,11 +316,18 @@ struct ReplyCard: View {
                     }
                 }
                 
-                // Reply content
-                Text(reply.content)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.primary)
-                    .fixedSize(horizontal: false, vertical: true)
+                if !reply.content.isEmpty {
+                    // Reply content
+                    Text(reply.content)
+                        .font(.system(size: 15))
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                
+                if !reply.mediaItems.isEmpty {
+                    SocialPostMediaGalleryView(mediaItems: reply.mediaItems, maxHeight: 420)
+                        .padding(.top, 6)
+                }
                 
                 // Like button
                 Button(action: handleLike) {
@@ -524,4 +531,3 @@ struct ReplyComposerView: View {
         }
     }
 }
-
