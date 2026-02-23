@@ -3,5 +3,9 @@
 *.xcuserstate
 node_modules/
 functions/.env
+.env.local
+.firebase/
+functions/lib/
+*.log
 firebase-debug.log
 functions/firebase-debug.log

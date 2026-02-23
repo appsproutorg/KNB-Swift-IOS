@@ -52,6 +52,28 @@ service cloud.firestore {
               || (data.media is map && validSocialMediaItem(data.media)));
     }
 
+    function canAddOwnLike() {
+      return !resource.data.likes.hasAny([request.auth.token.email])
+             && request.resource.data.likes.hasAny([request.auth.token.email])
+             && request.resource.data.likes.size() == resource.data.likes.size() + 1
+             && request.resource.data.likes.hasAll(resource.data.likes);
+    }
+
+    function canRemoveOwnLike() {
+      return resource.data.likes.hasAny([request.auth.token.email])
+             && !request.resource.data.likes.hasAny([request.auth.token.email])
+             && request.resource.data.likes.size() == resource.data.likes.size() - 1
+             && resource.data.likes.hasAll(request.resource.data.likes);
+    }
+
+    function canToggleOnlyOwnLike() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likeCount'])
+             && request.resource.data.likes is list
+             && resource.data.likes is list
+             && request.resource.data.likeCount == request.resource.data.likes.size()
+             && (canAddOwnLike() || canRemoveOwnLike());
+    }
+
     // Shared Kiddush calendar (public read-only)
     match /kiddushCalendar/{isoDate} {
       allow read: if true;
@@ -60,6 +82,17 @@ service cloud.firestore {
 
     // Sync metadata must stay private
     match /kiddushMeta/{docId} {
+      allow read, write: if false;
+    }
+
+    // Community occasions (app read-only)
+    match /communityOccasions/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // Community sync metadata must stay private
+    match /communityMeta/{docId} {
       allow read, write: if false;
     }
     
@@ -71,9 +104,11 @@ service cloud.firestore {
                     && (isAdmin() 
                         || (
                            // Non-admins can only update bids, currentBid, and currentWinner
-                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bids', 'currentBid', 'currentWinner'])
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bids', 'currentBid', 'currentWinner', 'isSold'])
+                           && (resource.data.isSold == false || !(resource.data.isSold is bool))
                            && request.resource.data.currentBid > resource.data.currentBid // Bid must increase
                            && request.resource.data.bids.size() == resource.data.bids.size() + 1 // Must add exactly one bid
+                           && (request.resource.data.isSold == resource.data.isSold || request.resource.data.isSold == true)
                         ));
       allow delete: if isAdmin(); // Only admins can delete
     }
@@ -82,7 +117,22 @@ service cloud.firestore {
     match /kiddush_sponsorships/{sponsorshipId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() 
-                    && request.resource.data.sponsorEmail == request.auth.token.email;
+                    && request.resource.data.sponsorEmail == request.auth.token.email
+                    && request.resource.data.keys().hasOnly([
+                      'id', 'date', 'sponsorName', 'sponsorEmail', 'occasion',
+                      'tierName', 'tierAmount', 'isAnonymous', 'timestamp', 'isPaid'
+                    ])
+                    && request.resource.data.id is string
+                    && request.resource.data.date is timestamp
+                    && request.resource.data.sponsorName is string
+                    && request.resource.data.sponsorName.size() > 0
+                    && request.resource.data.sponsorEmail is string
+                    && request.resource.data.occasion is string
+                    && request.resource.data.tierName is string
+                    && request.resource.data.tierAmount is int
+                    && request.resource.data.isAnonymous is bool
+                    && request.resource.data.timestamp is timestamp
+                    && request.resource.data.isPaid == false;
       allow delete: if isAuthenticated() 
                     && (resource.data.sponsorEmail == request.auth.token.email 
                         || isAdmin());
@@ -100,6 +150,9 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() 
                     && request.resource.data.authorEmail == request.auth.token.email
+                    && request.resource.data.authorName is string
+                    && request.resource.data.authorName.size() > 0
+                    && request.resource.data.authorName.size() <= 80
                     && request.resource.data.content is string
                     && request.resource.data.content.size() <= 140
                     && (request.resource.data.content.size() > 0 || hasAnySocialMedia(request.resource.data))
@@ -118,11 +171,7 @@ service cloud.firestore {
                           && (request.resource.data.content.size() > 0 || hasAnySocialMedia(request.resource.data))
                         )
                         ||
-                        (
-                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likeCount', 'replyCount'])
-                          && request.resource.data.likeCount >= 0
-                          && request.resource.data.replyCount >= 0
-                        )
+                        canToggleOnlyOwnLike()
                       );
       allow delete: if isAuthenticated() 
                     && (resource.data.authorEmail == request.auth.token.email 
@@ -146,15 +195,21 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (userId == request.auth.token.email || isAdmin());
       allow create: if isAuthenticated() 
-                    && request.resource.data.email == request.auth.token.email;
+                    && userId == request.auth.token.email
+                    && request.resource.data.email == request.auth.token.email
+                    && (!request.resource.data.keys().hasAny(['isAdmin']) || request.resource.data.isAdmin == false);
       allow update: if isAuthenticated() 
                     && (
                       // User updating their own profile (cannot change email or isAdmin)
                       (resource.data.email == request.auth.token.email
                        && request.resource.data.email == resource.data.email
-                       && request.resource.data.isAdmin == resource.data.isAdmin)
+                       && request.resource.data.isAdmin == resource.data.isAdmin
+                       && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                         'name', 'notificationPrefs', 'lastUpdated', 'fcmTokens',
+                         'fcmToken', 'fcmTokenUpdatedAt'
+                       ]))
                       ||
                       // Super Admin can update anything (including making others admin)
                       isSuperAdmin()

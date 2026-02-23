@@ -1,5 +1,6 @@
 const functions = require("firebase-functions");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { onRequest } = require("firebase-functions/v2/https");
 const logger = require("firebase-functions/logger");
 const admin = require("firebase-admin");
 const crypto = require("node:crypto");
@@ -7,14 +8,51 @@ const cheerio = require("cheerio");
 
 admin.initializeApp();
 const db = admin.firestore();
+const storageBucket = admin.storage().bucket();
+
+function sanitizeNotificationData(rawData) {
+    const data = rawData || {};
+    return Object.fromEntries(
+        Object.entries(data).map(([key, value]) => [key, String(value)])
+    );
+}
+
+function isTerminalFcmTokenError(errorCode) {
+    return (
+        errorCode === "messaging/invalid-registration-token" ||
+        errorCode === "messaging/registration-token-not-registered"
+    );
+}
+
+async function shouldSkipDuplicateEvent(handlerName, eventId) {
+    if (!eventId) return false;
+
+    const dedupeRef = db.collection("_functionEventDedup").doc(`${handlerName}_${eventId}`);
+    return db.runTransaction(async (transaction) => {
+        const doc = await transaction.get(dedupeRef);
+        if (doc.exists) {
+            return true;
+        }
+
+        transaction.set(dedupeRef, {
+            handlerName,
+            eventId,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return false;
+    });
+}
 
 // Helper to send notifications
-async function sendNotification(userId, notification) {
+async function sendNotification(userId, notification, userDataOverride = null) {
     try {
-        const userDoc = await db.collection("users").doc(userId).get();
-        if (!userDoc.exists) return;
+        let userData = userDataOverride;
+        if (!userData) {
+            const userDoc = await db.collection("users").doc(userId).get();
+            if (!userDoc.exists) return;
+            userData = userDoc.data();
+        }
 
-        const userData = userDoc.data();
         const prefs = userData.notificationPrefs || {};
         const tokensMap = userData.fcmTokens || {};
 
@@ -46,7 +84,7 @@ async function sendNotification(userId, notification) {
                 title: notification.title,
                 body: notification.body,
             },
-            data: notification.data || {},
+            data: sanitizeNotificationData(notification.data),
             apns: {
                 payload: {
                     aps: {
@@ -79,7 +117,10 @@ async function sendNotification(userId, notification) {
                 if (!resp.success) {
                     const failedToken = tokens[idx];
                     console.error(`❌ Failed to send to token ${failedToken}:`, resp.error);
-                    updates[`fcmTokens.${failedToken}`] = admin.firestore.FieldValue.delete();
+                    const errorCode = resp.error?.code || "";
+                    if (isTerminalFcmTokenError(errorCode)) {
+                        updates[`fcmTokens.${failedToken}`] = admin.firestore.FieldValue.delete();
+                    }
                 }
             });
             if (Object.keys(updates).length > 0) {
@@ -94,76 +135,142 @@ async function sendNotification(userId, notification) {
     }
 }
 
+function chunkArray(items, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+        chunks.push(items.slice(i, i + chunkSize));
+    }
+    return chunks;
+}
+
+function extractSocialMediaPaths(data) {
+    const paths = new Set();
+    const mediaItems = Array.isArray(data.mediaItems) ? data.mediaItems : [];
+    mediaItems.forEach((item) => {
+        if (item && typeof item.storagePath === "string" && item.storagePath.length > 0) {
+            paths.add(item.storagePath);
+        }
+    });
+
+    if (data.media && typeof data.media === "object" && typeof data.media.storagePath === "string") {
+        if (data.media.storagePath.length > 0) {
+            paths.add(data.media.storagePath);
+        }
+    }
+
+    return paths;
+}
+
+async function deleteStoragePaths(paths) {
+    await Promise.all(
+        Array.from(paths).map(async (path) => {
+            try {
+                await storageBucket.file(path).delete({ ignoreNotFound: true });
+            } catch (error) {
+                logger.warn("Failed deleting storage object during social cleanup.", {
+                    path,
+                    error: error.message,
+                });
+            }
+        })
+    );
+}
+
 // 1. Admin Post Notification
 exports.onAdminPostCreate = functions.firestore
     .document("social_posts/{postId}")
     .onCreate(async (snap, context) => {
-        const post = snap.data();
-
-        // Check if author is admin (by email or flag)
-        // Assuming admin email check or isAdmin flag on user. 
-        // For simplicity, checking if post.isAdminPost is true (if model has it) or authorEmail specific.
-        // The prompt said "anyone with admin badge".
-        // We'll check the user doc of the author.
-
-        const authorDoc = await db.collection("users").doc(post.authorEmail).get();
-        const isAuthorAdmin = authorDoc.exists && authorDoc.data().isAdmin;
-
-        if (!isAuthorAdmin) return;
-
-        const notification = {
-            type: "ADMIN_POST",
-            title: "New Admin Post",
-            body: `${post.authorName} posted: ${post.content.substring(0, 50)}...`,
-            data: { postId: context.params.postId },
-        };
-
-        // Batch send to all users (naive implementation for <500 users)
-        // For production scaling, use batched writes/sends or topics.
-        const usersSnap = await db.collection("users").get();
-        const promises = [];
-        usersSnap.forEach((doc) => {
-            if (doc.id !== post.authorEmail) { // Don't notify author
-                promises.push(sendNotification(doc.id, notification));
+        try {
+            if (await shouldSkipDuplicateEvent("onAdminPostCreate", context.eventId)) {
+                return;
             }
-        });
 
-        await Promise.all(promises);
+            const post = snap.data() || {};
+            const authorEmail = normalizeWhitespace(post.authorEmail || "");
+            if (!authorEmail) return;
+
+            const authorDoc = await db.collection("users").doc(authorEmail).get();
+            const isAuthorAdmin = authorDoc.exists && authorDoc.data().isAdmin;
+            if (!isAuthorAdmin) return;
+
+            const contentPreview = normalizeWhitespace(String(post.content || "")).slice(0, 50);
+            const notification = {
+                type: "ADMIN_POST",
+                title: "New Admin Post",
+                body: `${post.authorName || "Admin"} posted: ${contentPreview}${contentPreview.length === 50 ? "..." : ""}`,
+                data: { postId: context.params.postId },
+            };
+
+            const usersSnap = await db.collection("users")
+                .select("notificationPrefs", "fcmTokens")
+                .get();
+            await Promise.all(
+                usersSnap.docs
+                    .filter((doc) => doc.id !== authorEmail)
+                    .map((doc) => sendNotification(doc.id, notification, doc.data()))
+            );
+        } catch (error) {
+            logger.error("onAdminPostCreate failed.", {
+                postId: context.params.postId,
+                error: error.message,
+            });
+        }
     });
 
 // 2. Post Like Notification
 exports.onPostLikeUpdate = functions.firestore
     .document("social_posts/{postId}")
     .onUpdate(async (change, context) => {
-        const before = change.before.data();
-        const after = change.after.data();
-        const postId = context.params.postId;
+        try {
+            if (await shouldSkipDuplicateEvent("onPostLikeUpdate", context.eventId)) {
+                return;
+            }
 
-        const beforeLikes = before.likes || [];
-        const afterLikes = after.likes || [];
+            const before = change.before.data() || {};
+            const after = change.after.data() || {};
+            const postId = context.params.postId;
 
-        // Find new likers
-        const newLikers = afterLikes.filter(email => !beforeLikes.includes(email));
+            // Replies are handled by onReplyLikeUpdate.
+            if (after.parentPostId) {
+                return;
+            }
 
-        if (newLikers.length === 0) return;
+            const beforeLikes = new Set(before.likes || []);
+            const afterLikes = new Set(after.likes || []);
+            const newLikers = Array.from(afterLikes).filter((email) => !beforeLikes.has(email));
 
-        const authorEmail = after.authorEmail;
+            if (newLikers.length === 0) return;
 
-        for (const likerEmail of newLikers) {
-            if (likerEmail === authorEmail) continue; // Don't notify self
+            const authorEmail = normalizeWhitespace(after.authorEmail || "");
+            if (!authorEmail) return;
+            const authorDoc = await db.collection("users")
+                .doc(authorEmail)
+                .get();
+            if (!authorDoc.exists) return;
+            const authorData = authorDoc.data();
 
-            // Get liker name
-            const likerDoc = await db.collection("users").doc(likerEmail).get();
-            const likerName = likerDoc.exists ? likerDoc.data().name : "Someone";
+            await Promise.all(
+                newLikers.map(async (likerEmail) => {
+                    if (likerEmail === authorEmail) return;
 
-            const notification = {
-                type: "POST_LIKE",
-                title: "New Like",
-                body: `${likerName} liked your post`,
-                data: { postId: postId },
-            };
+                    const likerDoc = await db.collection("users").doc(likerEmail).get();
+                    const likerName = likerDoc.exists ? likerDoc.data().name : "Someone";
 
-            await sendNotification(authorEmail, notification);
+                    const notification = {
+                        type: "POST_LIKE",
+                        title: "New Like",
+                        body: `${likerName} liked your post`,
+                        data: { postId },
+                    };
+
+                    await sendNotification(authorEmail, notification, authorData);
+                })
+            );
+        } catch (error) {
+            logger.error("onPostLikeUpdate failed.", {
+                postId: context.params.postId,
+                error: error.message,
+            });
         }
     });
 
@@ -172,31 +279,49 @@ exports.onPostLikeUpdate = functions.firestore
 exports.onPostReplyCreate = functions.firestore
     .document("social_posts/{replyId}")
     .onCreate(async (snap, context) => {
-        const reply = snap.data();
-        const replyId = context.params.replyId;
+        try {
+            if (await shouldSkipDuplicateEvent("onPostReplyCreate", context.eventId)) {
+                return;
+            }
 
-        // Check if this is actually a reply (has parentPostId)
-        if (!reply.parentPostId) return;
+            const reply = snap.data() || {};
+            const replyId = context.params.replyId;
+            const postId = normalizeWhitespace(reply.parentPostId || "");
 
-        const postId = reply.parentPostId;
+            if (!postId) return;
 
-        // Get parent post to find author
-        const postDoc = await db.collection("social_posts").doc(postId).get();
-        if (!postDoc.exists) return;
+            const parentRef = db.collection("social_posts").doc(postId);
+            await parentRef.set(
+                {
+                    replyCount: admin.firestore.FieldValue.increment(1),
+                },
+                { merge: true }
+            );
 
-        const post = postDoc.data();
-        const authorEmail = post.authorEmail;
+            const postDoc = await parentRef.get();
+            if (!postDoc.exists) return;
 
-        if (reply.authorEmail === authorEmail) return; // Don't notify self
+            const post = postDoc.data() || {};
+            const authorEmail = normalizeWhitespace(post.authorEmail || "");
+            if (!authorEmail || reply.authorEmail === authorEmail) return;
 
-        const notification = {
-            type: "POST_REPLY",
-            title: "New Reply",
-            body: `${reply.authorName} replied: "${reply.content.length > 100 ? reply.content.substring(0, 100) + '...' : reply.content}"`,
-            data: { postId: postId, replyId: replyId },
-        };
+            const content = String(reply.content || "");
+            const preview = content.length > 100 ? `${content.slice(0, 100)}...` : content;
 
-        await sendNotification(authorEmail, notification);
+            const notification = {
+                type: "POST_REPLY",
+                title: "New Reply",
+                body: `${reply.authorName || "Someone"} replied: "${preview}"`,
+                data: { postId, replyId },
+            };
+
+            await sendNotification(authorEmail, notification);
+        } catch (error) {
+            logger.error("onPostReplyCreate failed.", {
+                replyId: context.params.replyId,
+                error: error.message,
+            });
+        }
     });
 
 // 4. Reply Like Notification
@@ -204,38 +329,54 @@ exports.onPostReplyCreate = functions.firestore
 exports.onReplyLikeUpdate = functions.firestore
     .document("social_posts/{replyId}")
     .onUpdate(async (change, context) => {
-        const before = change.before.data();
-        const after = change.after.data();
-        const replyId = context.params.replyId;
+        try {
+            if (await shouldSkipDuplicateEvent("onReplyLikeUpdate", context.eventId)) {
+                return;
+            }
 
-        // Check if this is a reply
-        if (!after.parentPostId) return;
+            const before = change.before.data() || {};
+            const after = change.after.data() || {};
+            const replyId = context.params.replyId;
 
-        const postId = after.parentPostId;
+            if (!after.parentPostId) return;
+            const postId = after.parentPostId;
 
-        const beforeLikes = before.likes || [];
-        const afterLikes = after.likes || [];
+            const beforeLikes = new Set(before.likes || []);
+            const afterLikes = new Set(after.likes || []);
+            const newLikers = Array.from(afterLikes).filter((email) => !beforeLikes.has(email));
 
-        const newLikers = afterLikes.filter(email => !beforeLikes.includes(email));
+            if (newLikers.length === 0) return;
 
-        if (newLikers.length === 0) return;
+            const authorEmail = normalizeWhitespace(after.authorEmail || "");
+            if (!authorEmail) return;
+            const authorDoc = await db.collection("users")
+                .doc(authorEmail)
+                .get();
+            if (!authorDoc.exists) return;
+            const authorData = authorDoc.data();
 
-        const authorEmail = after.authorEmail;
+            await Promise.all(
+                newLikers.map(async (likerEmail) => {
+                    if (likerEmail === authorEmail) return;
 
-        for (const likerEmail of newLikers) {
-            if (likerEmail === authorEmail) continue;
+                    const likerDoc = await db.collection("users").doc(likerEmail).get();
+                    const likerName = likerDoc.exists ? likerDoc.data().name : "Someone";
 
-            const likerDoc = await db.collection("users").doc(likerEmail).get();
-            const likerName = likerDoc.exists ? likerDoc.data().name : "Someone";
+                    const notification = {
+                        type: "REPLY_LIKE",
+                        title: "Reply Liked",
+                        body: `${likerName} liked your reply`,
+                        data: { postId, replyId },
+                    };
 
-            const notification = {
-                type: "REPLY_LIKE",
-                title: "Reply Liked",
-                body: `${likerName} liked your reply`,
-                data: { postId: postId, replyId: replyId },
-            };
-
-            await sendNotification(authorEmail, notification);
+                    await sendNotification(authorEmail, notification, authorData);
+                })
+            );
+        } catch (error) {
+            logger.error("onReplyLikeUpdate failed.", {
+                replyId: context.params.replyId,
+                error: error.message,
+            });
         }
     });
 
@@ -243,78 +384,137 @@ exports.onReplyLikeUpdate = functions.firestore
 exports.onOutbid = functions.firestore
     .document("honors/{honorId}")
     .onUpdate(async (change, context) => {
-        const before = change.before.data();
-        const after = change.after.data();
-        const honorId = context.params.honorId;
+        try {
+            if (await shouldSkipDuplicateEvent("onOutbid", context.eventId)) {
+                return;
+            }
 
-        // Check if currentWinner changed and bid increased
-        if (before.currentWinner === after.currentWinner) return;
-        if (!before.currentWinner) return; // No previous winner to notify
+            const before = change.before.data() || {};
+            const after = change.after.data() || {};
+            const honorId = context.params.honorId;
 
-        const previousWinnerEmail = before.currentWinner;
-        const newWinnerEmail = after.currentWinner;
+            if (before.currentWinner === after.currentWinner) return;
+            if (!before.currentWinner) return;
 
-        if (previousWinnerEmail === newWinnerEmail) return;
+            const previousWinnerEmail = before.currentWinner;
+            const newWinnerEmail = after.currentWinner;
+            if (previousWinnerEmail === newWinnerEmail) return;
 
-        const notification = {
-            type: "OUTBID",
-            title: "You've been outbid!",
-            body: `Someone outbid you on ${after.name}. Current bid: $${after.currentBid}`,
-            data: { honorId: honorId },
-        };
+            const notification = {
+                type: "OUTBID",
+                title: "You've been outbid!",
+                body: `Someone outbid you on ${after.name}. Current bid: $${after.currentBid}`,
+                data: { honorId },
+            };
 
-        await sendNotification(previousWinnerEmail, notification);
+            await sendNotification(previousWinnerEmail, notification);
+        } catch (error) {
+            logger.error("onOutbid failed.", {
+                honorId: context.params.honorId,
+                error: error.message,
+            });
+        }
     });
 
 // 6. Propagate Name Changes
 exports.onUserUpdate = functions.firestore
     .document("users/{userEmail}")
     .onUpdate(async (change, context) => {
-        const newData = change.after.data();
-        const oldData = change.before.data();
-        const userEmail = context.params.userEmail;
-
-        // Only run if name changed
-        if (newData.name === oldData.name) return null;
-
-        console.log(`👤 User ${userEmail} changed name from "${oldData.name}" to "${newData.name}". Updating content...`);
-
-        const batch = db.batch();
-        let operationCount = 0;
-
         try {
-            // 1. Update Posts
+            if (await shouldSkipDuplicateEvent("onUserUpdate", context.eventId)) {
+                return null;
+            }
+
+            const newData = change.after.data() || {};
+            const oldData = change.before.data() || {};
+            const userEmail = context.params.userEmail;
+
+            if (newData.name === oldData.name) return null;
+
+            console.log(`👤 User ${userEmail} changed name from "${oldData.name}" to "${newData.name}". Updating content...`);
+
             const postsSnapshot = await db.collection("social_posts")
                 .where("authorEmail", "==", userEmail)
                 .get();
 
-            postsSnapshot.docs.forEach(doc => {
-                batch.update(doc.ref, { authorName: newData.name });
-                operationCount++;
-            });
-
-            // 2. Update Replies (using Collection Group Query)
-            const repliesSnapshot = await db.collectionGroup("replies")
-                .where("authorEmail", "==", userEmail)
-                .get();
-
-            repliesSnapshot.docs.forEach(doc => {
-                batch.update(doc.ref, { authorName: newData.name });
-                operationCount++;
-            });
-
-            // Commit if there are updates
-            if (operationCount > 0) {
-                await batch.commit();
-                console.log(`✅ Updated ${postsSnapshot.size} posts and ${repliesSnapshot.size} replies.`);
-            } else {
+            const docs = postsSnapshot.docs;
+            if (!docs.length) {
                 console.log("ℹ️ No content to update.");
+                return null;
             }
+
+            const chunks = chunkArray(docs, 450);
+            for (const docsChunk of chunks) {
+                const batch = db.batch();
+                docsChunk.forEach((doc) => {
+                    batch.update(doc.ref, { authorName: newData.name });
+                });
+                await batch.commit();
+            }
+
+            console.log(`✅ Updated ${docs.length} social post/reply documents.`);
         } catch (error) {
             console.error("❌ Error updating user content:", error);
-            if (error.code === 9 || error.message.includes("index")) {
-                console.error("🚨 MISSING INDEX: You need to create a composite index for 'replies' collection group on 'authorEmail'. Check the Firebase Console logs for the direct link to create it.");
+        }
+    });
+
+exports.onSocialPostDelete = functions.firestore
+    .document("social_posts/{postId}")
+    .onDelete(async (snap, context) => {
+        try {
+            if (await shouldSkipDuplicateEvent("onSocialPostDelete", context.eventId)) {
+                return;
             }
+
+            const deletedPost = snap.data() || {};
+            const postId = context.params.postId;
+            const parentPostId = normalizeWhitespace(deletedPost.parentPostId || "");
+
+            if (parentPostId) {
+                const parentRef = db.collection("social_posts").doc(parentPostId);
+                await db.runTransaction(async (transaction) => {
+                    const parentDoc = await transaction.get(parentRef);
+                    if (!parentDoc.exists) {
+                        return;
+                    }
+
+                    const currentReplyCount = Number(parentDoc.data()?.replyCount || 0);
+                    transaction.update(parentRef, {
+                        replyCount: Math.max(0, currentReplyCount - 1),
+                    });
+                });
+                return;
+            }
+
+            const replySnapshot = await db.collection("social_posts")
+                .where("parentPostId", "==", postId)
+                .get();
+
+            const mediaPaths = new Set();
+            mediaPaths.formUnion(extractSocialMediaPaths(deletedPost));
+            replySnapshot.docs.forEach((replyDoc) => {
+                extractSocialMediaPaths(replyDoc.data()).forEach((path) => mediaPaths.add(path));
+            });
+
+            const replyChunks = chunkArray(replySnapshot.docs, 450);
+            for (const docsChunk of replyChunks) {
+                const batch = db.batch();
+                docsChunk.forEach((doc) => batch.delete(doc.ref));
+                await batch.commit();
+            }
+
+            await deleteStoragePaths(mediaPaths);
+
+            logger.info("Cascaded reply cleanup for deleted top-level post.", {
+                postId,
+                repliesDeleted: replySnapshot.size,
+                mediaDeleted: mediaPaths.size,
+            });
+        } catch (error) {
+            logger.error("onSocialPostDelete failed.", {
+                postId: context.params.postId,
+                error: error.message,
+            });
         }
     });
 
@@ -325,6 +525,17 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
     }
 
     const userEmail = context.auth.token.email;
+    const rateLimitRef = db.collection("metaRateLimits").doc(`sendTestNotification_${userEmail}`);
+    const rateLimitSnap = await rateLimitRef.get();
+    const now = Date.now();
+    const lastCalledAt = rateLimitSnap.exists ? rateLimitSnap.data().lastCalledAtMillis || 0 : 0;
+    if (now - lastCalledAt < 60_000) {
+        throw new functions.https.HttpsError(
+            "resource-exhausted",
+            "Please wait at least 60 seconds between test notifications."
+        );
+    }
+
     console.log(`🧪 Sending test notification to ${userEmail}`);
 
     const notification = {
@@ -339,6 +550,7 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
     const success = await sendNotification(userEmail, notification);
 
     if (success) {
+        await rateLimitRef.set({ lastCalledAtMillis: now }, { merge: true });
         return { success: true, message: "Notification sent!" };
     } else {
         throw new functions.https.HttpsError('internal', 'Failed to send notification.');
@@ -346,6 +558,7 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
 });
 
 const KIDDUSH_CALENDAR_URL = "https://www.heritagecongregation.com/website/index.php";
+const HERITAGE_HOME_URL = "https://www.heritagecongregation.com/website/index.php";
 const KIDDUSH_COLLECTION = "kiddushCalendar";
 const KIDDUSH_APP_SPONSORSHIPS_COLLECTION = "kiddush_sponsorships";
 const KIDDUSH_META_DOC_PATH = "kiddushMeta/sync";
@@ -356,6 +569,12 @@ const KIDDUSH_EMAIL_PROVIDER_URL = "https://api.sendgrid.com/v3/mail/send";
 const KIDDUSH_REQUIRED_BOOKING_RECIPIENTS = [
     "kiddush@heritagecongregation.com",
 ];
+const COMMUNITY_OCCASIONS_COLLECTION = "communityOccasions";
+const COMMUNITY_META_DOC_PATH = "communityMeta/sync";
+const COMMUNITY_SYNC_TIMEZONE = "America/Chicago";
+const COMMUNITY_SYNC_USER_AGENT = "KNB-CommunityOccasionsSync/1.0 (+Firebase Functions)";
+const COMMUNITY_HTTP_TIMEOUT_MS = 15000;
+const SYNC_BOOTSTRAP_KEY_ENV = "SYNC_BOOTSTRAP_KEY";
 
 const MONTH_INDEX_MAP = {
     january: 0,
@@ -370,6 +589,32 @@ const MONTH_INDEX_MAP = {
     october: 9,
     november: 10,
     december: 11,
+};
+
+const COMMUNITY_CATEGORY_LABELS = {
+    births: "Births",
+    bar_bas_mitzvahs: "Bar/Bas Mitzvahs",
+    engagements: "Engagements",
+    anniversaries: "Anniversaries",
+    birthdays: "Birthdays",
+    yahrzeit: "Yahrzeit",
+    condolences: "Condolences",
+};
+
+const COMMUNITY_GROUP_RANK = {
+    time_sensitive: 0,
+    celebration: 1,
+    notice: 2,
+};
+
+const COMMUNITY_CATEGORY_RANK = {
+    anniversaries: 10,
+    birthdays: 11,
+    yahrzeit: 12,
+    engagements: 20,
+    births: 21,
+    bar_bas_mitzvahs: 22,
+    condolences: 30,
 };
 
 function normalizeWhitespace(value) {
@@ -786,6 +1031,22 @@ function mergeWebsiteWithAppReservations(websiteDataset, appSponsorshipsByIsoDat
     });
 }
 
+function isValidKiddushSponsorshipPayload(data) {
+    return Boolean(
+        data &&
+        data.date &&
+        typeof data.date.toDate === "function" &&
+        typeof data.sponsorName === "string" &&
+        data.sponsorName.trim().length > 0 &&
+        typeof data.sponsorEmail === "string" &&
+        data.sponsorEmail.trim().length > 0 &&
+        typeof data.occasion === "string" &&
+        typeof data.tierName === "string" &&
+        Number.isFinite(Number(data.tierAmount)) &&
+        typeof data.isAnonymous === "boolean"
+    );
+}
+
 async function sendKiddushBookingEmail(sponsorshipId, data) {
     const apiKey = process.env.SENDGRID_API_KEY;
     const notifyToRaw = process.env.KIDDUSH_BOOKING_NOTIFY_TO;
@@ -1012,6 +1273,549 @@ function parseKiddushCalendarTable(html) {
     };
 }
 
+async function fetchCommunityOccasionsHtml() {
+    const response = await fetch(HERITAGE_HOME_URL, {
+        method: "GET",
+        headers: {
+            "User-Agent": COMMUNITY_SYNC_USER_AGENT,
+            Accept: "text/html,application/xhtml+xml",
+        },
+        signal: AbortSignal.timeout(COMMUNITY_HTTP_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status} while fetching community occasions page`);
+    }
+
+    return response.text();
+}
+
+function normalizeCommunityCategoryHeader(headerText) {
+    const normalized = normalizeWhitespace(headerText).toLowerCase().replace(/\.+$/, "");
+    if (!normalized) {
+        return null;
+    }
+
+    if (normalized.includes("bar/bas mitzvah")) {
+        return {
+            categoryKey: "bar_bas_mitzvahs",
+            categoryLabel: COMMUNITY_CATEGORY_LABELS.bar_bas_mitzvahs,
+        };
+    }
+    if (normalized.includes("births")) {
+        return {
+            categoryKey: "births",
+            categoryLabel: COMMUNITY_CATEGORY_LABELS.births,
+        };
+    }
+    if (normalized.includes("engagement")) {
+        return {
+            categoryKey: "engagements",
+            categoryLabel: COMMUNITY_CATEGORY_LABELS.engagements,
+        };
+    }
+    if (normalized.includes("anniversar")) {
+        return {
+            categoryKey: "anniversaries",
+            categoryLabel: COMMUNITY_CATEGORY_LABELS.anniversaries,
+        };
+    }
+    if (normalized.includes("birthday")) {
+        return {
+            categoryKey: "birthdays",
+            categoryLabel: COMMUNITY_CATEGORY_LABELS.birthdays,
+        };
+    }
+    if (normalized.includes("yahrzeit")) {
+        return {
+            categoryKey: "yahrzeit",
+            categoryLabel: COMMUNITY_CATEGORY_LABELS.yahrzeit,
+        };
+    }
+    if (normalized.includes("condolence")) {
+        return {
+            categoryKey: "condolences",
+            categoryLabel: COMMUNITY_CATEGORY_LABELS.condolences,
+        };
+    }
+
+    return null;
+}
+
+function parseCommunityOccasions(html) {
+    const $ = cheerio.load(html);
+    const celebrationsHeading = $("h3")
+        .filter((_, element) => {
+            const text = normalizeWhitespace($(element).text()).toLowerCase();
+            return (
+                text.includes("celebrations and rememberance") ||
+                text.includes("celebrations and remembrance")
+            );
+        })
+        .first();
+
+    if (!celebrationsHeading.length) {
+        return {
+            sectionFound: false,
+            rows: [],
+            categoryCounts: {},
+        };
+    }
+
+    let cardBody = celebrationsHeading.closest(".card-header").nextAll(".card-body").first();
+    if (!cardBody.length) {
+        cardBody = celebrationsHeading.closest(".column").find(".card-body").first();
+    }
+
+    if (!cardBody.length) {
+        return {
+            sectionFound: false,
+            rows: [],
+            categoryCounts: {},
+        };
+    }
+
+    let currentCategory = null;
+    const rows = [];
+    const seen = new Set();
+    const categoryCounts = {};
+
+    cardBody.find("div.triangle-header, td").each((_, node) => {
+        const tagName = (node.tagName || "").toLowerCase();
+        const nodeElement = $(node);
+
+        if (tagName === "div" && nodeElement.hasClass("triangle-header")) {
+            currentCategory = normalizeCommunityCategoryHeader(nodeElement.text());
+            return;
+        }
+
+        if (!currentCategory) {
+            return;
+        }
+
+        if (nodeElement.find("div.triangle-header").length > 0) {
+            return;
+        }
+
+        const rawText = normalizeWhitespace(nodeElement.text().replace(/\u00a0/g, " "));
+        if (!rawText) {
+            return;
+        }
+
+        if (rawText.toLowerCase() === currentCategory.categoryLabel.toLowerCase()) {
+            return;
+        }
+
+        const dedupeKey = `${currentCategory.categoryKey}|${rawText.toLowerCase()}`;
+        if (seen.has(dedupeKey)) {
+            return;
+        }
+        seen.add(dedupeKey);
+
+        rows.push({
+            categoryKey: currentCategory.categoryKey,
+            categoryLabel: currentCategory.categoryLabel,
+            rawText,
+        });
+        categoryCounts[currentCategory.categoryKey] = (categoryCounts[currentCategory.categoryKey] || 0) + 1;
+    });
+
+    return {
+        sectionFound: true,
+        rows,
+        categoryCounts,
+    };
+}
+
+function communityGroupForCategory(categoryKey) {
+    if (["anniversaries", "birthdays", "yahrzeit"].includes(categoryKey)) {
+        return "time_sensitive";
+    }
+    if (categoryKey === "condolences") {
+        return "notice";
+    }
+    return "celebration";
+}
+
+function parseFullDateFromText(rawText) {
+    const fullDateMatch = rawText.match(
+        /(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s*(\d{4})/i
+    );
+    if (!fullDateMatch) {
+        return null;
+    }
+
+    const monthName = fullDateMatch[1];
+    const monthIndex = MONTH_INDEX_MAP[monthName.toLowerCase()];
+    const day = Number(fullDateMatch[2]);
+    const year = Number(fullDateMatch[3]);
+    if (monthIndex === undefined || Number.isNaN(day) || Number.isNaN(year) || day < 1 || day > 31) {
+        return null;
+    }
+
+    return {
+        sourceDateText: `${monthName} ${day}, ${year}`,
+        monthIndex,
+        day,
+        year,
+        isoDate: toIsoDate(year, monthIndex, day),
+    };
+}
+
+function parseMonthDayFromText(rawText) {
+    const monthDayMatch = rawText.match(
+        /(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2})(?!,\s*\d{4})/i
+    );
+    if (!monthDayMatch) {
+        return null;
+    }
+
+    const monthName = monthDayMatch[1];
+    const monthIndex = MONTH_INDEX_MAP[monthName.toLowerCase()];
+    const day = Number(monthDayMatch[2]);
+    if (monthIndex === undefined || Number.isNaN(day) || day < 1 || day > 31) {
+        return null;
+    }
+
+    return {
+        sourceDateText: `${monthName} ${day}`,
+        monthIndex,
+        day,
+    };
+}
+
+function inferNearestRecurringIsoDate(monthIndex, day, todayParts) {
+    const todayUtc = Date.UTC(todayParts.year, todayParts.month - 1, todayParts.day);
+    const candidateYears = [todayParts.year - 1, todayParts.year, todayParts.year + 1];
+
+    let chosenYear = candidateYears[0];
+    let smallestDistance = Number.POSITIVE_INFINITY;
+
+    for (const year of candidateYears) {
+        const candidateUtc = Date.UTC(year, monthIndex, day);
+        const distance = Math.abs(candidateUtc - todayUtc);
+        if (distance < smallestDistance) {
+            smallestDistance = distance;
+            chosenYear = year;
+        }
+    }
+
+    return toIsoDate(chosenYear, monthIndex, day);
+}
+
+function isoDateToDayNumber(isoDate) {
+    const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+        return null;
+    }
+
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    if (Number.isNaN(year) || Number.isNaN(month) || Number.isNaN(day)) {
+        return null;
+    }
+
+    return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+}
+
+function isInCommunityPriorityWindow(effectiveDateIso, todayIso) {
+    if (!effectiveDateIso) {
+        return false;
+    }
+
+    const dateDayNumber = isoDateToDayNumber(effectiveDateIso);
+    const todayDayNumber = isoDateToDayNumber(todayIso);
+    if (dateDayNumber === null || todayDayNumber === null) {
+        return false;
+    }
+
+    const dayDifference = dateDayNumber - todayDayNumber;
+    return dayDifference >= -14 && dayDifference <= 45;
+}
+
+function buildCommunityOccasionDocumentId(categoryKey, rawText) {
+    const hash = crypto
+        .createHash("sha256")
+        .update(`${categoryKey}|${rawText.toLowerCase()}`)
+        .digest("hex")
+        .slice(0, 20);
+    return `${categoryKey}_${hash}`;
+}
+
+function normalizeCommunityOccasionRows(parsedRows, todayParts) {
+    const todayIso = toIsoDate(todayParts.year, todayParts.month - 1, todayParts.day);
+    const normalizedRows = parsedRows.map((row) => {
+        const fullDate = parseFullDateFromText(row.rawText);
+        const monthDay = !fullDate ? parseMonthDayFromText(row.rawText) : null;
+        let sourceDateText = fullDate?.sourceDateText || monthDay?.sourceDateText || null;
+        let effectiveDateIso = fullDate?.isoDate || null;
+
+        if (
+            !effectiveDateIso &&
+            monthDay &&
+            ["anniversaries", "birthdays", "yahrzeit"].includes(row.categoryKey)
+        ) {
+            effectiveDateIso = inferNearestRecurringIsoDate(
+                monthDay.monthIndex,
+                monthDay.day,
+                todayParts
+            );
+        }
+
+        const group = communityGroupForCategory(row.categoryKey);
+        const docId = buildCommunityOccasionDocumentId(row.categoryKey, row.rawText);
+
+        return {
+            id: docId,
+            categoryKey: row.categoryKey,
+            categoryLabel: row.categoryLabel || COMMUNITY_CATEGORY_LABELS[row.categoryKey] || row.categoryKey,
+            rawText: row.rawText,
+            effectiveDateIso,
+            sourceDateText,
+            group,
+            isInPriorityWindow: isInCommunityPriorityWindow(effectiveDateIso, todayIso),
+            source: "website",
+            sortRank: 0,
+        };
+    });
+
+    normalizedRows.sort((a, b) => {
+        const groupDelta = (COMMUNITY_GROUP_RANK[a.group] || 99) - (COMMUNITY_GROUP_RANK[b.group] || 99);
+        if (groupDelta !== 0) {
+            return groupDelta;
+        }
+
+        if (a.group === "time_sensitive" || b.group === "time_sensitive") {
+            const aDate = a.effectiveDateIso || "9999-12-31";
+            const bDate = b.effectiveDateIso || "9999-12-31";
+            if (aDate !== bDate) {
+                return aDate.localeCompare(bDate);
+            }
+        }
+
+        const categoryDelta =
+            (COMMUNITY_CATEGORY_RANK[a.categoryKey] || 999) -
+            (COMMUNITY_CATEGORY_RANK[b.categoryKey] || 999);
+        if (categoryDelta !== 0) {
+            return categoryDelta;
+        }
+
+        if ((a.effectiveDateIso || "") !== (b.effectiveDateIso || "")) {
+            return (a.effectiveDateIso || "").localeCompare(b.effectiveDateIso || "");
+        }
+
+        return a.rawText.localeCompare(b.rawText);
+    });
+
+    return normalizedRows.map((row, index) => ({
+        ...row,
+        sortRank: index + 1,
+    }));
+}
+
+function canonicalizeCommunityOccasionDataset(rows) {
+    return rows
+        .map((row) => ({
+            id: row.id,
+            categoryKey: row.categoryKey,
+            categoryLabel: row.categoryLabel,
+            rawText: row.rawText,
+            effectiveDateIso: row.effectiveDateIso ?? null,
+            sourceDateText: row.sourceDateText ?? null,
+            group: row.group,
+            isInPriorityWindow: Boolean(row.isInPriorityWindow),
+            sortRank: Number(row.sortRank || 0),
+            source: row.source || "website",
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function isSameCommunityOccasionDocument(existingDoc, incomingDoc) {
+    if (!existingDoc) {
+        return false;
+    }
+
+    return (
+        normalizeWhitespace(String(existingDoc.id || "")) === incomingDoc.id &&
+        normalizeWhitespace(String(existingDoc.categoryKey || "")) === incomingDoc.categoryKey &&
+        normalizeWhitespace(String(existingDoc.categoryLabel || "")) === incomingDoc.categoryLabel &&
+        normalizeWhitespace(String(existingDoc.rawText || "")) === incomingDoc.rawText &&
+        normalizeWhitespace(String(existingDoc.effectiveDateIso || "")) ===
+            normalizeWhitespace(String(incomingDoc.effectiveDateIso || "")) &&
+        normalizeWhitespace(String(existingDoc.sourceDateText || "")) ===
+            normalizeWhitespace(String(incomingDoc.sourceDateText || "")) &&
+        normalizeWhitespace(String(existingDoc.group || "")) === incomingDoc.group &&
+        Boolean(existingDoc.isInPriorityWindow) === Boolean(incomingDoc.isInPriorityWindow) &&
+        Number(existingDoc.sortRank || 0) === Number(incomingDoc.sortRank || 0) &&
+        normalizeWhitespace(String(existingDoc.source || "website")) ===
+            normalizeWhitespace(String(incomingDoc.source || "website"))
+    );
+}
+
+async function runCommunityOccasionsSync(triggerSource = "scheduled") {
+    logger.info("Starting community occasions sync.", { triggerSource });
+
+    let html;
+    try {
+        html = await fetchCommunityOccasionsHtml();
+    } catch (error) {
+        logger.error("Community occasions sync failed while fetching source HTML.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    let parsedResult;
+    try {
+        parsedResult = parseCommunityOccasions(html);
+    } catch (error) {
+        logger.error("Community occasions sync failed while parsing HTML.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    if (!parsedResult.sectionFound) {
+        logger.error("Community occasions sync aborted: celebrations card was not found.", {
+            triggerSource,
+        });
+        return;
+    }
+
+    if (!parsedResult.rows.length) {
+        logger.error("Community occasions sync aborted: parsed zero entries.", {
+            triggerSource,
+        });
+        return;
+    }
+
+    let dataset;
+    try {
+        const todayParts = getChicagoTodayParts();
+        const normalizedRows = normalizeCommunityOccasionRows(parsedResult.rows, todayParts);
+        if (!normalizedRows.length) {
+            logger.error("Community occasions sync aborted: normalization produced zero entries.", {
+                triggerSource,
+            });
+            return;
+        }
+
+        dataset = canonicalizeCommunityOccasionDataset(normalizedRows);
+    } catch (error) {
+        logger.error("Community occasions sync failed during normalization.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    const datasetHash = computeDatasetHash(dataset);
+    const metaRef = db.doc(COMMUNITY_META_DOC_PATH);
+
+    let previousHash = null;
+    try {
+        const metaSnap = await metaRef.get();
+        previousHash = metaSnap.exists ? metaSnap.data().hash || null : null;
+    } catch (error) {
+        logger.error("Community occasions sync failed while reading metadata.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    let existingDocsSnapshot;
+    try {
+        existingDocsSnapshot = await db.collection(COMMUNITY_OCCASIONS_COLLECTION).get();
+    } catch (error) {
+        logger.error("Community occasions sync failed while reading existing docs.", {
+            triggerSource,
+            error: error.message,
+        });
+        return;
+    }
+
+    const existingById = new Map();
+    existingDocsSnapshot.forEach((doc) => {
+        existingById.set(doc.id, doc.data());
+    });
+
+    const incomingById = new Map();
+    for (const row of dataset) {
+        incomingById.set(row.id, row);
+    }
+
+    const batch = db.batch();
+    let upsertCount = 0;
+    let deleteCount = 0;
+
+    for (const row of dataset) {
+        const existingDoc = existingById.get(row.id);
+        if (!isSameCommunityOccasionDocument(existingDoc, row)) {
+            batch.set(
+                db.collection(COMMUNITY_OCCASIONS_COLLECTION).doc(row.id),
+                {
+                    ...row,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                }
+            );
+            upsertCount += 1;
+        }
+    }
+
+    for (const [docId] of existingById) {
+        if (!incomingById.has(docId)) {
+            batch.delete(db.collection(COMMUNITY_OCCASIONS_COLLECTION).doc(docId));
+            deleteCount += 1;
+        }
+    }
+
+    const hashChanged = previousHash !== datasetHash;
+    const hasContentChanges = upsertCount > 0 || deleteCount > 0;
+    const driftCorrection = !hashChanged && hasContentChanges;
+
+    if (!hashChanged && !hasContentChanges) {
+        logger.info("Community occasions unchanged, skipping Firestore writes.", {
+            triggerSource,
+            rows: dataset.length,
+            hash: datasetHash,
+            categoryCounts: parsedResult.categoryCounts,
+        });
+        return;
+    }
+
+    batch.set(
+        metaRef,
+        {
+            hash: datasetHash,
+            lastSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+    );
+
+    try {
+        await batch.commit();
+        logger.info("Community occasions sync committed.", {
+            triggerSource,
+            rows: dataset.length,
+            upserts: upsertCount,
+            deletes: deleteCount,
+            hash: datasetHash,
+            hashChanged,
+            driftCorrection,
+            categoryCounts: parsedResult.categoryCounts,
+        });
+    } catch (error) {
+        logger.error("Community occasions sync failed while committing batch.", {
+            triggerSource,
+            error: error.message,
+        });
+    }
+}
+
 async function runKiddushCalendarSync(triggerSource = "scheduled") {
     logger.info("Starting Kiddush calendar sync.", { triggerSource });
 
@@ -1125,8 +1929,7 @@ async function runKiddushCalendarSync(triggerSource = "scheduled") {
                 {
                     ...row,
                     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                },
-                { merge: true }
+                }
             );
             upsertCount += 1;
         }
@@ -1180,6 +1983,58 @@ async function runKiddushCalendarSync(triggerSource = "scheduled") {
     }
 }
 
+exports.runInitialCalendarSync = onRequest(
+    {
+        region: "us-central1",
+        memory: "256MiB",
+        timeoutSeconds: 60,
+    },
+    async (req, res) => {
+        if (req.method !== "POST") {
+            res.status(405).json({ ok: false, error: "Use POST" });
+            return;
+        }
+
+        const expectedKey = process.env[SYNC_BOOTSTRAP_KEY_ENV];
+        const providedKey = req.get("x-sync-bootstrap-key") || req.query.key;
+
+        if (!expectedKey) {
+            logger.error("Initial sync endpoint is missing required secret key env var.", {
+                envVar: SYNC_BOOTSTRAP_KEY_ENV,
+            });
+            res.status(500).json({ ok: false, error: "Server missing bootstrap key configuration" });
+            return;
+        }
+
+        if (!providedKey || providedKey !== expectedKey) {
+            logger.warn("Rejected unauthorized initial sync request.");
+            res.status(403).json({ ok: false, error: "Unauthorized" });
+            return;
+        }
+
+        logger.info("Starting immediate post-deploy sync for calendar datasets.");
+
+        await runKiddushCalendarSync("post_deploy_bootstrap");
+        await runCommunityOccasionsSync("post_deploy_bootstrap");
+
+        res.status(200).json({
+            ok: true,
+            message: "Triggered immediate calendar sync for Kiddush and community occasions.",
+        });
+    }
+);
+
+exports.syncCommunityOccasions = onSchedule(
+    {
+        schedule: "every 30 minutes",
+        region: "us-central1",
+        timeZone: COMMUNITY_SYNC_TIMEZONE,
+        memory: "256MiB",
+        timeoutSeconds: 60,
+    },
+    async () => runCommunityOccasionsSync("scheduled")
+);
+
 exports.syncKiddushCalendar = onSchedule(
     {
         schedule: "every 30 minutes",
@@ -1197,7 +2052,18 @@ exports.onKiddushSponsorshipCreate = functions.firestore
         const data = snap.data() || {};
         const sponsorshipId = context.params.sponsorshipId;
 
+        if (await shouldSkipDuplicateEvent("onKiddushSponsorshipCreate", context.eventId)) {
+            return;
+        }
+
         if (data.bookingEmailSentAt) {
+            return;
+        }
+
+        if (!isValidKiddushSponsorshipPayload(data)) {
+            logger.error("Invalid sponsorship payload. Skipping email + mirror.", {
+                sponsorshipId,
+            });
             return;
         }
 
@@ -1245,6 +2111,10 @@ exports.onKiddushSponsorshipDelete = functions.firestore
         const data = snap.data() || {};
         const sponsorshipId = context.params.sponsorshipId;
 
+        if (await shouldSkipDuplicateEvent("onKiddushSponsorshipDelete", context.eventId)) {
+            return;
+        }
+
         const calendarDoc = buildKiddushCalendarDocFromAppSponsorship(data);
         if (!calendarDoc) {
             logger.warn("Could not resolve isoDate for deleted sponsorship.", { sponsorshipId });
@@ -1253,9 +2123,39 @@ exports.onKiddushSponsorshipDelete = functions.firestore
 
         try {
             const calendarRef = db.collection(KIDDUSH_COLLECTION).doc(calendarDoc.docId);
-            const calendarSnap = await calendarRef.get();
+            const txResult = await db.runTransaction(async (transaction) => {
+                const calendarSnap = await transaction.get(calendarRef);
 
-            if (!calendarSnap.exists) {
+                if (!calendarSnap.exists) {
+                    return { status: "missing" };
+                }
+
+                const existing = calendarSnap.data() || {};
+                const source = normalizeWhitespace(String(existing.source || ""));
+                if (source !== "app") {
+                    return {
+                        status: "skipped_source",
+                        source: existing.source || null,
+                    };
+                }
+
+                transaction.set(
+                    calendarRef,
+                    {
+                        status: "available",
+                        sponsorText: null,
+                        source: "website",
+                        sponsorName: null,
+                        sponsorEmail: null,
+                        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    },
+                    { merge: true }
+                );
+
+                return { status: "cleared" };
+            });
+
+            if (txResult.status === "missing") {
                 logger.info("No mirrored calendar doc found on sponsorship delete.", {
                     sponsorshipId,
                     isoDate: calendarDoc.docId,
@@ -1263,27 +2163,14 @@ exports.onKiddushSponsorshipDelete = functions.firestore
                 return;
             }
 
-            const existing = calendarSnap.data() || {};
-            if (normalizeWhitespace(String(existing.source || "")) !== "app") {
+            if (txResult.status === "skipped_source") {
                 logger.info("Skipped clearing calendar doc because source is not app.", {
                     sponsorshipId,
                     isoDate: calendarDoc.docId,
-                    source: existing.source || null,
+                    source: txResult.source,
                 });
                 return;
             }
-
-            await calendarRef.set(
-                {
-                    status: "available",
-                    sponsorText: null,
-                    source: "website",
-                    sponsorName: null,
-                    sponsorEmail: null,
-                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-                },
-                { merge: true }
-            );
 
             logger.info("Cleared app-mirrored calendar sponsorship after delete.", {
                 sponsorshipId,

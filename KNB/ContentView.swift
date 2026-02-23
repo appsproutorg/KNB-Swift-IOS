@@ -32,16 +32,18 @@ struct ContentView: View {
                         // Check auth state first
                         await MainActor.run {
                             authManager.setFirestoreManager(firestoreManager)
-                            authManager.checkAuthState()
                         }
+                        await authManager.checkAuthState()
                         
                         // If user is authenticated, preload data
-                        if authManager.isAuthenticated {
+                        let isAuthenticated = await MainActor.run { authManager.isAuthenticated }
+                        if isAuthenticated {
                             print("✨ Preloading data for authenticated user...")
                             
                             // Preload Firestore data
                             await firestoreManager.initializeHonorsInFirestore()
                             await firestoreManager.fetchKiddushSponsorships()
+                            await firestoreManager.fetchCommunityOccasions()
                             
                             // Preload calendar data (90 days)
                             let hebrewCalendarService = HebrewCalendarService()

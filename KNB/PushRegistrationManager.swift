@@ -61,6 +61,8 @@ class PushRegistrationManager: NSObject, ObservableObject {
             
             guard let token = token else { return }
             print("FCM Token: \(token)")
+            let previousSyncedToken = UserDefaults.standard.string(forKey: "lastSyncedFCMToken")
+            UserDefaults.standard.set(token, forKey: "fcmToken")
             
             // Update token in Firestore
             let db = Firestore.firestore()
@@ -72,12 +74,28 @@ class PushRegistrationManager: NSObject, ObservableObject {
             db.collection("users").document(userEmail).setData([
                 "fcmTokens": [
                     token: tokenData
-                ]
+                ],
+                "fcmToken": FieldValue.delete(),
+                "fcmTokenUpdatedAt": FieldValue.delete()
             ], merge: true) { error in
                 if let error = error {
                     print("Error syncing FCM token: \(error.localizedDescription)")
                 } else {
                     print("Successfully synced FCM token for user: \(userEmail)")
+                    UserDefaults.standard.set(token, forKey: "lastSyncedFCMToken")
+
+                    if let previousSyncedToken,
+                       previousSyncedToken != token {
+                        db.collection("users").document(userEmail).updateData([
+                            FieldPath(["fcmTokens", previousSyncedToken]): FieldValue.delete()
+                        ]) { cleanupError in
+                            if let cleanupError {
+                                print("⚠️ Failed to remove stale FCM token: \(cleanupError.localizedDescription)")
+                            } else {
+                                print("🧹 Removed stale FCM token mapping")
+                            }
+                        }
+                    }
                 }
             }
         }

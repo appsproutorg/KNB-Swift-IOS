@@ -17,6 +17,10 @@ struct CalendarView: View {
     @State private var showingSponsorshipForm = false
     @State private var hebrewDatesCache: [Date: String] = [:]
     @State private var refreshTrigger = UUID()  // Force refresh when needed
+    @AppStorage("calendarBookingCoachmarkLastShownAt") private var bookingCoachmarkLastShownAt: Double = 0
+    @State private var showBookingCoachmark = false
+    @State private var bookingCoachmarkPulse = false
+    @State private var isLoadingOccasions = false
     
     let calendar = Calendar.chicago
     let dateFormatter: DateFormatter = {
@@ -24,6 +28,42 @@ struct CalendarView: View {
         formatter.dateFormat = "MMMM yyyy"
         return formatter
     }()
+
+    private var recentUpcomingOccasions: [CommunityOccasionItem] {
+        firestoreManager.communityOccasions
+            .filter { $0.group == .timeSensitive && $0.isInPriorityWindow }
+            .sorted {
+                if let lhsDate = $0.effectiveDateIso, let rhsDate = $1.effectiveDateIso, lhsDate != rhsDate {
+                    return lhsDate < rhsDate
+                }
+                if $0.sortRank != $1.sortRank {
+                    return $0.sortRank < $1.sortRank
+                }
+                return $0.rawText < $1.rawText
+            }
+    }
+
+    private var celebrationOccasions: [CommunityOccasionItem] {
+        firestoreManager.communityOccasions
+            .filter { $0.group == .celebration }
+            .sorted {
+                if $0.sortRank != $1.sortRank {
+                    return $0.sortRank < $1.sortRank
+                }
+                return $0.rawText < $1.rawText
+            }
+    }
+
+    private var communityNoticeOccasions: [CommunityOccasionItem] {
+        firestoreManager.communityOccasions
+            .filter { $0.group == .notice }
+            .sorted {
+                if $0.sortRank != $1.sortRank {
+                    return $0.sortRank < $1.sortRank
+                }
+                return $0.rawText < $1.rawText
+            }
+    }
     
     var body: some View {
         NavigationStack {
@@ -38,10 +78,10 @@ struct CalendarView: View {
                 
                 VStack(spacing: 0) {
                     // Custom Animated Header
-                    VStack(spacing: 8) {
+                    VStack(spacing: 4) {
                         // Title with gradient
-                        Text("Kiddush Sponsorship")
-                            .font(.system(size: 30, weight: .bold, design: .rounded))
+                        Text("Calendar & Kiddush")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [.blue, .blue.opacity(0.7)],
@@ -49,19 +89,48 @@ struct CalendarView: View {
                                     endPoint: .trailing
                                 )
                             )
-                            .shadow(color: .blue.opacity(0.2), radius: 6, x: 0, y: 3)
+                            .shadow(color: .blue.opacity(0.18), radius: 4, x: 0, y: 2)
+
+                        ZStack {
+                            if showBookingCoachmark {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "hand.tap.fill")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .foregroundStyle(.blue)
+
+                                    Text("Tap a Shabbos to reserve Kiddush")
+                                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.blue)
+                                }
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.blue.opacity(0.12))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .strokeBorder(Color.blue.opacity(0.25), lineWidth: 1)
+                                )
+                                .shadow(color: .blue.opacity(0.16), radius: 8, x: 0, y: 3)
+                                .opacity(showBookingCoachmark ? (bookingCoachmarkPulse ? 1 : 0.8) : 0)
+                                .offset(x: showBookingCoachmark ? 0 : -10)
+                                .animation(.easeInOut(duration: 0.25), value: showBookingCoachmark)
+                                .allowsHitTesting(false)
+                            }
+                        }
+                        .frame(height: showBookingCoachmark ? 34 : 0)
                         
                         // Month/Year with navigation - now more compact
-                        HStack(spacing: 12) {
+                        HStack(spacing: 10) {
                             Button(action: previousMonth) {
                                 Image(systemName: "chevron.left.circle.fill")
-                                    .font(.system(size: 26))
+                                    .font(.system(size: 22, weight: .semibold))
                                     .foregroundStyle(.blue.opacity(0.8))
-                                    .symbolEffect(.bounce, value: currentMonth)
                             }
                             
                             Text(dateFormatter.string(from: currentMonth))
-                                .font(.system(size: 22, weight: .semibold, design: .rounded))
+                                .font(.system(size: 23, weight: .bold, design: .rounded))
                                 .foregroundStyle(.primary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
@@ -70,19 +139,19 @@ struct CalendarView: View {
                             
                             Button(action: nextMonth) {
                                 Image(systemName: "chevron.right.circle.fill")
-                                    .font(.system(size: 26))
+                                    .font(.system(size: 22, weight: .semibold))
                                     .foregroundStyle(.blue.opacity(0.8))
-                                    .symbolEffect(.bounce, value: currentMonth)
                             }
                         }
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 14)
                     }
                     .padding(.top, 16)
-                    .padding(.bottom, 12)
+                    .padding(.bottom, 2)
                     
                     ScrollView {
-                        VStack(spacing: 20) {
-                            Spacer(minLength: 12)
+                        VStack(spacing: 12) {
                         
                         // Weekday Headers with wider Saturday
                         HStack(spacing: 4) {
@@ -94,7 +163,7 @@ struct CalendarView: View {
                             }
                         }
                         .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 2)
                         
                         // Calendar Grid with wider Shabbat columns - using fixed widths to fit screen
                         LazyVGrid(
@@ -149,57 +218,22 @@ struct CalendarView: View {
                                         .padding(.horizontal, 16)
                                         .id(refreshTrigger)  // Force grid refresh when sponsorships change
                         
-                        // Clear, easy-to-understand legend
-                        VStack(spacing: 16) {
-                            Text("How it works")
-                                .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            
-                            VStack(spacing: 12) {
-                                SimpleLegendRow(
-                                    color: Color(red: 0.2, green: 0.6, blue: 0.3),
-                                    label: "Available",
-                                    description: "Tap to sponsor this Shabbat"
-                                )
-                                
-                                SimpleLegendRow(
-                                    color: Color(red: 0.9, green: 0.2, blue: 0.2),
-                                    label: "Booked",
-                                    description: "Already sponsored"
-                                )
-                                
-                                SimpleLegendRow(
-                                    color: .gray,
-                                    label: "Past",
-                                    description: "Cannot be booked"
-                                )
-                            }
-                        }
-                        .padding(24)
-                        .background(
-                            RoundedRectangle(cornerRadius: 24)
-                                .fill(.ultraThinMaterial)
-                                .shadow(color: .black.opacity(0.08), radius: 16, x: 0, y: 6)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 24)
-                                .strokeBorder(
-                                    LinearGradient(
-                                        colors: [Color.secondary.opacity(0.15), Color.secondary.opacity(0.05)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    ),
-                                    lineWidth: 1.5
-                                )
+                        HappyOccasionsCardView(
+                            recentUpcoming: recentUpcomingOccasions,
+                            celebrations: celebrationOccasions,
+                            communityNotices: communityNoticeOccasions,
+                            isLoading: isLoadingOccasions
                         )
                         .padding(.horizontal)
-                        
-                        Spacer(minLength: 20)
+                    }
+                    .refreshable {
+                        await refreshCommunityOccasions()
                     }
                 }
                 }
             }
             .navigationBarHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
             .onAppear {
                 // Clear old cache to get fresh data with correct date matching
                 let cacheVersion = UserDefaults.standard.integer(forKey: "hebrew_cache_version")
@@ -216,11 +250,19 @@ struct CalendarView: View {
                 }
                 loadCalendarData()
                 firestoreManager.startListeningToSponsorships()
+                firestoreManager.startListeningToCommunityOccasions()
+                maybeShowBookingCoachmark()
+                isLoadingOccasions = firestoreManager.communityOccasions.isEmpty
+
+                Task {
+                    await refreshCommunityOccasions()
+                }
                 
                 print("📊 Current sponsorships count: \(firestoreManager.kiddushSponsorships.count)")
             }
             .onDisappear {
                 firestoreManager.stopListeningToSponsorships()
+                firestoreManager.stopListeningToCommunityOccasions()
             }
             .onChange(of: currentMonth) { _, _ in
                 loadCalendarData()
@@ -229,6 +271,11 @@ struct CalendarView: View {
                 // Force UI refresh when sponsorships change
                 print("🔄 Sponsorships updated! Count: \(newSponsorships.count)")
                 refreshTrigger = UUID()  // This triggers a re-render
+            }
+            .onChange(of: firestoreManager.communityOccasions) { _, _ in
+                if isLoadingOccasions {
+                    isLoadingOccasions = false
+                }
             }
             .sheet(isPresented: $showingSponsorshipForm, onDismiss: {
                 // Force refresh when form is dismissed
@@ -301,7 +348,7 @@ struct CalendarView: View {
         }
         
         // Fill remaining cells to complete 6 weeks (42 cells total)
-        while days.count < 42 {
+        while days.count % 7 != 0 {
             days.append(nil)
         }
         
@@ -329,16 +376,78 @@ struct CalendarView: View {
                 print("   💰 \(startOfDay) - \(sponsorship.sponsorEmail)")
             }
             
-            // Fetch Hebrew dates for visible days
-            for date in getDaysInMonth().compactMap({ $0 }) {
-                if hebrewDatesCache[date] == nil {
-                    if let hebrewDate = await hebrewCalendarService.fetchHebrewDate(for: date) {
+            // Fetch Hebrew dates for visible days concurrently.
+            let missingDates = getDaysInMonth().compactMap { $0 }.filter { hebrewDatesCache[$0] == nil }
+            await withTaskGroup(of: (Date, String?).self) { group in
+                for date in missingDates {
+                    group.addTask {
+                        let hebrewDate = await hebrewCalendarService.fetchHebrewDate(for: date)
+                        return (date, hebrewDate)
+                    }
+                }
+
+                for await (date, hebrewDate) in group {
+                    if let hebrewDate {
                         hebrewDatesCache[date] = hebrewDate
                     }
                 }
             }
+
+            trimHebrewDatesCache()
             
             print("✅ Calendar data loaded. ShabbatTimes count: \(hebrewCalendarService.shabbatTimes.count)")
+        }
+    }
+
+    func maybeShowBookingCoachmark() {
+        bookingCoachmarkPulse = false
+
+        let now = Date().timeIntervalSince1970
+        let sevenDays: TimeInterval = 7 * 24 * 60 * 60
+        guard now - bookingCoachmarkLastShownAt >= sevenDays else {
+            return
+        }
+
+        bookingCoachmarkLastShownAt = now
+
+        withAnimation(.easeOut(duration: 0.3)) {
+            showBookingCoachmark = true
+        }
+        withAnimation(.easeInOut(duration: 1.0).repeatCount(6, autoreverses: true)) {
+            bookingCoachmarkPulse = true
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 7) {
+            withAnimation(.easeOut(duration: 0.35)) {
+                showBookingCoachmark = false
+                bookingCoachmarkPulse = false
+            }
+        }
+    }
+
+    func refreshCommunityOccasions() async {
+        await MainActor.run {
+            isLoadingOccasions = true
+        }
+        await firestoreManager.fetchCommunityOccasions()
+        await MainActor.run {
+            isLoadingOccasions = false
+        }
+    }
+
+    private func trimHebrewDatesCache() {
+        let maxCacheEntries = 240
+        guard hebrewDatesCache.count > maxCacheEntries else { return }
+
+        let retainedMonths = [-1, 0, 1].compactMap {
+            calendar.date(byAdding: .month, value: $0, to: currentMonth)
+        }.map {
+            calendar.dateComponents([.year, .month], from: $0)
+        }
+
+        hebrewDatesCache = hebrewDatesCache.filter { date, _ in
+            let components = calendar.dateComponents([.year, .month], from: date)
+            return retainedMonths.contains(components)
         }
     }
     
@@ -582,66 +691,299 @@ struct CalendarDayCell: View {
     )
 }
 
-// MARK: - Simple Legend Row Component
-struct SimpleLegendRow: View {
-    let color: Color
-    let label: String
-    let description: String
-    
+// MARK: - Happy Occasions Components
+struct HappyOccasionsCardView: View {
+    let recentUpcoming: [CommunityOccasionItem]
+    let celebrations: [CommunityOccasionItem]
+    let communityNotices: [CommunityOccasionItem]
+    let isLoading: Bool
+
     var body: some View {
-        HStack(spacing: 14) {
-            // Color indicator circle - modernized
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [color, color.opacity(0.7)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 16, height: 16)
-                .shadow(color: color.opacity(0.4), radius: 3, x: 0, y: 2)
-                .overlay(
-                    Circle()
-                        .strokeBorder(.white.opacity(0.3), lineWidth: 1)
-                )
-            
-            VStack(alignment: .leading, spacing: 3) {
-                Text(label)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.primary)
-                
-                Text(description)
-                    .font(.system(size: 14, design: .rounded))
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "party.popper.fill")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Community Occasions")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                    Text("Clear categories and cleaner event text")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
             }
-            
-            Spacer()
-        }
-        .padding(14)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(
-                    LinearGradient(
-                        colors: [color.opacity(0.1), color.opacity(0.05)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+
+            if isLoading {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Loading latest occasions...")
+                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 8)
+            } else {
+                HappyOccasionsSectionView(
+                    title: "Recent & Upcoming",
+                    subtitle: "Birthdays, anniversaries, and yahrzeit in the active window.",
+                    items: recentUpcoming,
+                    emptyText: "No birthdays, anniversaries, or yahrzeit entries in the current window."
                 )
+
+                HappyOccasionsSectionView(
+                    title: "Celebrations",
+                    subtitle: "Engagements, births, and bar/bas mitzvah announcements.",
+                    items: celebrations,
+                    emptyText: "No celebration entries available right now."
+                )
+
+                HappyOccasionsSectionView(
+                    title: "Community Notices",
+                    subtitle: "Important notices and community updates.",
+                    items: communityNotices,
+                    emptyText: "No community notices right now."
+                )
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 24)
+                .fill(Color(.secondarySystemBackground).opacity(0.9))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(color.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [Color.secondary.opacity(0.18), Color.secondary.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
         )
     }
 }
 
-// MARK: - Additional Calendar Enhancements
-extension CalendarView {
-    // Add subtle haptic feedback for interactions
-    private func provideFeedback() {
-        let generator = UIImpactFeedbackGenerator(style: .light)
-        generator.impactOccurred()
+struct HappyOccasionsSectionView: View {
+    let title: String
+    let subtitle: String
+    let items: [CommunityOccasionItem]
+    let emptyText: String
+    @State private var isExpanded = true
+
+    private var categoryGroups: [OccasionCategoryGroup] {
+        var grouped: [CommunityOccasionCategory: [CommunityOccasionItem]] = [:]
+        var orderedCategories: [CommunityOccasionCategory] = []
+
+        for item in items {
+            if grouped[item.category] == nil {
+                orderedCategories.append(item.category)
+            }
+            grouped[item.category, default: []].append(item)
+        }
+
+        return orderedCategories.compactMap { category in
+            guard let groupedItems = grouped[category] else { return nil }
+            return OccasionCategoryGroup(category: category, items: groupedItems)
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.82)) {
+                    isExpanded.toggle()
+                }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    if !items.isEmpty {
+                        Text("\(items.count)")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 0 : -90))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if isExpanded {
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .medium, design: .rounded))
+                    .foregroundStyle(.secondary)
+
+                if items.isEmpty {
+                    Text(emptyText)
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .padding(.vertical, 6)
+                } else {
+                    ForEach(categoryGroups) { group in
+                        OccasionCategoryGroupView(group: group)
+                    }
+                }
+            }
+        }
     }
 }
 
+private struct OccasionCategoryGroupView: View {
+    let group: OccasionCategoryGroup
+
+    private var style: OccasionCategoryStyle {
+        group.category.occasionStyle
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                ZStack {
+                    Circle()
+                        .fill(style.iconBackground)
+                    Image(systemName: group.category.symbolName)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(style.accent)
+                }
+                .frame(width: 26, height: 26)
+
+                Text(group.category.displayLabel.uppercased())
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(style.accent)
+                    .lineLimit(1)
+
+                Spacer(minLength: 8)
+
+                Text("\(group.items.count)")
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(style.accent.opacity(0.9))
+            }
+
+            ForEach(Array(group.items.enumerated()), id: \.element.id) { index, item in
+                CommunityOccasionRow(item: item, style: style)
+                if index < group.items.count - 1 {
+                    Divider()
+                        .overlay(style.rowBorder.opacity(0.4))
+                        .padding(.leading, 2)
+                }
+            }
+        }
+        .padding(.vertical, 8)
+    }
+}
+
+private struct CommunityOccasionRow: View {
+    let item: CommunityOccasionItem
+    let style: OccasionCategoryStyle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(item.preferredDisplayText)
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if item.showsStandaloneDateBadge, let dateText = item.displayDateText, !dateText.isEmpty {
+                Label(dateText, systemImage: "calendar")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(style.accent.opacity(0.95))
+            }
+        }
+        .padding(.horizontal, 2)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct OccasionCategoryGroup: Identifiable {
+    let category: CommunityOccasionCategory
+    let items: [CommunityOccasionItem]
+
+    var id: String {
+        category.rawValue
+    }
+}
+
+private struct OccasionCategoryStyle {
+    let accent: Color
+    let sectionBackground: Color
+    let sectionBorder: Color
+    let rowBorder: Color
+    let badgeBackground: Color
+    let iconBackground: Color
+}
+
+private extension CommunityOccasionCategory {
+    var occasionStyle: OccasionCategoryStyle {
+        switch self {
+        case .birthdays:
+            return OccasionCategoryStyle(
+                accent: Color(red: 0.11, green: 0.47, blue: 0.89),
+                sectionBackground: Color(red: 0.92, green: 0.96, blue: 1.0),
+                sectionBorder: Color(red: 0.74, green: 0.87, blue: 1.0),
+                rowBorder: Color(red: 0.73, green: 0.86, blue: 0.99),
+                badgeBackground: Color(red: 0.84, green: 0.92, blue: 1.0),
+                iconBackground: Color(red: 0.82, green: 0.91, blue: 1.0)
+            )
+        case .yahrzeit:
+            return OccasionCategoryStyle(
+                accent: Color(red: 0.66, green: 0.42, blue: 0.08),
+                sectionBackground: Color(red: 1.0, green: 0.96, blue: 0.89),
+                sectionBorder: Color(red: 0.95, green: 0.84, blue: 0.62),
+                rowBorder: Color(red: 0.94, green: 0.83, blue: 0.61),
+                badgeBackground: Color(red: 0.98, green: 0.9, blue: 0.72),
+                iconBackground: Color(red: 0.97, green: 0.88, blue: 0.69)
+            )
+        case .engagements:
+            return OccasionCategoryStyle(
+                accent: Color(red: 0.68, green: 0.22, blue: 0.62),
+                sectionBackground: Color(red: 0.99, green: 0.93, blue: 0.98),
+                sectionBorder: Color(red: 0.93, green: 0.77, blue: 0.91),
+                rowBorder: Color(red: 0.92, green: 0.76, blue: 0.9),
+                badgeBackground: Color(red: 0.96, green: 0.84, blue: 0.95),
+                iconBackground: Color(red: 0.95, green: 0.81, blue: 0.93)
+            )
+        case .births:
+            return OccasionCategoryStyle(
+                accent: Color(red: 0.02, green: 0.56, blue: 0.28),
+                sectionBackground: Color(red: 0.92, green: 0.98, blue: 0.92),
+                sectionBorder: Color(red: 0.74, green: 0.9, blue: 0.75),
+                rowBorder: Color(red: 0.72, green: 0.89, blue: 0.74),
+                badgeBackground: Color(red: 0.84, green: 0.95, blue: 0.85),
+                iconBackground: Color(red: 0.8, green: 0.93, blue: 0.81)
+            )
+        case .barBasMitzvahs:
+            return OccasionCategoryStyle(
+                accent: Color(red: 0.29, green: 0.39, blue: 0.87),
+                sectionBackground: Color(red: 0.93, green: 0.94, blue: 1.0),
+                sectionBorder: Color(red: 0.79, green: 0.82, blue: 0.99),
+                rowBorder: Color(red: 0.78, green: 0.81, blue: 0.99),
+                badgeBackground: Color(red: 0.85, green: 0.88, blue: 1.0),
+                iconBackground: Color(red: 0.83, green: 0.86, blue: 0.99)
+            )
+        case .anniversaries:
+            return OccasionCategoryStyle(
+                accent: Color(red: 0.71, green: 0.24, blue: 0.53),
+                sectionBackground: Color(red: 1.0, green: 0.94, blue: 0.98),
+                sectionBorder: Color(red: 0.95, green: 0.79, blue: 0.9),
+                rowBorder: Color(red: 0.94, green: 0.78, blue: 0.89),
+                badgeBackground: Color(red: 0.97, green: 0.86, blue: 0.93),
+                iconBackground: Color(red: 0.96, green: 0.84, blue: 0.92)
+            )
+        case .condolences:
+            return OccasionCategoryStyle(
+                accent: Color(red: 0.89, green: 0.47, blue: 0.13),
+                sectionBackground: Color(red: 1.0, green: 0.96, blue: 0.91),
+                sectionBorder: Color(red: 0.97, green: 0.84, blue: 0.66),
+                rowBorder: Color(red: 0.96, green: 0.83, blue: 0.64),
+                badgeBackground: Color(red: 0.99, green: 0.9, blue: 0.76),
+                iconBackground: Color(red: 0.99, green: 0.88, blue: 0.72)
+            )
+        }
+    }
+}

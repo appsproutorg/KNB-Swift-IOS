@@ -156,6 +156,152 @@ struct ShabbatTime: Codable, Equatable {
     }
 }
 
+enum CommunityOccasionCategory: String, Codable, CaseIterable {
+    case births
+    case barBasMitzvahs = "bar_bas_mitzvahs"
+    case engagements
+    case anniversaries
+    case birthdays
+    case yahrzeit
+    case condolences
+
+    var displayLabel: String {
+        switch self {
+        case .births:
+            return "Births"
+        case .barBasMitzvahs:
+            return "Bar/Bas Mitzvahs"
+        case .engagements:
+            return "Engagements"
+        case .anniversaries:
+            return "Anniversaries"
+        case .birthdays:
+            return "Birthdays"
+        case .yahrzeit:
+            return "Yahrzeit"
+        case .condolences:
+            return "Condolences"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .births:
+            return "figure.2.and.child.holdinghands"
+        case .barBasMitzvahs:
+            return "staroflife.fill"
+        case .engagements:
+            return "sparkles"
+        case .anniversaries:
+            return "heart.fill"
+        case .birthdays:
+            return "gift.fill"
+        case .yahrzeit:
+            return "flame.fill"
+        case .condolences:
+            return "bell.fill"
+        }
+    }
+}
+
+enum CommunityOccasionGroup: String, Codable {
+    case timeSensitive = "time_sensitive"
+    case celebration
+    case notice
+}
+
+struct CommunityOccasionItem: Identifiable, Codable, Equatable {
+    let id: String
+    var category: CommunityOccasionCategory
+    var categoryLabel: String
+    var rawText: String
+    var effectiveDateIso: String?
+    var sourceDateText: String?
+    var group: CommunityOccasionGroup
+    var isInPriorityWindow: Bool
+    var sortRank: Int
+    var source: String
+    var updatedAt: Date?
+
+    private static let isoFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "America/Chicago")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    private static let readableDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM d, yyyy"
+        formatter.timeZone = TimeZone(identifier: "America/Chicago")
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        return formatter
+    }()
+
+    var effectiveDate: Date? {
+        guard let effectiveDateIso else { return nil }
+        return CommunityOccasionItem.isoFormatter.date(from: effectiveDateIso)
+    }
+
+    var displayDateText: String? {
+        if let sourceDateText, !sourceDateText.isEmpty {
+            return sourceDateText
+        }
+        if let effectiveDate {
+            return CommunityOccasionItem.readableDateFormatter.string(from: effectiveDate)
+        }
+        return effectiveDateIso
+    }
+
+    var preferredDisplayText: String {
+        let normalizedRaw = normalizeOccasionText(rawText)
+        guard let dateText = displayDateText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !dateText.isEmpty else {
+            return normalizedRaw
+        }
+
+        let cleaned = normalizeOccasionText(removingDateText(dateText, from: normalizedRaw))
+        return cleaned.isEmpty ? normalizedRaw : cleaned
+    }
+
+    var showsStandaloneDateBadge: Bool {
+        guard let dateText = displayDateText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !dateText.isEmpty else {
+            return false
+        }
+
+        let normalizedRaw = normalizeOccasionText(rawText)
+        let rawContainsDate = normalizedRaw.range(of: dateText, options: .caseInsensitive) != nil
+        return !(rawContainsDate && preferredDisplayText == normalizedRaw)
+    }
+
+    private func removingDateText(_ dateText: String, from source: String) -> String {
+        let escapedDate = NSRegularExpression.escapedPattern(for: dateText)
+        guard !escapedDate.isEmpty else { return source }
+        guard let regex = try? NSRegularExpression(pattern: escapedDate, options: [.caseInsensitive]) else {
+            return source
+        }
+        let range = NSRange(source.startIndex..<source.endIndex, in: source)
+        return regex.stringByReplacingMatches(in: source, options: [], range: range, withTemplate: "")
+    }
+
+    private func normalizeOccasionText(_ source: String) -> String {
+        var cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        cleaned = cleaned.replacingOccurrences(of: "\\s{2,}", with: " ", options: .regularExpression)
+        cleaned = cleaned.replacingOccurrences(of: "\\s+on\\s*$", with: "", options: .regularExpression)
+        cleaned = cleaned.replacingOccurrences(of: "^[,;:\\-\\s]+", with: "", options: .regularExpression)
+        cleaned = cleaned.replacingOccurrences(of: "[,;:\\-\\s]+$", with: "", options: .regularExpression)
+        return cleaned.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+struct CommunityOccasionSection: Identifiable, Equatable {
+    let id: String
+    let title: String
+    var items: [CommunityOccasionItem]
+}
+
 // MARK: - Social Post Model
 struct SocialPostMedia: Codable, Equatable {
     let type: String

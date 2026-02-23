@@ -231,12 +231,8 @@ struct HonorDetailView: View {
                 bidAmount = ""
                 comment = ""
                 
-                // Update user's total pledged locally
-                currentUser?.totalPledged += amount
-                
-                // Sync totalPledged to Firestore
                 if let userEmail = currentUser?.email {
-                    _ = await firestoreManager.updateUserTotalPledged(email: userEmail, amount: currentUser?.totalPledged ?? 0)
+                    _ = await firestoreManager.incrementUserTotalPledged(email: userEmail, by: amount)
                 }
                 
                 // Dismiss after successful bid
@@ -272,12 +268,8 @@ struct HonorDetailView: View {
                 let notificationFeedback = UINotificationFeedbackGenerator()
                 notificationFeedback.notificationOccurred(.success)
                 
-                // Update user's total pledged locally
-                currentUser?.totalPledged += honor.buyNowPrice
-                
-                // Sync totalPledged to Firestore
                 if let userEmail = currentUser?.email {
-                    _ = await firestoreManager.updateUserTotalPledged(email: userEmail, amount: currentUser?.totalPledged ?? 0)
+                    _ = await firestoreManager.incrementUserTotalPledged(email: userEmail, by: honor.buyNowPrice)
                 }
                 
                 // Dismiss after successful purchase
@@ -574,5 +566,4 @@ struct SoldBanner: View {
         .cornerRadius(20)
     }
 }
-
 

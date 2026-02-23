@@ -534,7 +534,9 @@ struct ProfileTabView: View {
                         
                         // Enhanced Sign Out Button
                         Button(action: {
-                            authManager.signOut()
+                            Task {
+                                await authManager.signOut()
+                            }
                         }) {
                             HStack(spacing: 10) {
                                 Image(systemName: "arrow.right.square.fill")
@@ -593,24 +595,17 @@ struct ProfileTabView: View {
                     .environmentObject(firestoreManager)
             }
             .onAppear {
-                if let email = firestoreManager.currentUser?.email {
+                if let email = firestoreManager.currentUser?.email, !email.isEmpty {
                     notificationManager.currentUserEmail = email
                     notificationManager.startListening()
                 }
-            }
-            .onChange(of: firestoreManager.currentUser) { _, newUser in
-                if let email = newUser?.email {
-                    notificationManager.currentUserEmail = email
-                    notificationManager.startListening()
-                }
-            }
-            .onAppear {
                 loadUserSponsorships()
                 // Start listening to real-time updates
                 firestoreManager.startListeningToSponsorships()
             }
             .onDisappear {
                 firestoreManager.stopListeningToSponsorships()
+                notificationManager.stopListening()
             }
             .refreshable {
                 loadUserSponsorships()
@@ -626,6 +621,10 @@ struct ProfileTabView: View {
                 loadUserSponsorships()
             }
             .onChange(of: firestoreManager.currentUser) { _, newUser in
+                if let email = newUser?.email, !email.isEmpty {
+                    notificationManager.currentUserEmail = email
+                    notificationManager.startListening()
+                }
                 // Sync FirestoreManager updates (real-time) to the local user binding
                 if let newUser = newUser {
                     user = newUser

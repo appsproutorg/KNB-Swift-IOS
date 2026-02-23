@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct MainTabView: View {
+    private static var didSetupTabBarAppearance = false
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
     @ObservedObject var authManager: AuthenticationManager
@@ -24,7 +25,7 @@ struct MainTabView: View {
                     currentUser: $currentUser
                 )
                 .tabItem {
-                    Label("Kiddush", systemImage: "calendar")
+                    Label("Calendar", systemImage: "calendar")
                 }
                 .tag(0)
                 
@@ -63,6 +64,9 @@ struct MainTabView: View {
     
     // MARK: - Liquid Glass Tab Bar Setup
     private func setupLiquidGlassTabBar() {
+        guard !Self.didSetupTabBarAppearance else { return }
+        Self.didSetupTabBarAppearance = true
+
         // Configure iOS 26 Liquid Glass appearance
         let appearance = UITabBarAppearance()
         
@@ -171,4 +175,3 @@ extension View {
         authManager: AuthenticationManager()
     )
 }
-

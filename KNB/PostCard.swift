@@ -325,7 +325,7 @@ struct PostCard: View {
         
         // 4. Fetch from Firestore (Last resort)
         Task {
-            if let userData = await firestoreManager.fetchUserData(email: post.authorEmail) {
+            if let userData = await firestoreManager.fetchUser(email: post.authorEmail) {
                 await MainActor.run {
                     authorDisplayName = userData.name
                     userCache.cacheName(userData.name, for: post.authorEmail)

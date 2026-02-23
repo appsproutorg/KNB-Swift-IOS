@@ -338,9 +338,20 @@ struct SocialPostMediaGalleryView: View {
     }
 
     private func estimatedHeight(for media: SocialPostMedia) -> CGFloat {
-        let width = max(200, UIScreen.main.bounds.width - 92)
+        let width = max(200, currentScreenWidth() - 92)
         let ratio = CGFloat(max(media.width, 1)) / CGFloat(max(media.height, 1))
         return min(width / max(ratio, 0.01), maxHeight)
+    }
+
+    private func currentScreenWidth() -> CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        if let windowScene = scenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene {
+            return windowScene.screen.bounds.width
+        }
+        if let windowScene = scenes.first(where: { $0 is UIWindowScene }) as? UIWindowScene {
+            return windowScene.screen.bounds.width
+        }
+        return 390
     }
 }
 

@@ -30,6 +30,13 @@ class NetworkMonitor: ObservableObject {
     init() {
         // Don't start monitoring immediately - let the view start it
     }
+
+    deinit {
+        recheckTimer?.invalidate()
+        recheckTimer = nil
+        monitor?.cancel()
+        monitor = nil
+    }
     
     func startMonitoring() {
         guard !isMonitoring else { return }
@@ -50,8 +57,8 @@ class NetworkMonitor: ObservableObject {
         recheckTimer?.invalidate()
         recheckTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            guard let path = self.monitor?.currentPath else { return }
             Task { @MainActor in
+                guard let path = self.monitor?.currentPath else { return }
                 self.apply(path: path)
             }
         }
@@ -75,15 +82,13 @@ class NetworkMonitor: ObservableObject {
     private func apply(path: NWPath) {
         let connected = path.status == .satisfied
         let type = mapConnectionType(from: path)
-        
-        DispatchQueue.main.async {
-            // Publish only when needed to keep UI updates clean.
-            if self.isConnected != connected {
-                self.isConnected = connected
-            }
-            if self.connectionType != type {
-                self.connectionType = type
-            }
+
+        // Publish only when needed to keep UI updates clean.
+        if isConnected != connected {
+            isConnected = connected
+        }
+        if connectionType != type {
+            connectionType = type
         }
     }
     

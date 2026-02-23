@@ -358,9 +358,7 @@ struct PostComposerView: View {
         }
 
         do {
-            let prepared = try await Task.detached(priority: .userInitiated) {
-                try SocialImageCompressor.prepareUploadWithPreview(from: image)
-            }.value
+            let prepared = try SocialImageCompressor.prepareUploadWithPreview(from: image)
 
             await MainActor.run {
                 selectedImages.append(prepared.previewImage)
@@ -405,9 +403,7 @@ struct PostComposerView: View {
                     throw SocialMediaCompressionError.invalidImageData
                 }
 
-                let prepared = try await Task.detached(priority: .userInitiated) {
-                    try SocialImageCompressor.prepareUploadWithPreview(from: image)
-                }.value
+                let prepared = try SocialImageCompressor.prepareUploadWithPreview(from: image)
                 preparedItems.append(prepared)
             } catch {
                 failureCount += 1

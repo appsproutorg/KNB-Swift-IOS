@@ -21,6 +21,7 @@ class FirestoreManager: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var kiddushSponsorships: [KiddushSponsorship] = []
+    @Published var communityOccasions: [CommunityOccasionItem] = []
     @Published var availableDates: [Date] = []
     @Published var socialPosts: [SocialPost] = []
     @Published var lastUpdated: Date?
@@ -30,10 +31,12 @@ class FirestoreManager: ObservableObject {
     
     private var honorsListener: ListenerRegistration?
     private var sponsorshipsListener: ListenerRegistration?
+    private var communityOccasionsListener: ListenerRegistration?
     private var socialPostsListener: ListenerRegistration?
     private var seatReservationsListener: ListenerRegistration?
 
     private let scrapedKiddushCollection = "kiddushCalendar"
+    private let communityOccasionsCollection = "communityOccasions"
     private let scrapedSponsorEmailPlaceholder = "website@heritagecongregation.com"
     
 
@@ -181,6 +184,21 @@ class FirestoreManager: ObservableObject {
     // MARK: - Stop Listening
     func stopListening() {
         honorsListener?.remove()
+        honorsListener = nil
+        stopListeningToSponsorships()
+        stopListeningToCommunityOccasions()
+        stopListeningToSocialPosts()
+        stopListeningToSeatReservations()
+        stopListeningToUser()
+    }
+
+    deinit {
+        honorsListener?.remove()
+        sponsorshipsListener?.remove()
+        communityOccasionsListener?.remove()
+        socialPostsListener?.remove()
+        seatReservationsListener?.remove()
+        userListener?.remove()
     }
     
     // MARK: - Fetch Honors (One-time)
@@ -534,6 +552,7 @@ class FirestoreManager: ObservableObject {
     // Stop listening to sponsorships
     func stopListeningToSponsorships() {
         sponsorshipsListener?.remove()
+        sponsorshipsListener = nil
     }
     
     // Fetch all Kiddush sponsorships
@@ -549,6 +568,103 @@ class FirestoreManager: ObservableObject {
             }.sorted { $0.date < $1.date }
         } catch {
             print("Error fetching sponsorships: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func parseCommunityOccasion(docId: String, data: [String: Any]) -> CommunityOccasionItem? {
+        let categoryRaw = (data["categoryKey"] as? String) ?? ""
+        guard let category = CommunityOccasionCategory(rawValue: categoryRaw) else {
+            return nil
+        }
+
+        let groupRaw = (data["group"] as? String) ?? ""
+        guard let group = CommunityOccasionGroup(rawValue: groupRaw) else {
+            return nil
+        }
+
+        let rawText = (data["rawText"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !rawText.isEmpty else {
+            return nil
+        }
+
+        let normalizedCategoryLabel =
+            (data["categoryLabel"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let categoryLabel = normalizedCategoryLabel.isEmpty ? category.displayLabel : normalizedCategoryLabel
+
+        let effectiveDateIso = (data["effectiveDateIso"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let sourceDateText = (data["sourceDateText"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = (data["source"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "website"
+        let updatedAt = (data["updatedAt"] as? Timestamp)?.dateValue()
+        let isInPriorityWindow = data["isInPriorityWindow"] as? Bool ?? false
+        let sortRank = parseIntValue(data["sortRank"])
+
+        return CommunityOccasionItem(
+            id: (data["id"] as? String) ?? docId,
+            category: category,
+            categoryLabel: categoryLabel,
+            rawText: rawText,
+            effectiveDateIso: effectiveDateIso?.isEmpty == true ? nil : effectiveDateIso,
+            sourceDateText: sourceDateText?.isEmpty == true ? nil : sourceDateText,
+            group: group,
+            isInPriorityWindow: isInPriorityWindow,
+            sortRank: sortRank,
+            source: source,
+            updatedAt: updatedAt
+        )
+    }
+
+    func startListeningToCommunityOccasions() {
+        communityOccasionsListener?.remove()
+
+        communityOccasionsListener = db.collection(communityOccasionsCollection)
+            .order(by: "sortRank")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    print("❌ Error listening to community occasions: \(error.localizedDescription)")
+                    return
+                }
+
+                guard let documents = snapshot?.documents else { return }
+
+                self.communityOccasions = documents.compactMap { doc in
+                    self.parseCommunityOccasion(docId: doc.documentID, data: doc.data())
+                }.sorted {
+                    if $0.sortRank != $1.sortRank {
+                        return $0.sortRank < $1.sortRank
+                    }
+                    return $0.rawText < $1.rawText
+                }
+
+                print("✅ Loaded \(self.communityOccasions.count) community occasions")
+            }
+    }
+
+    func stopListeningToCommunityOccasions() {
+        communityOccasionsListener?.remove()
+        communityOccasionsListener = nil
+    }
+
+    func fetchCommunityOccasions() async {
+        do {
+            let snapshot = try await db.collection(communityOccasionsCollection)
+                .order(by: "sortRank")
+                .getDocuments()
+
+            communityOccasions = snapshot.documents.compactMap { doc in
+                parseCommunityOccasion(docId: doc.documentID, data: doc.data())
+            }.sorted {
+                if $0.sortRank != $1.sortRank {
+                    return $0.sortRank < $1.sortRank
+                }
+                return $0.rawText < $1.rawText
+            }
+        } catch {
+            print("❌ Error fetching community occasions: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
         }
     }
@@ -835,7 +951,10 @@ class FirestoreManager: ObservableObject {
             }
 
             // Fallback for legacy docs with non-deterministic IDs.
-            let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
+            guard let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) else {
+                errorMessage = "Failed to compute sponsorship date range."
+                return false
+            }
             let snapshot = try await db.collection("kiddush_sponsorships")
                 .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: startOfDay))
                 .whereField("date", isLessThan: Timestamp(date: endOfDay))
@@ -1139,29 +1258,41 @@ class FirestoreManager: ObservableObject {
     func toggleLike(postId: String, userEmail: String) async -> Bool {
         do {
             let postRef = db.collection("social_posts").document(postId)
-            let postDoc = try await postRef.getDocument()
-            
-            guard let data = postDoc.data(),
-                  var likes = data["likes"] as? [String] else {
-                errorMessage = "Post not found"
-                return false
-            }
-            
-            var likeCount = data["likeCount"] as? Int ?? 0
-            let wasLiked = likes.contains(userEmail)
-            
-            if wasLiked {
-                likes.removeAll { $0 == userEmail }
-                likeCount = max(0, likeCount - 1)
-            } else {
-                likes.append(userEmail)
-                likeCount += 1
-            }
-            
-            try await postRef.updateData([
-                "likes": likes,
-                "likeCount": likeCount
-            ])
+            let _ = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
+                let postDoc: DocumentSnapshot
+                do {
+                    postDoc = try transaction.getDocument(postRef)
+                } catch let fetchError as NSError {
+                    errorPointer?.pointee = fetchError
+                    return nil
+                }
+
+                guard let data = postDoc.data(),
+                      let likes = data["likes"] as? [String] else {
+                    let error = NSError(
+                        domain: "AppError",
+                        code: 404,
+                        userInfo: [NSLocalizedDescriptionKey: "Post not found"]
+                    )
+                    errorPointer?.pointee = error
+                    return nil
+                }
+
+                var likeSet = Set(likes)
+                if likeSet.contains(userEmail) {
+                    likeSet.remove(userEmail)
+                } else {
+                    likeSet.insert(userEmail)
+                }
+
+                let normalizedLikes = Array(likeSet).sorted()
+                transaction.updateData([
+                    "likes": normalizedLikes,
+                    "likeCount": normalizedLikes.count
+                ], forDocument: postRef)
+
+                return nil
+            })
             
             print("✅ Toggled like for post: \(postId)")
             return true
@@ -1211,7 +1342,6 @@ class FirestoreManager: ObservableObject {
                 )
             }
             
-            let batch = db.batch()
             let replyRef = db.collection("social_posts").document(reply.id)
             
             var replyData: [String: Any] = [
@@ -1230,13 +1360,8 @@ class FirestoreManager: ObservableObject {
             replyData["mediaItems"] = replyMediaItems.map(socialMediaToMap(_:))
             replyData["media"] = replyMediaItems.first.map(socialMediaToMap(_:)) ?? NSNull()
             
-            batch.setData(replyData, forDocument: replyRef)
-            batch.updateData([
-                "replyCount": FieldValue.increment(Int64(1))
-            ], forDocument: parentRef)
-            
             do {
-                try await batch.commit()
+                try await replyRef.setData(replyData)
             } catch {
                 if let mediaPath = uploadedMedia?.storagePath {
                     try? await deleteSocialPostMedia(at: mediaPath)
@@ -1273,55 +1398,16 @@ class FirestoreManager: ObservableObject {
     // Delete a social post
     func deleteSocialPost(postId: String) async -> Bool {
         do {
-            let postDoc = try await db.collection("social_posts").document(postId).getDocument()
-            guard let postData = postDoc.data() else {
+            let postRef = db.collection("social_posts").document(postId)
+            let postDoc = try await postRef.getDocument()
+            guard postDoc.exists else {
                 errorMessage = "Post not found"
                 return false
             }
-            
-            let parentPostId = postData["parentPostId"] as? String
-            let isTopLevelPost = parentPostId == nil
-            
-            var replyIds: [String] = []
-            var mediaPathsToDelete = Set<String>()
-            mediaPathsToDelete.formUnion(extractSocialMediaPaths(from: postData))
-            
-            if isTopLevelPost {
-                let repliesSnapshot = try await db.collection("social_posts")
-                    .whereField("parentPostId", isEqualTo: postId)
-                    .getDocuments()
-                replyIds = repliesSnapshot.documents.map { $0.documentID }
-                
-                for reply in repliesSnapshot.documents {
-                    mediaPathsToDelete.formUnion(extractSocialMediaPaths(from: reply.data()))
-                }
-            }
-            
-            let batch = db.batch()
-            
-            if let parentId = parentPostId {
-                let parentRef = db.collection("social_posts").document(parentId)
-                batch.updateData([
-                    "replyCount": FieldValue.increment(Int64(-1))
-                ], forDocument: parentRef)
-            }
-            
-            let postRef = db.collection("social_posts").document(postId)
-            batch.deleteDocument(postRef)
-            try await batch.commit()
-            
-            if isTopLevelPost && !replyIds.isEmpty {
-                let repliesBatch = db.batch()
-                for replyId in replyIds {
-                    let replyRef = db.collection("social_posts").document(replyId)
-                    repliesBatch.deleteDocument(replyRef)
-                }
-                try await repliesBatch.commit()
-            }
-            
-            for mediaPath in mediaPathsToDelete {
-                try? await deleteSocialPostMedia(at: mediaPath)
-            }
+
+            // The backend onDelete trigger performs authoritative cascade cleanup:
+            // replyCount maintenance, reply deletion, and media deletion.
+            try await postRef.delete()
             
             print("✅ Deleted social post: \(postId)")
             return true
@@ -1607,37 +1693,40 @@ class FirestoreManager: ObservableObject {
     }
     
     // Fetch user data from Firestore
-    func fetchUserData(email: String) async -> User? {
+    func fetchUser(email: String) async -> User? {
         do {
             let userDoc = try await db.collection("users").document(email).getDocument()
             
             guard let data = userDoc.data() else {
-                // User document doesn't exist yet, return nil
                 return nil
             }
-            
+
             let name = data["name"] as? String ?? "Member"
             let totalPledged = data["totalPledged"] as? Double ?? 0
             let isAdmin = data["isAdmin"] as? Bool ?? false
-            
-            let user = User(
+
+            return User(
                 name: name,
                 email: email,
                 totalPledged: totalPledged,
                 isAdmin: isAdmin,
                 notificationPrefs: NotificationPreferences(data: data["notificationPrefs"] as? [String: Any] ?? [:])
             )
-            
-            self.currentUser = user
-            
-            // Start listening for real-time updates to this user
-            self.startListeningToUser(email: email)
-            
-            return user
         } catch {
             print("❌ Error fetching user data: \(error.localizedDescription)")
             return nil
         }
+    }
+
+    // Fetch and set current user data from Firestore.
+    func fetchUserData(email: String) async -> User? {
+        guard let user = await fetchUser(email: email) else {
+            return nil
+        }
+
+        self.currentUser = user
+        startListeningToUser(email: email)
+        return user
     }
     
     // Listen for real-time updates to the current user's profile
@@ -1651,26 +1740,24 @@ class FirestoreManager: ObservableObject {
         
         userListener = db.collection("users").document(email)
             .addSnapshotListener { [weak self] snapshot, error in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    print("❌ Error listening to user updates: \(error.localizedDescription)")
-                    return
-                }
-                
-                guard let snapshot = snapshot, let data = snapshot.data() else {
-                    print("⚠️ User document does not exist")
-                    return
-                }
-                
-                // Parse updated user data
-                let name = data["name"] as? String ?? "Member"
-                let totalPledged = data["totalPledged"] as? Double ?? 0
-                let isAdmin = data["isAdmin"] as? Bool ?? false
-                
-                // Update current user on main thread
-                DispatchQueue.main.async {
-                    // Create updated user object
+                Task { @MainActor in
+                    guard let self = self else { return }
+
+                    if let error = error {
+                        print("❌ Error listening to user updates: \(error.localizedDescription)")
+                        return
+                    }
+
+                    guard let snapshot = snapshot, let data = snapshot.data() else {
+                        print("⚠️ User document does not exist")
+                        return
+                    }
+
+                    // Parse updated user data
+                    let name = data["name"] as? String ?? "Member"
+                    let totalPledged = data["totalPledged"] as? Double ?? 0
+                    let isAdmin = data["isAdmin"] as? Bool ?? false
+
                     let updatedUser = User(
                         name: name,
                         email: email,
@@ -1678,16 +1765,14 @@ class FirestoreManager: ObservableObject {
                         isAdmin: isAdmin,
                         notificationPrefs: NotificationPreferences(data: data["notificationPrefs"] as? [String: Any] ?? [:])
                     )
-                    
+
                     // Only update if something changed to avoid loops
-                    if self.currentUser?.isAdmin != updatedUser.isAdmin || 
-                       self.currentUser?.name != updatedUser.name ||
-                       self.currentUser?.totalPledged != updatedUser.totalPledged {
-                        
+                    if self.currentUser?.isAdmin != updatedUser.isAdmin ||
+                        self.currentUser?.name != updatedUser.name ||
+                        self.currentUser?.totalPledged != updatedUser.totalPledged {
                         print("🔄 User profile updated from Firestore. Admin: \(isAdmin)")
                         self.currentUser = updatedUser
-                        
-                        // Also update admin list if this user became an admin
+
                         if isAdmin {
                             self.adminEmails.insert(email)
                         } else {
@@ -1716,6 +1801,33 @@ class FirestoreManager: ObservableObject {
             return true
         } catch {
             print("❌ Error updating totalPledged: \(error.localizedDescription)")
+            errorMessage = "Failed to update total pledged: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    // Atomically increment total pledged to avoid lost updates from concurrent bids.
+    func incrementUserTotalPledged(email: String, by amount: Double) async -> Bool {
+        guard amount > 0, amount.isFinite else {
+            errorMessage = "Invalid total pledged increment."
+            return false
+        }
+
+        do {
+            let userRef = db.collection("users").document(email)
+            try await userRef.updateData([
+                "totalPledged": FieldValue.increment(amount),
+                "lastUpdated": Timestamp(date: Date())
+            ])
+
+            if currentUser?.email == email {
+                currentUser?.totalPledged += amount
+            }
+
+            print("✅ Incremented totalPledged for \(email) by $\(amount)")
+            return true
+        } catch {
+            print("❌ Error incrementing totalPledged: \(error.localizedDescription)")
             errorMessage = "Failed to update total pledged: \(error.localizedDescription)"
             return false
         }
@@ -1899,6 +2011,7 @@ class FirestoreManager: ObservableObject {
     // Stop listening to seat reservations
     func stopListeningToSeatReservations() {
         seatReservationsListener?.remove()
+        seatReservationsListener = nil
     }
     
     // Reserve a seat (with transaction to prevent conflicts)
@@ -1926,7 +2039,7 @@ class FirestoreManager: ObservableObject {
                 
                 // Create the reservation
                 let reservationData: [String: Any] = [
-                    "id": UUID().uuidString,
+                    "id": seatId,
                     "row": row,
                     "number": number,
                     "reservedBy": userEmail,

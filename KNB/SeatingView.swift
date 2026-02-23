@@ -90,7 +90,7 @@ struct Seat: Identifiable {
     var isOccupied: Bool
     
     init(
-        id: String = UUID().uuidString,
+        id: String? = nil,
         row: String,
         number: Int,
         section: String,
@@ -98,7 +98,7 @@ struct Seat: Identifiable {
         isSelected: Bool = false,
         isOccupied: Bool = false
     ) {
-        self.id = id
+        self.id = id ?? "\(row)-\(number)"
         self.row = row
         self.number = number
         self.section = section

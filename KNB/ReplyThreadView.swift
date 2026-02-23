@@ -395,7 +395,7 @@ struct ReplyCard: View {
         
         // 4. Fetch from Firestore
         Task {
-            if let userData = await firestoreManager.fetchUserData(email: reply.authorEmail) {
+            if let userData = await firestoreManager.fetchUser(email: reply.authorEmail) {
                 await MainActor.run {
                     authorDisplayName = userData.name
                     userCache.cacheName(userData.name, for: reply.authorEmail)

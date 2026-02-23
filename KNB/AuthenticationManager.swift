@@ -20,6 +20,7 @@ class AuthenticationManager: ObservableObject {
     @Published var errorMessage: String?
     private var hasCheckedAuth = false
     private var firestoreManager: FirestoreManager?
+    private var loadUserTask: Task<Void, Never>?
     
     init() {
         // Defer auth check until after Firebase is fully initialized
@@ -29,13 +30,13 @@ class AuthenticationManager: ObservableObject {
         self.firestoreManager = manager
     }
     
-    func checkAuthState() {
+    func checkAuthState() async {
         guard !hasCheckedAuth else { return }
         hasCheckedAuth = true
         
         // Check if user is already logged in
         if let firebaseUser = Auth.auth().currentUser {
-            loadUserData(from: firebaseUser)
+            await loadUserData(from: firebaseUser)
         }
     }
     
@@ -79,7 +80,7 @@ class AuthenticationManager: ObservableObject {
     func signIn(email: String, password: String) async -> Bool {
         do {
             let authResult = try await Auth.auth().signIn(withEmail: email, password: password)
-            loadUserData(from: authResult.user)
+            await loadUserData(from: authResult.user)
             
             // Store FCM token if available
             await storeFCMTokenIfAvailable()
@@ -113,7 +114,7 @@ class AuthenticationManager: ObservableObject {
             let credential = GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken)
             let authResult = try await Auth.auth().signIn(with: credential)
 
-            loadUserData(from: authResult.user)
+            await loadUserData(from: authResult.user)
             await storeFCMTokenIfAvailable()
 
             errorMessage = nil
@@ -137,19 +138,32 @@ class AuthenticationManager: ObservableObject {
     }
     
     // MARK: - Sign Out
-    func signOut() {
+    func signOut() async {
+        loadUserTask?.cancel()
+        loadUserTask = nil
+
+        let signedInEmail = user?.email ?? Auth.auth().currentUser?.email
+        await removeStoredFCMTokenIfAvailable(for: signedInEmail)
+
         do {
             try Auth.auth().signOut()
-            user = nil
-            isAuthenticated = false
-            errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
+            return
         }
+
+        firestoreManager?.stopListening()
+        firestoreManager?.currentUser = nil
+
+        user = nil
+        isAuthenticated = false
+        errorMessage = nil
     }
     
     // MARK: - Helper Methods
-    private func loadUserData(from firebaseUser: FirebaseAuth.User) {
+    private func loadUserData(from firebaseUser: FirebaseAuth.User) async {
+        loadUserTask?.cancel()
+
         let email = firebaseUser.email ?? ""
         
         // Try to load from cache first for instant UI
@@ -159,9 +173,14 @@ class AuthenticationManager: ObservableObject {
         }
         
         // Then load from Firestore to get latest data
-        Task {
+        loadUserTask = Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            guard !Task.isCancelled else { return }
+
             if let firestoreManager = firestoreManager {
                 if let firestoreUser = await firestoreManager.fetchUserData(email: email) {
+                    guard !Task.isCancelled else { return }
+                    guard Auth.auth().currentUser?.email == email else { return }
                     // User exists in Firestore, use that data
                     user = firestoreUser
                     // Cache the updated user data
@@ -174,6 +193,8 @@ class AuthenticationManager: ObservableObject {
                         totalPledged: 0,
                         isAdmin: isAdminEmail(email)
                     )
+                    guard !Task.isCancelled else { return }
+                    guard Auth.auth().currentUser?.email == email else { return }
                     user = newUser
                     // Cache and create user document in Firestore
                     cacheUser(user: newUser)
@@ -187,11 +208,15 @@ class AuthenticationManager: ObservableObject {
                     totalPledged: 0,
                     isAdmin: isAdminEmail(email)
                 )
+                guard !Task.isCancelled else { return }
+                guard Auth.auth().currentUser?.email == email else { return }
                 user = defaultUser
                 cacheUser(user: defaultUser)
             }
             isAuthenticated = true
         }
+
+        await loadUserTask?.value
     }
     
     // Cache user profile data
@@ -218,14 +243,35 @@ class AuthenticationManager: ObservableObject {
            let userEmail = user?.email {
             let db = Firestore.firestore()
             do {
+                let tokenData: [String: Any] = [
+                    "platform": "ios",
+                    "updatedAt": FieldValue.serverTimestamp()
+                ]
                 try await db.collection("users").document(userEmail).setData([
-                    "fcmToken": fcmToken,
-                    "fcmTokenUpdatedAt": Timestamp(date: Date())
+                    "fcmTokens": [
+                        fcmToken: tokenData
+                    ],
+                    "fcmToken": FieldValue.delete(),
+                    "fcmTokenUpdatedAt": FieldValue.delete()
                 ], merge: true)
                 print("✅ Stored FCM token for user: \(userEmail)")
             } catch {
                 print("❌ Error storing FCM token: \(error.localizedDescription)")
             }
+        }
+    }
+
+    private func removeStoredFCMTokenIfAvailable(for userEmail: String?) async {
+        guard let userEmail, !userEmail.isEmpty else { return }
+        guard let fcmToken = UserDefaults.standard.string(forKey: "fcmToken"), !fcmToken.isEmpty else { return }
+
+        do {
+            try await Firestore.firestore().collection("users").document(userEmail).updateData([
+                FieldPath(["fcmTokens", fcmToken]): FieldValue.delete()
+            ])
+            print("🧹 Removed FCM token mapping for signed-out user: \(userEmail)")
+        } catch {
+            print("⚠️ Failed to remove FCM token on sign-out: \(error.localizedDescription)")
         }
     }
     
@@ -302,8 +348,8 @@ class AuthenticationManager: ObservableObject {
 
     private func getGoogleSignInErrorMessage(from error: Error) -> String {
         let nsError = error as NSError
-        let message = nsError.localizedDescription.lowercased()
-        if message.contains("cancel") {
+        let isGoogleCancelCode = nsError.domain.contains("GIDSignIn") && nsError.code == -5
+        if isGoogleCancelCode {
             return "Google sign in was canceled."
         }
 
