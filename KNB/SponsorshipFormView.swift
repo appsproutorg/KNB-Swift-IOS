@@ -236,6 +236,128 @@ struct SponsorshipFormView: View {
         formatter.timeZone = TimeZone(identifier: "America/Chicago")
         return "kiddushSelectedTier_\(formatter.string(from: shabbatDate))"
     }
+
+    @ViewBuilder
+    private var shabbatHeaderSection: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: 60))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [SponsorshipPalette.headerBlue, SponsorshipPalette.headerCyan],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .padding(.top, 20)
+
+            Text("Sponsor Kiddush")
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+
+            Text(formattedDate)
+                .font(.system(size: 18, weight: .medium, design: .rounded))
+                .foregroundStyle(.secondary)
+
+            if let hebrewDate = hebrewDate {
+                Text(hebrewDate)
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal)
+                    .multilineTextAlignment(.center)
+            }
+
+            if let parsha = shabbatTime?.parsha {
+                HStack(spacing: 8) {
+                    Image(systemName: "book.fill")
+                        .font(.system(size: 18))
+                    Text("Parashat \(parsha)")
+                        .font(.system(size: 20, weight: .bold, design: .rounded))
+                }
+                .foregroundStyle(SponsorshipPalette.headerBlue)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.7))
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(SponsorshipPalette.headerBlue.opacity(0.16), lineWidth: 1.2)
+                )
+            }
+
+            if let shabbatTime = shabbatTime {
+                HStack(spacing: 20) {
+                    SponsorshipTimeCard(
+                        icon: "light.max",
+                        title: "Candle Lighting",
+                        timeText: formatTime(shabbatTime.candleLighting),
+                        accent: Color(red: 0.92, green: 0.47, blue: 0.17),
+                        iconBackground: Color(red: 1.0, green: 0.95, blue: 0.86)
+                    )
+
+                    SponsorshipTimeCard(
+                        icon: "moon.stars.fill",
+                        title: "Havdalah",
+                        timeText: formatTime(shabbatTime.havdalah),
+                        accent: Color(red: 0.48, green: 0.35, blue: 0.89),
+                        iconBackground: Color(red: 0.93, green: 0.91, blue: 1.0)
+                    )
+                }
+                .padding(.horizontal)
+
+                if !additionalZmanimItems.isEmpty {
+                    VStack(spacing: 7) {
+                        Text("Additional Zmanim")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.flexible(), spacing: 8),
+                                GridItem(.flexible(), spacing: 8),
+                            ],
+                            spacing: 8
+                        ) {
+                            ForEach(additionalZmanimItems, id: \.title) { item in
+                                HStack(spacing: 5) {
+                                    Text(item.title)
+                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                    Text(item.value)
+                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.primary.opacity(0.9))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 6)
+                                .background(Color.white.opacity(0.72))
+                                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 10)
+                    .background(Color.white.opacity(0.46))
+                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(Color.white.opacity(0.88), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 24)
+                    .padding(.top, 4)
+                } else if let additionalZmanimText {
+                    Text(additionalZmanimText)
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.top, 4)
+                }
+            }
+        }
+        .padding(.bottom, 10)
+    }
     
     var body: some View {
         NavigationStack {
@@ -280,129 +402,7 @@ struct SponsorshipFormView: View {
                 
                 ScrollView {
                     VStack(spacing: 25) {
-                        // Header
-                        VStack(spacing: 12) {
-                            Image(systemName: "calendar.badge.plus")
-                                .font(.system(size: 60))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [SponsorshipPalette.headerBlue, SponsorshipPalette.headerCyan],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .padding(.top, 20)
-                            
-                            Text("Sponsor Kiddush")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                            
-                            // Gregorian Date
-                            Text(formattedDate)
-                                .font(.system(size: 18, weight: .medium, design: .rounded))
-                                .foregroundStyle(.secondary)
-                            
-                            // Hebrew Date (prominently displayed)
-                            if let hebrewDate = hebrewDate {
-                                Text(hebrewDate)
-                                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                                    .foregroundStyle(.primary)
-                                    .padding(.horizontal)
-                                    .multilineTextAlignment(.center)
-                            }
-                            
-                            // Parsha (prominently displayed)
-                            if let parsha = shabbatTime?.parsha {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "book.fill")
-                                        .font(.system(size: 18))
-                                    Text("Parashat \(parsha)")
-                                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                                }
-                                .foregroundStyle(SponsorshipPalette.headerBlue)
-                                .padding(.horizontal, 20)
-                                .padding(.vertical, 10)
-                                .background(
-                                    Capsule()
-                                        .fill(Color.white.opacity(0.7))
-                                )
-                                .overlay(
-                                    Capsule()
-                                        .stroke(SponsorshipPalette.headerBlue.opacity(0.16), lineWidth: 1.2)
-                                )
-                            }
-                            
-                            // Candle Lighting & Havdalah Times
-                            if let shabbatTime = shabbatTime {
-                                HStack(spacing: 20) {
-                                    SponsorshipTimeCard(
-                                        icon: "light.max",
-                                        title: "Candle Lighting",
-                                        timeText: formatTime(shabbatTime.candleLighting),
-                                        accent: Color(red: 0.92, green: 0.47, blue: 0.17),
-                                        iconBackground: Color(red: 1.0, green: 0.95, blue: 0.86)
-                                    )
-                                    
-                                    SponsorshipTimeCard(
-                                        icon: "moon.stars.fill",
-                                        title: "Havdalah",
-                                        timeText: formatTime(shabbatTime.havdalah),
-                                        accent: Color(red: 0.48, green: 0.35, blue: 0.89),
-                                        iconBackground: Color(red: 0.93, green: 0.91, blue: 1.0)
-                                    )
-                                }
-                                .padding(.horizontal)
-
-                                if !additionalZmanimItems.isEmpty {
-                                    VStack(spacing: 7) {
-                                        Text("Additional Zmanim")
-                                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(.secondary)
-
-                                        LazyVGrid(
-                                            columns: [
-                                                GridItem(.flexible(), spacing: 8),
-                                                GridItem(.flexible(), spacing: 8),
-                                            ],
-                                            spacing: 8
-                                        ) {
-                                            ForEach(additionalZmanimItems, id: \.title) { item in
-                                                HStack(spacing: 5) {
-                                                    Text(item.title)
-                                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                                                        .foregroundStyle(.secondary)
-                                                    Text(item.value)
-                                                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                                                        .foregroundStyle(.primary.opacity(0.9))
-                                                }
-                                                .frame(maxWidth: .infinity, alignment: .leading)
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 6)
-                                                .background(Color.white.opacity(0.72))
-                                                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                                            }
-                                        }
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 10)
-                                    .background(Color.white.opacity(0.46))
-                                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                            .stroke(Color.white.opacity(0.88), lineWidth: 1)
-                                    )
-                                    .padding(.horizontal, 24)
-                                    .padding(.top, 4)
-                                } else if let additionalZmanimText {
-                                    Text(additionalZmanimText)
-                                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                                        .foregroundStyle(.secondary)
-                                        .multilineTextAlignment(.center)
-                                        .padding(.horizontal, 24)
-                                        .padding(.top, 4)
-                                }
-                            }
-                        }
-                        .padding(.bottom, 10)
+                        shabbatHeaderSection
                         
                         // Past Date Warning Banner
                         if isPastDate {
