@@ -95,7 +95,18 @@ service cloud.firestore {
     match /communityMeta/{docId} {
       allow read, write: if false;
     }
-    
+
+    // Daily calendar docs (app read-only)
+    match /dailyCalendar/{isoDate} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    // Daily calendar sync metadata stays private
+    match /dailyCalendarMeta/{docId} {
+      allow read, write: if false;
+    }
+
     // Honors collection
     match /honors/{honorId} {
       allow read: if isAuthenticated();

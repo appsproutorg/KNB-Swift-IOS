@@ -22,6 +22,7 @@ class FirestoreManager: ObservableObject {
     @Published var errorMessage: String?
     @Published var kiddushSponsorships: [KiddushSponsorship] = []
     @Published var communityOccasions: [CommunityOccasionItem] = []
+    @Published var dailyCalendarByIsoDate: [String: DailyCalendarDay] = [:]
     @Published var availableDates: [Date] = []
     @Published var socialPosts: [SocialPost] = []
     @Published var lastUpdated: Date?
@@ -37,6 +38,7 @@ class FirestoreManager: ObservableObject {
 
     private let scrapedKiddushCollection = "kiddushCalendar"
     private let communityOccasionsCollection = "communityOccasions"
+    private let dailyCalendarCollection = "dailyCalendar"
     private let scrapedSponsorEmailPlaceholder = "website@heritagecongregation.com"
     
 
@@ -507,18 +509,23 @@ class FirestoreManager: ObservableObject {
         }
 
         let sponsorText = (data["sponsorText"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let sponsorName = sponsorText.isEmpty ? "Reserved" : parseSponsorName(from: sponsorText)
+        let sponsorNameFromField = (data["sponsorName"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let sponsorName = sponsorNameFromField.isEmpty
+            ? (sponsorText.isEmpty ? "Reserved" : parseSponsorName(from: sponsorText))
+            : sponsorNameFromField
+        let sponsorEmail = (data["sponsorEmail"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? scrapedSponsorEmailPlaceholder
+        let isAnonymous = data["isAnonymous"] as? Bool ?? false
         let updatedAt = (data["updatedAt"] as? Timestamp)?.dateValue() ?? Date()
 
         return KiddushSponsorship(
             id: UUID(),
             date: date,
             sponsorName: sponsorName,
-            sponsorEmail: scrapedSponsorEmailPlaceholder,
+            sponsorEmail: sponsorEmail,
             occasion: sponsorText.isEmpty ? "Reserved" : sponsorText,
             tierName: "Website Reserved",
             tierAmount: 0,
-            isAnonymous: false,
+            isAnonymous: isAnonymous,
             timestamp: updatedAt,
             isPaid: true
         )
@@ -667,6 +674,210 @@ class FirestoreManager: ObservableObject {
             print("❌ Error fetching community occasions: \(error.localizedDescription)")
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Daily Calendar
+    private func isoDateString(for date: Date) -> String {
+        chicagoIsoFormatter().string(from: Calendar.chicago.startOfDay(for: date))
+    }
+
+    private func monthStart(for date: Date) -> Date? {
+        let calendar = Calendar.chicago
+        return calendar.date(from: calendar.dateComponents([.year, .month], from: date))
+    }
+
+    private func monthKey(for date: Date) -> String {
+        let calendar = Calendar.chicago
+        let components = calendar.dateComponents([.year, .month], from: date)
+        let year = components.year ?? 0
+        let month = components.month ?? 0
+        return String(format: "%04d-%02d", year, month)
+    }
+
+    private func parseDailyScheduleLines(_ value: Any?) -> [DailyScheduleLine] {
+        guard let rawArray = value as? [[String: Any]] else { return [] }
+        return rawArray.compactMap { raw in
+            let title = (raw["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let timeText = (raw["timeText"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rawLine = (raw["rawLine"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+            guard !title.isEmpty || !rawLine.isEmpty else {
+                return nil
+            }
+
+            return DailyScheduleLine(
+                title: title.isEmpty ? rawLine : title,
+                timeText: timeText?.isEmpty == true ? nil : timeText,
+                rawLine: rawLine.isEmpty ? title : rawLine
+            )
+        }
+    }
+
+    private func parseDailyZmanim(_ value: Any?) -> DailyZmanim {
+        guard let raw = value as? [String: Any] else {
+            return DailyZmanim(alos: nil, netz: nil, chatzos: nil, shkia: nil, tzes: nil)
+        }
+
+        let alos = (raw["alos"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let netz = (raw["netz"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let chatzos = (raw["chatzos"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let shkia = (raw["shkia"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tzes = (raw["tzes"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return DailyZmanim(
+            alos: alos?.isEmpty == true ? nil : alos,
+            netz: netz?.isEmpty == true ? nil : netz,
+            chatzos: chatzos?.isEmpty == true ? nil : chatzos,
+            shkia: shkia?.isEmpty == true ? nil : shkia,
+            tzes: tzes?.isEmpty == true ? nil : tzes
+        )
+    }
+
+    private func parseDailyEvents(_ value: Any?, isoDate: String) -> [DailyCalendarEvent] {
+        guard let rawArray = value as? [[String: Any]] else { return [] }
+
+        return rawArray.compactMap { raw in
+            let title = (raw["title"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !title.isEmpty else { return nil }
+
+            let categoryKey = (raw["categoryKey"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "event"
+            let categoryLabel = (raw["categoryLabel"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? categoryKey.capitalized
+            let id = (raw["id"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? "\(isoDate)_\(categoryKey)_\(title)"
+            let headerText = (raw["headerText"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let detailsText = (raw["detailsText"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let sourceCssClass = (raw["sourceCssClass"] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+            return DailyCalendarEvent(
+                id: id,
+                categoryKey: categoryKey,
+                categoryLabel: categoryLabel,
+                title: title,
+                headerText: headerText?.isEmpty == true ? nil : headerText,
+                detailsText: detailsText?.isEmpty == true ? nil : detailsText,
+                sourceCssClass: sourceCssClass
+            )
+        }
+    }
+
+    private func parseDailyCalendarDoc(docId: String, data: [String: Any]) -> DailyCalendarDay? {
+        let isoDate = ((data["isoDate"] as? String) ?? docId).trimmingCharacters(in: .whitespacesAndNewlines)
+        let formatter = chicagoIsoFormatter()
+        guard let parsedDate = formatter.date(from: isoDate) else {
+            return nil
+        }
+
+        let calendar = Calendar.chicago
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: parsedDate)
+        let fallbackYear = dateComponents.year ?? 0
+        let fallbackMonth = dateComponents.month ?? 0
+        let fallbackDay = dateComponents.day ?? 0
+        let fallbackWeekdayLabel = DateFormatter.weekdayFormatter.string(from: parsedDate)
+
+        let year = parseIntValue(data["year"])
+        let month = parseIntValue(data["month"])
+        let day = parseIntValue(data["day"])
+        let weekdayLabel = (data["weekdayLabel"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let hebrewDate = (data["hebrewDate"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let monthKeyValue = (data["monthKey"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = (data["source"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "website"
+        let updatedAt = (data["updatedAt"] as? Timestamp)?.dateValue()
+
+        let resolvedYear = year > 0 ? year : fallbackYear
+        let resolvedMonth = month > 0 ? month : fallbackMonth
+        let resolvedDay = day > 0 ? day : fallbackDay
+        let resolvedMonthKey = monthKeyValue?.isEmpty == false
+            ? monthKeyValue!
+            : String(format: "%04d-%02d", resolvedYear, resolvedMonth)
+
+        return DailyCalendarDay(
+            isoDate: isoDate,
+            monthKey: resolvedMonthKey,
+            year: resolvedYear,
+            month: resolvedMonth,
+            day: resolvedDay,
+            weekdayLabel: weekdayLabel?.isEmpty == false ? weekdayLabel! : fallbackWeekdayLabel,
+            hebrewDate: hebrewDate,
+            scheduleLines: parseDailyScheduleLines(data["scheduleLines"]),
+            zmanim: parseDailyZmanim(data["zmanim"]),
+            events: parseDailyEvents(data["events"], isoDate: isoDate),
+            source: source,
+            updatedAt: updatedAt
+        )
+    }
+
+    private func mergeDailyCalendarDocs(_ docs: [DailyCalendarDay], startIso: String, endIso: String) {
+        var merged = dailyCalendarByIsoDate
+        let keysToRemove = merged.keys.filter { $0 >= startIso && $0 < endIso }
+        for key in keysToRemove {
+            merged.removeValue(forKey: key)
+        }
+        for doc in docs {
+            merged[doc.isoDate] = doc
+        }
+        dailyCalendarByIsoDate = merged
+    }
+
+    private func fetchDailyCalendarRange(from startDate: Date, to endDateExclusive: Date) async -> [DailyCalendarDay] {
+        do {
+            let startIso = isoDateString(for: startDate)
+            let endIso = isoDateString(for: endDateExclusive)
+
+            let snapshot = try await db.collection(dailyCalendarCollection)
+                .whereField(FieldPath.documentID(), isGreaterThanOrEqualTo: startIso)
+                .whereField(FieldPath.documentID(), isLessThan: endIso)
+                .order(by: FieldPath.documentID())
+                .getDocuments()
+
+            let parsedDays = snapshot.documents.compactMap { doc in
+                parseDailyCalendarDoc(docId: doc.documentID, data: doc.data())
+            }
+
+            mergeDailyCalendarDocs(parsedDays, startIso: startIso, endIso: endIso)
+            return parsedDays
+        } catch {
+            print("❌ Error fetching daily calendar range: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+            return []
+        }
+    }
+
+    func getDailyCalendarDay(for date: Date) -> DailyCalendarDay? {
+        let key = isoDateString(for: date)
+        return dailyCalendarByIsoDate[key]
+    }
+
+    func prefetchDailyCalendarDefaultWindow() async {
+        let calendar = Calendar.chicago
+        guard let baseMonth = monthStart(for: Date()) else { return }
+
+        for offset in 0..<12 {
+            guard let targetMonth = calendar.date(byAdding: .month, value: offset, to: baseMonth) else {
+                continue
+            }
+            await fetchDailyCalendarWindow(centerMonth: targetMonth)
+        }
+    }
+
+    func fetchDailyCalendarWindow(centerMonth: Date) async {
+        let calendar = Calendar.chicago
+        guard let centerMonthStart = monthStart(for: centerMonth) else { return }
+
+        guard let rangeStart = calendar.date(byAdding: .month, value: -1, to: centerMonthStart),
+              let afterRangeEnd = calendar.date(byAdding: .month, value: 2, to: centerMonthStart) else {
+            return
+        }
+
+        _ = await fetchDailyCalendarRange(from: rangeStart, to: afterRangeEnd)
     }
     
     // Sponsor Kiddush - returns true if successful, false if date already taken
@@ -2102,4 +2313,14 @@ class FirestoreManager: ObservableObject {
     func getUserSeatReservations(userEmail: String) -> [SeatReservation] {
         return seatReservations.filter { $0.reservedBy == userEmail }
     }
+}
+
+private extension DateFormatter {
+    static let weekdayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "America/Chicago")
+        return formatter
+    }()
 }

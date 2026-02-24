@@ -302,6 +302,58 @@ struct CommunityOccasionSection: Identifiable, Equatable {
     var items: [CommunityOccasionItem]
 }
 
+// MARK: - Daily Calendar Models
+struct DailyScheduleLine: Codable, Equatable {
+    var title: String
+    var timeText: String?
+    var rawLine: String
+}
+
+struct DailyZmanim: Codable, Equatable {
+    var alos: String?
+    var netz: String?
+    var chatzos: String?
+    var shkia: String?
+    var tzes: String?
+
+    var hasAnyValue: Bool {
+        [alos, netz, chatzos, shkia, tzes].contains { value in
+            guard let value else { return false }
+            return !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+    }
+}
+
+struct DailyCalendarEvent: Identifiable, Codable, Equatable {
+    let id: String
+    var categoryKey: String
+    var categoryLabel: String
+    var title: String
+    var headerText: String?
+    var detailsText: String?
+    var sourceCssClass: String
+}
+
+struct DailyCalendarDay: Identifiable, Codable, Equatable {
+    var id: String { isoDate }
+    var isoDate: String
+    var monthKey: String
+    var year: Int
+    var month: Int
+    var day: Int
+    var weekdayLabel: String
+    var hebrewDate: String
+    var scheduleLines: [DailyScheduleLine]
+    var zmanim: DailyZmanim
+    var events: [DailyCalendarEvent]
+    var source: String
+    var updatedAt: Date?
+
+    var eventCount: Int {
+        events.count
+    }
+}
+
 // MARK: - Social Post Model
 struct SocialPostMedia: Codable, Equatable {
     let type: String

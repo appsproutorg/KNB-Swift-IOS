@@ -559,6 +559,7 @@ exports.sendTestNotification = functions.https.onCall(async (data, context) => {
 
 const KIDDUSH_CALENDAR_URL = "https://www.heritagecongregation.com/website/index.php";
 const HERITAGE_HOME_URL = "https://www.heritagecongregation.com/website/index.php";
+const DAILY_CALENDAR_SOURCE_URL = "https://www.heritagecongregation.com/contacts/website_calendar.php";
 const KIDDUSH_COLLECTION = "kiddushCalendar";
 const KIDDUSH_APP_SPONSORSHIPS_COLLECTION = "kiddush_sponsorships";
 const KIDDUSH_META_DOC_PATH = "kiddushMeta/sync";
@@ -574,6 +575,12 @@ const COMMUNITY_META_DOC_PATH = "communityMeta/sync";
 const COMMUNITY_SYNC_TIMEZONE = "America/Chicago";
 const COMMUNITY_SYNC_USER_AGENT = "KNB-CommunityOccasionsSync/1.0 (+Firebase Functions)";
 const COMMUNITY_HTTP_TIMEOUT_MS = 15000;
+const DAILY_CALENDAR_COLLECTION = "dailyCalendar";
+const DAILY_CALENDAR_META_COLLECTION = "dailyCalendarMeta";
+const DAILY_CALENDAR_TIMEZONE = "America/Chicago";
+const DAILY_CALENDAR_SYNC_USER_AGENT = "KNB-DailyCalendarSync/1.0 (+Firebase Functions)";
+const DAILY_CALENDAR_HTTP_TIMEOUT_MS = 15000;
+const DAILY_CALENDAR_FUTURE_MONTHS_AHEAD = 12;
 const SYNC_BOOTSTRAP_KEY_ENV = "SYNC_BOOTSTRAP_KEY";
 
 const MONTH_INDEX_MAP = {
@@ -615,6 +622,20 @@ const COMMUNITY_CATEGORY_RANK = {
     births: 21,
     bar_bas_mitzvahs: 22,
     condolences: 30,
+};
+
+const DAILY_EVENT_CATEGORY_LABELS = {
+    kiddush: "Kiddush",
+    all: "All",
+    men: "Men",
+    women: "Women",
+    boys: "Boys",
+    girls: "Girls",
+    kids: "Kids",
+    holidays: "Holidays",
+    parsha: "Parsha",
+    rosh: "Rosh Chodesh",
+    mevorchim: "Shabbos Mevorchim",
 };
 
 function normalizeWhitespace(value) {
@@ -786,6 +807,579 @@ function parseSponsorTextFromOnclick(onclickValue) {
     return sponsorText || null;
 }
 
+function parseDisplayEventFromOnclick(onclickValue) {
+    if (!onclickValue) {
+        return null;
+    }
+
+    const openCall = "display_event(";
+    const callStart = onclickValue.indexOf(openCall);
+    if (callStart === -1) {
+        return null;
+    }
+
+    let index = callStart + openCall.length;
+    const args = [];
+
+    while (index < onclickValue.length) {
+        index = skipWhitespace(onclickValue, index);
+
+        if (onclickValue[index] === ")") {
+            break;
+        }
+
+        const arg = readSingleQuotedJsArg(onclickValue, index);
+        if (!arg) {
+            return null;
+        }
+
+        args.push(decodeSingleQuotedJsValue(arg.raw));
+        index = skipWhitespace(onclickValue, arg.nextIndex);
+
+        if (onclickValue[index] === ",") {
+            index += 1;
+            continue;
+        }
+
+        if (onclickValue[index] === ")") {
+            break;
+        }
+
+        return null;
+    }
+
+    if (args.length < 3) {
+        return null;
+    }
+
+    return {
+        header: normalizeWhitespace(decodeHtmlEntities(args[0])),
+        category: normalizeWhitespace(decodeHtmlEntities(args[1])),
+        messageHtml: String(args[2] || ""),
+    };
+}
+
+function decodeHtmlEntities(rawValue) {
+    if (rawValue === undefined || rawValue === null) {
+        return "";
+    }
+
+    const content = String(rawValue);
+    if (!content) {
+        return "";
+    }
+
+    return cheerio.load(`<span>${content}</span>`).text();
+}
+
+function extractTextLinesFromHtml(rawHtml) {
+    const html = String(rawHtml || "")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/?div[^>]*>/gi, "\n")
+        .replace(/<\/?p[^>]*>/gi, "\n")
+        .replace(/\u00a0/g, " ");
+
+    const decoded = decodeHtmlEntities(html);
+    return decoded
+        .split("\n")
+        .map((line) => normalizeWhitespace(line))
+        .filter((line) => line.length > 0);
+}
+
+function emptyDailyZmanim() {
+    return {
+        alos: null,
+        netz: null,
+        chatzos: null,
+        shkia: null,
+        tzes: null,
+    };
+}
+
+function parseScheduleLine(rawLine) {
+    const line = normalizeWhitespace(rawLine);
+    if (!line) {
+        return null;
+    }
+
+    const suffixMatch = line.match(/^(.*?)(\d{1,2}:\d{2}\s*(?:AM|PM))$/i);
+    if (suffixMatch) {
+        const title = normalizeWhitespace(suffixMatch[1].replace(/[:\-]+$/, ""));
+        const timeText = normalizeWhitespace(suffixMatch[2].toUpperCase());
+        return {
+            title: title || line,
+            timeText: timeText || null,
+            rawLine: line,
+        };
+    }
+
+    const prefixMatch = line.match(/^(\d{1,2}:\d{2}\s*(?:AM|PM))\s+(.+)$/i);
+    if (prefixMatch) {
+        const title = normalizeWhitespace(prefixMatch[2]);
+        const timeText = normalizeWhitespace(prefixMatch[1].toUpperCase());
+        return {
+            title: title || line,
+            timeText: timeText || null,
+            rawLine: line,
+        };
+    }
+
+    return {
+        title: line,
+        timeText: null,
+        rawLine: line,
+    };
+}
+
+function parseDailyScheduleAndZmanim(messageHtml) {
+    const raw = String(messageHtml || "");
+    const sections = raw.split(/<hr\s*\/?>/i);
+
+    const scheduleLines = extractTextLinesFromHtml(sections[0] || "")
+        .map(parseScheduleLine)
+        .filter((line) => Boolean(line));
+
+    const zmanim = emptyDailyZmanim();
+    const zmanimSection = sections.slice(1).join("<br>");
+    const zmanimLines = extractTextLinesFromHtml(zmanimSection);
+    for (const line of zmanimLines) {
+        const match = line.match(/^([A-Za-z]+)\s*:\s*(.+)$/);
+        if (!match) {
+            continue;
+        }
+
+        const key = normalizeWhitespace(match[1]).toLowerCase();
+        const value = normalizeWhitespace(match[2]);
+        if (!value) {
+            continue;
+        }
+
+        if (key === "alos") {
+            zmanim.alos = value;
+        } else if (key === "netz") {
+            zmanim.netz = value;
+        } else if (key === "chatzos") {
+            zmanim.chatzos = value;
+        } else if (key === "shkia") {
+            zmanim.shkia = value;
+        } else if (key === "tzes") {
+            zmanim.tzes = value;
+        }
+    }
+
+    return {
+        scheduleLines,
+        zmanim,
+    };
+}
+
+function toMonthKey(year, month) {
+    return `${year}-${String(month).padStart(2, "0")}`;
+}
+
+function addMonthsToYearMonth(year, month, offset) {
+    const date = new Date(Date.UTC(year, (month - 1) + offset, 1, 12, 0, 0));
+    return {
+        year: date.getUTCFullYear(),
+        month: date.getUTCMonth() + 1,
+    };
+}
+
+function buildSequentialMonthTargets(startYear, startMonth, count) {
+    const targets = [];
+    for (let i = 0; i < count; i += 1) {
+        targets.push(addMonthsToYearMonth(startYear, startMonth, i));
+    }
+    return targets;
+}
+
+function weekdayLabelForDate(year, month, day) {
+    const date = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+    return new Intl.DateTimeFormat("en-US", {
+        timeZone: DAILY_CALENDAR_TIMEZONE,
+        weekday: "long",
+    }).format(date);
+}
+
+function dailyCategoryKeyFromClassName(classNameValue) {
+    const classes = normalizeWhitespace(classNameValue || "").split(" ").filter(Boolean);
+    for (const className of classes) {
+        if (!className.startsWith("calendar-")) {
+            continue;
+        }
+        const key = className.replace(/^calendar-/, "").trim().toLowerCase();
+        if (!key || key === "day") {
+            continue;
+        }
+        if (key === "day" || key === "row") {
+            continue;
+        }
+        return key;
+    }
+    return null;
+}
+
+function categoryLabelFromKey(categoryKey) {
+    const normalizedKey = normalizeWhitespace(categoryKey || "").toLowerCase();
+    if (DAILY_EVENT_CATEGORY_LABELS[normalizedKey]) {
+        return DAILY_EVENT_CATEGORY_LABELS[normalizedKey];
+    }
+    if (!normalizedKey) {
+        return "Event";
+    }
+    return normalizedKey
+        .split("_")
+        .map((segment) => segment ? `${segment[0].toUpperCase()}${segment.slice(1)}` : "")
+        .join(" ");
+}
+
+function buildDailyCalendarEventId(isoDate, categoryKey, eventIndex, title) {
+    const hash = crypto
+        .createHash("sha1")
+        .update(`${isoDate}|${categoryKey}|${eventIndex}|${title}`)
+        .digest("hex")
+        .slice(0, 16);
+
+    return `${isoDate}_${categoryKey}_${hash}`;
+}
+
+function parseDailyCalendarMonth(html, year, month) {
+    const $ = cheerio.load(html);
+    const calendarTable = $("table.calendar").first();
+
+    if (!calendarTable.length) {
+        return {
+            tableFound: false,
+            rows: [],
+        };
+    }
+
+    const rows = [];
+    const monthKey = toMonthKey(year, month);
+
+    calendarTable.find("td.calendar-day, td.calendar-day-today").each((_, cellElement) => {
+        const cell = $(cellElement);
+        const dayNumberText = normalizeWhitespace(cell.find("div.day-number").first().text());
+        const day = Number(dayNumberText);
+        if (Number.isNaN(day) || day < 1 || day > 31) {
+            return;
+        }
+
+        const isoDate = toIsoDate(year, month - 1, day);
+        const hebrewDate = normalizeWhitespace(cell.find("div.day-hebrew").first().text());
+        const weekdayLabel = weekdayLabelForDate(year, month, day);
+
+        const scheduleAnchor = cell.find("div.day-schedule a").first();
+        let scheduleLines = [];
+        let zmanim = emptyDailyZmanim();
+
+        if (scheduleAnchor.length) {
+            const scheduleOnclick = scheduleAnchor.attr("onclick") || "";
+            const parsedSchedulePopup = parseDisplayEventFromOnclick(scheduleOnclick);
+            if (parsedSchedulePopup && parsedSchedulePopup.category.toLowerCase() === "schedule") {
+                const parsedSchedule = parseDailyScheduleAndZmanim(parsedSchedulePopup.messageHtml);
+                scheduleLines = parsedSchedule.scheduleLines;
+                zmanim = parsedSchedule.zmanim;
+            }
+        }
+
+        const events = [];
+        cell.children("div").each((eventIndex, divElement) => {
+            const divNode = $(divElement);
+            const rawClassName = divNode.attr("class") || "";
+
+            if (
+                rawClassName.includes("day-number") ||
+                rawClassName.includes("day-hebrew") ||
+                rawClassName.includes("day-schedule")
+            ) {
+                return;
+            }
+
+            const categoryKey = dailyCategoryKeyFromClassName(rawClassName);
+            if (!categoryKey) {
+                return;
+            }
+
+            const anchor = divNode.find("a").first();
+            const anchorText = normalizeWhitespace(anchor.text().replace(/\u00a0/g, " "));
+            const fallbackText = normalizeWhitespace(divNode.text().replace(/\u00a0/g, " "));
+            const eventTitle = anchorText || fallbackText;
+            if (!eventTitle) {
+                return;
+            }
+
+            const popup = parseDisplayEventFromOnclick(anchor.attr("onclick") || "");
+            const detailsText = popup ? extractTextLinesFromHtml(popup.messageHtml).join("\n") : null;
+
+            events.push({
+                id: buildDailyCalendarEventId(isoDate, categoryKey, eventIndex, eventTitle),
+                categoryKey,
+                categoryLabel: categoryLabelFromKey(categoryKey),
+                title: eventTitle,
+                headerText: popup ? popup.header : null,
+                detailsText: detailsText && detailsText.length > 0 ? detailsText : null,
+                sourceCssClass: `calendar-${categoryKey}`,
+            });
+        });
+
+        rows.push({
+            isoDate,
+            monthKey,
+            year,
+            month,
+            day,
+            weekdayLabel,
+            hebrewDate: hebrewDate || "",
+            scheduleLines,
+            zmanim,
+            events,
+            source: "website",
+        });
+    });
+
+    return {
+        tableFound: true,
+        rows,
+    };
+}
+
+function canonicalizeDailyCalendarDoc(row) {
+    const normalizedRow = row || {};
+    const scheduleLines = Array.isArray(normalizedRow.scheduleLines)
+        ? normalizedRow.scheduleLines.map((line) => ({
+            title: normalizeWhitespace(String(line?.title || "")),
+            timeText: normalizeWhitespace(String(line?.timeText || "")) || null,
+            rawLine: normalizeWhitespace(String(line?.rawLine || "")),
+        }))
+        : [];
+
+    const events = Array.isArray(normalizedRow.events)
+        ? normalizedRow.events.map((event) => ({
+            id: normalizeWhitespace(String(event?.id || "")),
+            categoryKey: normalizeWhitespace(String(event?.categoryKey || "")).toLowerCase(),
+            categoryLabel: normalizeWhitespace(String(event?.categoryLabel || "")),
+            title: normalizeWhitespace(String(event?.title || "")),
+            headerText: normalizeWhitespace(String(event?.headerText || "")) || null,
+            detailsText: normalizeWhitespace(String(event?.detailsText || "")) || null,
+            sourceCssClass: normalizeWhitespace(String(event?.sourceCssClass || "")),
+        }))
+        : [];
+
+    const zmanimValue = normalizedRow.zmanim || {};
+    const zmanim = {
+        alos: normalizeWhitespace(String(zmanimValue.alos || "")) || null,
+        netz: normalizeWhitespace(String(zmanimValue.netz || "")) || null,
+        chatzos: normalizeWhitespace(String(zmanimValue.chatzos || "")) || null,
+        shkia: normalizeWhitespace(String(zmanimValue.shkia || "")) || null,
+        tzes: normalizeWhitespace(String(zmanimValue.tzes || "")) || null,
+    };
+
+    return {
+        isoDate: normalizeWhitespace(String(normalizedRow.isoDate || "")),
+        monthKey: normalizeWhitespace(String(normalizedRow.monthKey || "")),
+        year: Number(normalizedRow.year || 0),
+        month: Number(normalizedRow.month || 0),
+        day: Number(normalizedRow.day || 0),
+        weekdayLabel: normalizeWhitespace(String(normalizedRow.weekdayLabel || "")),
+        hebrewDate: normalizeWhitespace(String(normalizedRow.hebrewDate || "")),
+        scheduleLines,
+        zmanim,
+        events,
+        source: normalizeWhitespace(String(normalizedRow.source || "website")) || "website",
+    };
+}
+
+function canonicalizeDailyCalendarDataset(rows) {
+    return rows
+        .map((row) => canonicalizeDailyCalendarDoc(row))
+        .sort((a, b) => a.isoDate.localeCompare(b.isoDate));
+}
+
+function isSameDailyCalendarDocument(existingDoc, incomingDoc) {
+    const existing = canonicalizeDailyCalendarDoc(existingDoc);
+    const incoming = canonicalizeDailyCalendarDoc(incomingDoc);
+    return JSON.stringify(existing) === JSON.stringify(incoming);
+}
+
+async function fetchDailyCalendarMonthHtml(year, month) {
+    const sourceUrl = new URL(DAILY_CALENDAR_SOURCE_URL);
+    sourceUrl.searchParams.set("month", String(month));
+    sourceUrl.searchParams.set("year", String(year));
+
+    const response = await fetch(sourceUrl.toString(), {
+        method: "GET",
+        headers: {
+            "User-Agent": DAILY_CALENDAR_SYNC_USER_AGENT,
+            Accept: "text/html,application/xhtml+xml",
+        },
+        signal: AbortSignal.timeout(DAILY_CALENDAR_HTTP_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status} while fetching daily calendar source`);
+    }
+
+    return response.text();
+}
+
+async function runDailyCalendarMonthSync(year, month, triggerSource = "scheduled") {
+    const monthKey = toMonthKey(year, month);
+    const html = await fetchDailyCalendarMonthHtml(year, month);
+    const parsed = parseDailyCalendarMonth(html, year, month);
+
+    if (!parsed.tableFound) {
+        throw new Error(`daily calendar table not found for ${monthKey}`);
+    }
+    if (!parsed.rows.length) {
+        throw new Error(`daily calendar parser produced zero rows for ${monthKey}`);
+    }
+
+    const dataset = canonicalizeDailyCalendarDataset(parsed.rows);
+    const datasetHash = computeDatasetHash(dataset);
+    const metaRef = db.collection(DAILY_CALENDAR_META_COLLECTION).doc(monthKey);
+
+    let previousHash = null;
+    const metaSnap = await metaRef.get();
+    if (metaSnap.exists) {
+        previousHash = metaSnap.data()?.hash || null;
+    }
+
+    const existingSnapshot = await db.collection(DAILY_CALENDAR_COLLECTION)
+        .where("monthKey", "==", monthKey)
+        .get();
+
+    const existingByIsoDate = new Map();
+    existingSnapshot.forEach((doc) => {
+        existingByIsoDate.set(doc.id, doc.data());
+    });
+
+    const incomingByIsoDate = new Map();
+    for (const row of dataset) {
+        incomingByIsoDate.set(row.isoDate, row);
+    }
+
+    const batch = db.batch();
+    let upsertCount = 0;
+    let deleteCount = 0;
+
+    for (const row of dataset) {
+        const existingDoc = existingByIsoDate.get(row.isoDate);
+        if (!isSameDailyCalendarDocument(existingDoc, row)) {
+            batch.set(
+                db.collection(DAILY_CALENDAR_COLLECTION).doc(row.isoDate),
+                {
+                    ...row,
+                    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+            );
+            upsertCount += 1;
+        }
+    }
+
+    for (const [existingIsoDate] of existingByIsoDate) {
+        if (!incomingByIsoDate.has(existingIsoDate)) {
+            batch.delete(db.collection(DAILY_CALENDAR_COLLECTION).doc(existingIsoDate));
+            deleteCount += 1;
+        }
+    }
+
+    const hashChanged = previousHash !== datasetHash;
+    const hasContentChanges = upsertCount > 0 || deleteCount > 0;
+    const driftCorrection = !hashChanged && hasContentChanges;
+
+    if (!hashChanged && !hasContentChanges) {
+        logger.info("Daily calendar month unchanged; skipping writes.", {
+            triggerSource,
+            monthKey,
+            rows: dataset.length,
+            hash: datasetHash,
+        });
+        return {
+            monthKey,
+            rows: dataset.length,
+            upserts: 0,
+            deletes: 0,
+            hash: datasetHash,
+            skipped: true,
+        };
+    }
+
+    batch.set(
+        metaRef,
+        {
+            hash: datasetHash,
+            docCount: dataset.length,
+            source: "website",
+            lastSyncedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+    );
+
+    await batch.commit();
+
+    logger.info("Daily calendar month sync committed.", {
+        triggerSource,
+        monthKey,
+        rows: dataset.length,
+        upserts: upsertCount,
+        deletes: deleteCount,
+        hash: datasetHash,
+        hashChanged,
+        driftCorrection,
+    });
+
+    return {
+        monthKey,
+        rows: dataset.length,
+        upserts: upsertCount,
+        deletes: deleteCount,
+        hash: datasetHash,
+        skipped: false,
+    };
+}
+
+async function runDailyCalendarSyncWindow(
+    startYear,
+    startMonth,
+    monthCount,
+    triggerSource = "scheduled",
+    failFast = false
+) {
+    const targets = buildSequentialMonthTargets(startYear, startMonth, monthCount);
+    const syncedMonthKeys = [];
+    const failures = [];
+
+    for (const target of targets) {
+        const monthKey = toMonthKey(target.year, target.month);
+        try {
+            await runDailyCalendarMonthSync(target.year, target.month, triggerSource);
+            syncedMonthKeys.push(monthKey);
+        } catch (error) {
+            failures.push({
+                monthKey,
+                error: error.message,
+            });
+
+            logger.error("Daily calendar month sync failed.", {
+                triggerSource,
+                monthKey,
+                error: error.message,
+            });
+
+            if (failFast) {
+                throw new Error(`Failed syncing ${monthKey}: ${error.message}`);
+            }
+        }
+    }
+
+    return {
+        syncedMonthKeys,
+        failures,
+    };
+}
+
 function parseMonthDay(dateText) {
     const cleaned = normalizeWhitespace(dateText).replace(",", "");
     const match = cleaned.match(/^([A-Za-z]+)\s+(\d{1,2})$/);
@@ -901,6 +1495,7 @@ function normalizeKiddushRows(parsedRows, todayParts) {
             parsha: row.parshaText,
             status: row.status,
             sponsorText: row.status === "reserved" ? row.sponsorText || null : null,
+            isAnonymous: false,
         };
     });
 }
@@ -916,6 +1511,7 @@ function canonicalizeDataset(rows) {
             source: row.source ?? "website",
             sponsorName: row.sponsorName ?? null,
             sponsorEmail: row.sponsorEmail ?? null,
+            isAnonymous: Boolean(row.isAnonymous),
         }))
         .sort((a, b) => a.isoDate.localeCompare(b.isoDate));
 }
@@ -953,7 +1549,8 @@ function isSameCalendarDocument(existingDoc, incomingDoc) {
         normalizeWhitespace(String(existingDoc.sponsorName || "")) ===
             normalizeWhitespace(String(incomingDoc.sponsorName || "")) &&
         normalizeWhitespace(String(existingDoc.sponsorEmail || "")) ===
-            normalizeWhitespace(String(incomingDoc.sponsorEmail || ""))
+            normalizeWhitespace(String(incomingDoc.sponsorEmail || "")) &&
+        Boolean(existingDoc.isAnonymous) === Boolean(incomingDoc.isAnonymous)
     );
 }
 
@@ -987,9 +1584,10 @@ async function fetchAppSponsorshipsByIsoDate() {
         if (!existing || timestamp >= existing.timestamp) {
             sponsorshipsByIsoDate.set(isoDate, {
                 isoDate,
-                sponsorName: visibleSponsorName,
+                sponsorName: sponsorNameRaw,
                 sponsorEmail,
                 sponsorText,
+                isAnonymous,
                 timestamp,
             });
         }
@@ -1007,6 +1605,7 @@ function mergeWebsiteWithAppReservations(websiteDataset, appSponsorshipsByIsoDat
                 source: "website",
                 sponsorName: null,
                 sponsorEmail: null,
+                isAnonymous: false,
             };
         }
 
@@ -1017,6 +1616,7 @@ function mergeWebsiteWithAppReservations(websiteDataset, appSponsorshipsByIsoDat
                 source: "website",
                 sponsorName: null,
                 sponsorEmail: null,
+                isAnonymous: false,
             };
         }
 
@@ -1027,6 +1627,7 @@ function mergeWebsiteWithAppReservations(websiteDataset, appSponsorshipsByIsoDat
             source: "app",
             sponsorName: appSponsorship.sponsorName,
             sponsorEmail: appSponsorship.sponsorEmail || null,
+            isAnonymous: Boolean(appSponsorship.isAnonymous),
         };
     });
 }
@@ -1181,8 +1782,9 @@ function buildKiddushCalendarDocFromAppSponsorship(data) {
             status: "reserved",
             sponsorText,
             source: "app",
-            sponsorName: visibleSponsorName,
+            sponsorName: sponsorNameRaw,
             sponsorEmail: sponsorEmail || null,
+            isAnonymous,
             updatedAt: admin.firestore.FieldValue.serverTimestamp(),
         },
     };
@@ -1983,11 +2585,37 @@ async function runKiddushCalendarSync(triggerSource = "scheduled") {
     }
 }
 
+async function runDailyCalendarScheduledSync(triggerSource = "scheduled") {
+    const today = getChicagoTodayParts();
+    const monthCount = DAILY_CALENDAR_FUTURE_MONTHS_AHEAD + 1;
+
+    logger.info("Starting daily calendar window sync.", {
+        triggerSource,
+        startYear: today.year,
+        startMonth: today.month,
+        futureMonthsAhead: DAILY_CALENDAR_FUTURE_MONTHS_AHEAD,
+        monthCount,
+    });
+
+    const result = await runDailyCalendarSyncWindow(
+        today.year,
+        today.month,
+        monthCount,
+        triggerSource
+    );
+
+    logger.info("Daily calendar window sync finished.", {
+        triggerSource,
+        syncedMonthKeys: result.syncedMonthKeys,
+        failures: result.failures,
+    });
+}
+
 exports.runInitialCalendarSync = onRequest(
     {
         region: "us-central1",
         memory: "256MiB",
-        timeoutSeconds: 60,
+        timeoutSeconds: 540,
     },
     async (req, res) => {
         if (req.method !== "POST") {
@@ -2016,17 +2644,18 @@ exports.runInitialCalendarSync = onRequest(
 
         await runKiddushCalendarSync("post_deploy_bootstrap");
         await runCommunityOccasionsSync("post_deploy_bootstrap");
+        await runDailyCalendarScheduledSync("post_deploy_bootstrap");
 
         res.status(200).json({
             ok: true,
-            message: "Triggered immediate calendar sync for Kiddush and community occasions.",
+            message: "Triggered immediate calendar sync for Kiddush, community occasions, and daily calendar.",
         });
     }
 );
 
 exports.syncCommunityOccasions = onSchedule(
     {
-        schedule: "every 30 minutes",
+        schedule: "every 2 hours",
         region: "us-central1",
         timeZone: COMMUNITY_SYNC_TIMEZONE,
         memory: "256MiB",
@@ -2044,6 +2673,17 @@ exports.syncKiddushCalendar = onSchedule(
         timeoutSeconds: 60,
     },
     async () => runKiddushCalendarSync("scheduled")
+);
+
+exports.syncDailyCalendar = onSchedule(
+    {
+        schedule: "every 48 hours",
+        region: "us-central1",
+        timeZone: DAILY_CALENDAR_TIMEZONE,
+        memory: "256MiB",
+        timeoutSeconds: 540,
+    },
+    async () => runDailyCalendarScheduledSync("scheduled")
 );
 
 exports.onKiddushSponsorshipCreate = functions.firestore
@@ -2147,6 +2787,7 @@ exports.onKiddushSponsorshipDelete = functions.firestore
                         source: "website",
                         sponsorName: null,
                         sponsorEmail: null,
+                        isAnonymous: false,
                         updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                     },
                     { merge: true }

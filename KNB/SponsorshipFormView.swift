@@ -40,11 +40,20 @@ private enum SponsorshipTier: String, CaseIterable, Identifiable {
     
     var accentColor: Color {
         switch self {
-        case .platinum: return Color(red: 0.52, green: 0.55, blue: 0.62)
-        case .gold: return Color(red: 0.86, green: 0.67, blue: 0.2)
-        case .silver: return Color(red: 0.38, green: 0.58, blue: 0.88)
+        case .platinum: return Color(red: 0.44, green: 0.49, blue: 0.56)
+        case .gold: return Color(red: 0.79, green: 0.6, blue: 0.18)
+        case .silver: return Color(red: 0.3, green: 0.54, blue: 0.82)
         }
     }
+}
+
+private enum SponsorshipPalette {
+    static let backgroundTop = Color(red: 0.95, green: 0.97, blue: 1.0)
+    static let backgroundBottom = Color(red: 0.99, green: 0.95, blue: 0.93)
+    static let cardFill = Color.white.opacity(0.62)
+    static let cardStroke = Color.white.opacity(0.88)
+    static let headerBlue = Color(red: 0.12, green: 0.49, blue: 0.9)
+    static let headerCyan = Color(red: 0.2, green: 0.67, blue: 0.87)
 }
 
 struct SponsorshipFormView: View {
@@ -54,6 +63,7 @@ struct SponsorshipFormView: View {
     
     let shabbatDate: Date
     let shabbatTime: ShabbatTime?
+    let dailyCalendarDay: DailyCalendarDay?
     let currentUser: User?
     
     @State private var name: String
@@ -76,9 +86,16 @@ struct SponsorshipFormView: View {
         shabbatDate < Date()
     }
     
-    init(shabbatDate: Date, shabbatTime: ShabbatTime?, currentUser: User?, firestoreManager: FirestoreManager) {
+    init(
+        shabbatDate: Date,
+        shabbatTime: ShabbatTime?,
+        dailyCalendarDay: DailyCalendarDay? = nil,
+        currentUser: User?,
+        firestoreManager: FirestoreManager
+    ) {
         self.shabbatDate = shabbatDate
         self.shabbatTime = shabbatTime
+        self.dailyCalendarDay = dailyCalendarDay
         self.currentUser = currentUser
         self.firestoreManager = firestoreManager
         
@@ -94,7 +111,8 @@ struct SponsorshipFormView: View {
     
     var sponsorDisplayText: String {
         guard let sponsorship = existingSponsorship else { return "" }
-        if sponsorship.isAnonymous && !isSponsoredByCurrentUser {
+        let isAdminViewer = currentUser?.isAdmin == true
+        if sponsorship.isAnonymous && !isSponsoredByCurrentUser && !isAdminViewer {
             return "Anonymous Sponsor"
         }
         if sponsorship.sponsorName == "Reserved" {
@@ -118,6 +136,48 @@ struct SponsorshipFormView: View {
     private var canAdminDeleteSponsorship: Bool {
         guard existingSponsorship != nil else { return false }
         return currentUser?.isAdmin == true
+    }
+
+    private var additionalZmanimText: String? {
+        guard let zmanim = dailyCalendarDay?.zmanim else { return nil }
+        var parts: [String] = []
+
+        let fields: [(String, String?)] = [
+            ("Alos", zmanim.alos),
+            ("Netz", zmanim.netz),
+            ("Chatzos", zmanim.chatzos),
+            ("Shkia", zmanim.shkia),
+            ("Tzes", zmanim.tzes),
+        ]
+
+        for (label, value) in fields {
+            guard let value else { continue }
+            let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !cleaned.isEmpty {
+                parts.append("\(label): \(cleaned)")
+            }
+        }
+
+        guard !parts.isEmpty else { return nil }
+        return parts.joined(separator: "  •  ")
+    }
+
+    private var additionalZmanimItems: [(title: String, value: String)] {
+        guard let zmanim = dailyCalendarDay?.zmanim else { return [] }
+        let fields: [(String, String?)] = [
+            ("Alos", zmanim.alos),
+            ("Netz", zmanim.netz),
+            ("Chatzos", zmanim.chatzos),
+            ("Shkia", zmanim.shkia),
+            ("Tzes", zmanim.tzes),
+        ]
+
+        return fields.compactMap { (title, value) in
+            guard let value else { return nil }
+            let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !cleaned.isEmpty else { return nil }
+            return (title, cleaned)
+        }
     }
 
     private func extractSponsorName(from occasion: String) -> String {
@@ -184,9 +244,8 @@ struct SponsorshipFormView: View {
                 ZStack {
                     LinearGradient(
                         colors: [
-                            Color.blue.opacity(0.15),
-                            Color.purple.opacity(0.12),
-                            Color.pink.opacity(0.08)
+                            SponsorshipPalette.backgroundTop,
+                            SponsorshipPalette.backgroundBottom
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -196,7 +255,7 @@ struct SponsorshipFormView: View {
                     Circle()
                         .fill(
                             RadialGradient(
-                                colors: [.blue.opacity(0.15), .clear],
+                                colors: [Color.cyan.opacity(0.16), .clear],
                                 center: .topLeading,
                                 startRadius: 0,
                                 endRadius: 400
@@ -208,7 +267,7 @@ struct SponsorshipFormView: View {
                     Circle()
                         .fill(
                             RadialGradient(
-                                colors: [.purple.opacity(0.12), .clear],
+                                colors: [Color.orange.opacity(0.12), .clear],
                                 center: .bottomTrailing,
                                 startRadius: 0,
                                 endRadius: 300
@@ -225,7 +284,13 @@ struct SponsorshipFormView: View {
                         VStack(spacing: 12) {
                             Image(systemName: "calendar.badge.plus")
                                 .font(.system(size: 60))
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(
+                                    LinearGradient(
+                                        colors: [SponsorshipPalette.headerBlue, SponsorshipPalette.headerCyan],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                                 .padding(.top, 20)
                             
                             Text("Sponsor Kiddush")
@@ -253,55 +318,88 @@ struct SponsorshipFormView: View {
                                     Text("Parashat \(parsha)")
                                         .font(.system(size: 20, weight: .bold, design: .rounded))
                                 }
-                                .foregroundStyle(.blue)
+                                .foregroundStyle(SponsorshipPalette.headerBlue)
                                 .padding(.horizontal, 20)
                                 .padding(.vertical, 10)
-                                .background(.blue.opacity(0.1))
-                                .cornerRadius(12)
+                                .background(
+                                    Capsule()
+                                        .fill(Color.white.opacity(0.7))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(SponsorshipPalette.headerBlue.opacity(0.16), lineWidth: 1.2)
+                                )
                             }
                             
                             // Candle Lighting & Havdalah Times
                             if let shabbatTime = shabbatTime {
                                 HStack(spacing: 20) {
-                                    // Candle Lighting
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "light.max")
-                                            .font(.system(size: 20))
-                                            .foregroundStyle(.orange)
-                                        Text("Candle Lighting")
-                                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.secondary)
-                                        Text(formatTime(shabbatTime.candleLighting))
-                                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                                            .foregroundStyle(.orange)
-                                    }
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(.orange.opacity(0.1))
+                                    SponsorshipTimeCard(
+                                        icon: "light.max",
+                                        title: "Candle Lighting",
+                                        timeText: formatTime(shabbatTime.candleLighting),
+                                        accent: Color(red: 0.92, green: 0.47, blue: 0.17),
+                                        iconBackground: Color(red: 1.0, green: 0.95, blue: 0.86)
                                     )
                                     
-                                    // Havdalah
-                                    VStack(spacing: 4) {
-                                        Image(systemName: "moon.stars.fill")
-                                            .font(.system(size: 20))
-                                            .foregroundStyle(.purple)
-                                        Text("Havdalah")
-                                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                                            .foregroundStyle(.secondary)
-                                        Text(formatTime(shabbatTime.havdalah))
-                                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                                            .foregroundStyle(.purple)
-                                    }
-                                    .padding()
-                                    .frame(maxWidth: .infinity)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12)
-                                            .fill(.purple.opacity(0.1))
+                                    SponsorshipTimeCard(
+                                        icon: "moon.stars.fill",
+                                        title: "Havdalah",
+                                        timeText: formatTime(shabbatTime.havdalah),
+                                        accent: Color(red: 0.48, green: 0.35, blue: 0.89),
+                                        iconBackground: Color(red: 0.93, green: 0.91, blue: 1.0)
                                     )
                                 }
                                 .padding(.horizontal)
+
+                                if !additionalZmanimItems.isEmpty {
+                                    VStack(spacing: 7) {
+                                        Text("Additional Zmanim")
+                                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(.secondary)
+
+                                        LazyVGrid(
+                                            columns: [
+                                                GridItem(.flexible(), spacing: 8),
+                                                GridItem(.flexible(), spacing: 8),
+                                            ],
+                                            spacing: 8
+                                        ) {
+                                            ForEach(additionalZmanimItems, id: \.title) { item in
+                                                HStack(spacing: 5) {
+                                                    Text(item.title)
+                                                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                                                        .foregroundStyle(.secondary)
+                                                    Text(item.value)
+                                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                                        .foregroundStyle(.primary.opacity(0.9))
+                                                }
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 6)
+                                                .background(Color.white.opacity(0.72))
+                                                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 10)
+                                    .background(Color.white.opacity(0.46))
+                                    .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                                            .stroke(Color.white.opacity(0.88), lineWidth: 1)
+                                    )
+                                    .padding(.horizontal, 24)
+                                    .padding(.top, 4)
+                                } else if let additionalZmanimText {
+                                    Text(additionalZmanimText)
+                                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 24)
+                                        .padding(.top, 4)
+                                }
                             }
                         }
                         .padding(.bottom, 10)
@@ -379,6 +477,12 @@ struct SponsorshipFormView: View {
                                         .font(.system(size: 22, weight: .bold, design: .rounded))
                                         .foregroundStyle(.primary)
                                         .lineLimit(2)
+                                    if currentUser?.isAdmin == true, let sponsorship = existingSponsorship, sponsorship.sponsorEmail != "website@heritagecongregation.com" {
+                                        Text(sponsorship.sponsorEmail)
+                                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                                            .foregroundStyle(.secondary)
+                                            .lineLimit(1)
+                                    }
                                 }
 
                                 VStack(alignment: .leading, spacing: 6) {
@@ -442,7 +546,7 @@ struct SponsorshipFormView: View {
                                     .font(.system(size: 48, weight: .bold, design: .rounded))
                                     .foregroundStyle(
                                         LinearGradient(
-                                            colors: [.green, .green.opacity(0.7)],
+                                            colors: [Color(red: 0.12, green: 0.66, blue: 0.41), Color(red: 0.17, green: 0.78, blue: 0.53)],
                                             startPoint: .topLeading,
                                             endPoint: .bottomTrailing
                                         )
@@ -458,13 +562,13 @@ struct SponsorshipFormView: View {
                             .background(
                                 ZStack {
                                     RoundedRectangle(cornerRadius: 22)
-                                        .fill(.green.opacity(0.05))
+                                        .fill(Color(red: 0.97, green: 1.0, blue: 0.98))
                                     RoundedRectangle(cornerRadius: 22)
-                                        .fill(.ultraThinMaterial)
+                                        .fill(.white.opacity(0.5))
                                     RoundedRectangle(cornerRadius: 22)
                                         .stroke(
                                             LinearGradient(
-                                                colors: [.green.opacity(0.3), .green.opacity(0.1)],
+                                                colors: [Color.green.opacity(0.32), Color.green.opacity(0.08)],
                                                 startPoint: .topLeading,
                                                 endPoint: .bottomTrailing
                                             ),
@@ -505,7 +609,11 @@ struct SponsorshipFormView: View {
                         .padding(18)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(.ultraThinMaterial)
+                                .fill(SponsorshipPalette.cardFill)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(SponsorshipPalette.cardStroke, lineWidth: 1)
                         )
                         .padding(.horizontal)
                         
@@ -775,12 +883,12 @@ private struct SponsorshipTierOptionCard: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(isSelected ? tier.accentColor.opacity(0.2) : Color.clear)
+                    .fill(isSelected ? tier.accentColor.opacity(0.16) : Color(red: 0.94, green: 0.95, blue: 0.98))
                     .frame(width: 30, height: 30)
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(isSelected ? tier.accentColor : .secondary)
+                    .foregroundStyle(isSelected ? tier.accentColor : Color.secondary.opacity(0.7))
             }
             
             VStack(alignment: .leading, spacing: 2) {
@@ -790,7 +898,7 @@ private struct SponsorshipTierOptionCard: View {
                 
                 Text(tier.subtitle)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.secondary.opacity(0.88))
             }
             
             Spacer()
@@ -802,21 +910,59 @@ private struct SponsorshipTierOptionCard: View {
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(isSelected ? tier.accentColor : tier.accentColor.opacity(0.16))
+                        .fill(isSelected ? tier.accentColor : tier.accentColor.opacity(0.13))
                 )
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 11)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? tier.accentColor.opacity(0.08) : Color.white.opacity(0.04))
+                .fill(isSelected ? tier.accentColor.opacity(0.08) : Color.white.opacity(0.56))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(isSelected ? tier.accentColor.opacity(0.55) : Color.white.opacity(0.12), lineWidth: isSelected ? 1.6 : 1)
+                .stroke(isSelected ? tier.accentColor.opacity(0.55) : Color(red: 0.9, green: 0.91, blue: 0.94), lineWidth: isSelected ? 1.6 : 1)
         )
         .shadow(color: isSelected ? tier.accentColor.opacity(0.2) : .clear, radius: 8, x: 0, y: 3)
         .scaleEffect(isSelected ? 1.01 : 1.0)
+    }
+}
+
+private struct SponsorshipTimeCard: View {
+    let icon: String
+    let title: String
+    let timeText: String
+    let accent: Color
+    let iconBackground: Color
+    
+    var body: some View {
+        VStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(accent)
+                .padding(8)
+                .background(
+                    Circle()
+                        .fill(iconBackground)
+                )
+            Text(title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+            Text(timeText)
+                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .foregroundStyle(accent)
+        }
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.67))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(accent.opacity(0.2), lineWidth: 1)
+        )
+        .shadow(color: accent.opacity(0.08), radius: 8, x: 0, y: 4)
     }
 }
 

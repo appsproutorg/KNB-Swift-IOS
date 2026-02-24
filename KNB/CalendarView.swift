@@ -14,6 +14,7 @@ struct CalendarView: View {
     
     @State private var currentMonth = Date()
     @State private var selectedDate: Date?
+    @State private var showingDayDetail = false
     @State private var showingSponsorshipForm = false
     @State private var hebrewDatesCache: [Date: String] = [:]
     @State private var refreshTrigger = UUID()  // Force refresh when needed
@@ -153,7 +154,6 @@ struct CalendarView: View {
                     ScrollView {
                         VStack(spacing: 12) {
                         
-                        // Weekday Headers with wider Saturday
                         HStack(spacing: 4) {
                             ForEach(Array(["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].enumerated()), id: \.offset) { index, day in
                                 Text(day)
@@ -164,17 +164,16 @@ struct CalendarView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 2)
-                        
-                        // Calendar Grid with wider Shabbat columns - using fixed widths to fit screen
+
                         LazyVGrid(
                             columns: [
-                                GridItem(.fixed(45), spacing: 4),  // Sun
-                                GridItem(.fixed(45), spacing: 4),  // Mon
-                                GridItem(.fixed(45), spacing: 4),  // Tue
-                                GridItem(.fixed(45), spacing: 4),  // Wed
-                                GridItem(.fixed(45), spacing: 4),  // Thu
-                                GridItem(.fixed(45), spacing: 4),  // Fri
-                                GridItem(.flexible(), spacing: 4)  // Sat (uses remaining space)
+                                GridItem(.fixed(45), spacing: 4),
+                                GridItem(.fixed(45), spacing: 4),
+                                GridItem(.fixed(45), spacing: 4),
+                                GridItem(.fixed(45), spacing: 4),
+                                GridItem(.fixed(45), spacing: 4),
+                                GridItem(.fixed(45), spacing: 4),
+                                GridItem(.flexible(), spacing: 4),
                             ],
                             spacing: 8
                         ) {
@@ -183,30 +182,27 @@ struct CalendarView: View {
                                     let shabbatTime = hebrewCalendarService.getShabbatTime(for: date)
                                     let sponsorship = firestoreManager.getSponsorship(for: date)
                                     let isShabbat = hebrewCalendarService.isShabbat(date)
+                                    let dailyCalendarDay = firestoreManager.getDailyCalendarDay(for: date)
                                     
                                     CalendarDayCell(
                                         date: date,
                                         hebrewDate: hebrewDatesCache[date],
                                         shabbatTime: shabbatTime,
                                         sponsorship: sponsorship,
+                                        dailyCalendarDay: dailyCalendarDay,
                                         isShabbat: isShabbat,
                                         isCurrentMonth: calendar.isDate(date, equalTo: currentMonth, toGranularity: .month),
                                         currentUserEmail: currentUser?.email,
                                         isPastDate: calendar.startOfDay(for: date) < calendar.startOfDay(for: Date())
                                     )
                                     .onTapGesture {
-                                        let isPastDate = calendar.startOfDay(for: date) < calendar.startOfDay(for: Date())
-                                        if isShabbat && !isPastDate {
-                                            let startOfDay = calendar.startOfDay(for: date)
-                                            print("🔍 Tapped date: \(date)")
-                                            print("   StartOfDay: \(startOfDay)")
-                                            print("   Is Shabbat: \(isShabbat)")
-                                            print("   ShabbatTime: \(shabbatTime != nil ? "exists" : "nil")")
-                                            print("   Parsha: '\(shabbatTime?.parsha ?? "none")'")
-                                            print("   Sponsorship: \(sponsorship != nil ? "exists" : "nil")")
-                                            
+                                        if calendar.isDate(date, equalTo: currentMonth, toGranularity: .month) {
                                             selectedDate = date
-                                            showingSponsorshipForm = true
+                                            if isShabbat {
+                                                showingSponsorshipForm = true
+                                            } else {
+                                                showingDayDetail = true
+                                            }
                                         }
                                     }
                                 } else {
@@ -215,8 +211,8 @@ struct CalendarView: View {
                                 }
                             }
                         }
-                                        .padding(.horizontal, 16)
-                                        .id(refreshTrigger)  // Force grid refresh when sponsorships change
+                        .padding(.horizontal, 16)
+                        .id(refreshTrigger)  // Force grid refresh when sponsorships change
                         
                         HappyOccasionsCardView(
                             recentUpcoming: recentUpcomingOccasions,
@@ -227,7 +223,7 @@ struct CalendarView: View {
                         .padding(.horizontal)
                     }
                     .refreshable {
-                        await refreshCommunityOccasions()
+                        await refreshCalendarFeeds()
                     }
                 }
                 }
@@ -247,6 +243,7 @@ struct CalendarView: View {
                 // Preload 90 days of data
                 Task {
                     await hebrewCalendarService.preload90Days()
+                    await firestoreManager.prefetchDailyCalendarDefaultWindow()
                 }
                 loadCalendarData()
                 firestoreManager.startListeningToSponsorships()
@@ -255,7 +252,7 @@ struct CalendarView: View {
                 isLoadingOccasions = firestoreManager.communityOccasions.isEmpty
 
                 Task {
-                    await refreshCommunityOccasions()
+                    await refreshCalendarFeeds()
                 }
                 
                 print("📊 Current sponsorships count: \(firestoreManager.kiddushSponsorships.count)")
@@ -277,12 +274,32 @@ struct CalendarView: View {
                     isLoadingOccasions = false
                 }
             }
+            .sheet(isPresented: $showingDayDetail) {
+                if let date = selectedDate {
+                    CalendarDayDetailView(
+                        date: date,
+                        dailyCalendarDay: firestoreManager.getDailyCalendarDay(for: date),
+                        hebrewDate: hebrewDatesCache[date],
+                        shabbatTime: hebrewCalendarService.getShabbatTime(for: date),
+                        sponsorship: firestoreManager.getSponsorship(for: date),
+                        isShabbat: hebrewCalendarService.isShabbat(date),
+                        isPastDate: calendar.startOfDay(for: date) < calendar.startOfDay(for: Date()),
+                        currentUserEmail: currentUser?.email,
+                        isAdminViewer: currentUser?.isAdmin == true,
+                        onReserveKiddush: {}
+                    )
+                    .presentationDetents([.fraction(0.58), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
+                }
+            }
             .sheet(isPresented: $showingSponsorshipForm, onDismiss: {
                 // Force refresh when form is dismissed
                 print("🔄 Form dismissed, forcing calendar refresh")
                 Task {
                     // Reload sponsorships from Firestore
                     await firestoreManager.fetchKiddushSponsorships()
+                    await firestoreManager.fetchDailyCalendarWindow(centerMonth: currentMonth)
                     // Force UI refresh
                     refreshTrigger = UUID()
                 }
@@ -291,6 +308,7 @@ struct CalendarView: View {
                     SponsorshipFormView(
                         shabbatDate: date,
                         shabbatTime: hebrewCalendarService.getShabbatTime(for: date),
+                        dailyCalendarDay: firestoreManager.getDailyCalendarDay(for: date),
                         currentUser: currentUser,
                         firestoreManager: firestoreManager
                     )
@@ -364,6 +382,7 @@ struct CalendarView: View {
         Task {
             // Fetch Shabbat times for this month
             await hebrewCalendarService.fetchShabbatTimes(for: year, month: month)
+            await firestoreManager.fetchDailyCalendarWindow(centerMonth: currentMonth)
             
             print("🔍 Checking what shabbatTimes we have:")
             for (date, time) in hebrewCalendarService.shabbatTimes {
@@ -425,11 +444,12 @@ struct CalendarView: View {
         }
     }
 
-    func refreshCommunityOccasions() async {
+    func refreshCalendarFeeds() async {
         await MainActor.run {
             isLoadingOccasions = true
         }
         await firestoreManager.fetchCommunityOccasions()
+        await firestoreManager.fetchDailyCalendarWindow(centerMonth: currentMonth)
         await MainActor.run {
             isLoadingOccasions = false
         }
@@ -470,6 +490,7 @@ struct CalendarDayCell: View {
     let hebrewDate: String?
     let shabbatTime: ShabbatTime?
     let sponsorship: KiddushSponsorship?
+    let dailyCalendarDay: DailyCalendarDay?
     let isShabbat: Bool
     let isCurrentMonth: Bool
     let currentUserEmail: String?
@@ -501,13 +522,26 @@ struct CalendarDayCell: View {
     var isAvailableForSponsorship: Bool {
         return !isPastDate && sponsorship == nil
     }
+
+    var dailyEventBadgeCount: Int {
+        let events = dailyCalendarDay?.events.count ?? 0
+        let scheduleCount = (dailyCalendarDay?.scheduleLines.isEmpty == false) ? 1 : 0
+        return events + scheduleCount
+    }
     
     var body: some View {
         VStack(spacing: isShabbat ? 4 : 2) {
-            // Status badge (top-right for Shabbat, center for regular days)
-            if sponsorship != nil || (isPastDate && isShabbat) {
+            if sponsorship != nil || (isPastDate && isShabbat) || (isCurrentMonth && !isShabbat && dailyEventBadgeCount > 0) {
                 HStack {
+                    if isCurrentMonth && !isShabbat && dailyEventBadgeCount > 0 {
+                        Label("\(dailyEventBadgeCount)", systemImage: "calendar.badge.clock")
+                            .font(.system(size: 8, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+
                     Spacer()
+
                     if sponsorship != nil {
                         Circle()
                             .fill(Color(red: 0.9, green: 0.2, blue: 0.2))
@@ -682,6 +716,249 @@ struct CalendarDayCell: View {
         formatter.timeStyle = .short
         return formatter.string(from: date)
     }
+}
+
+struct CalendarDayDetailView: View {
+    let date: Date
+    let dailyCalendarDay: DailyCalendarDay?
+    let hebrewDate: String?
+    let shabbatTime: ShabbatTime?
+    let sponsorship: KiddushSponsorship?
+    let isShabbat: Bool
+    let isPastDate: Bool
+    let currentUserEmail: String?
+    let isAdminViewer: Bool
+    let onReserveKiddush: () -> Void
+
+    private var displayDateText: String {
+        DateFormatter.detailDateFormatter.string(from: date)
+    }
+
+    private var displayHebrewDate: String {
+        let source = dailyCalendarDay?.hebrewDate ?? hebrewDate ?? ""
+        let cleaned = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        return cleaned.isEmpty ? "—" : cleaned
+    }
+
+    private var canReserveKiddush: Bool {
+        isShabbat && !isPastDate && sponsorship == nil
+    }
+
+    private var isSponsoredByCurrentUser: Bool {
+        guard let sponsorship, let currentUserEmail else { return false }
+        return sponsorship.sponsorEmail == currentUserEmail
+    }
+
+    private var sponsorDisplayName: String {
+        guard let sponsorship else { return "Reserved" }
+        if sponsorship.isAnonymous && !isAdminViewer && !isSponsoredByCurrentUser {
+            return "Anonymous Sponsor"
+        }
+        return sponsorship.sponsorName
+    }
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: [Color(.systemBackground), Color.blue.opacity(0.05)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(displayDateText)
+                            .font(.system(size: 23, weight: .bold, design: .rounded))
+                        Text(displayHebrewDate)
+                            .font(.system(size: 16, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color(.secondarySystemBackground))
+                    )
+
+                    if isShabbat {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Shabbat")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                            if let parsha = shabbatTime?.parsha, !parsha.isEmpty {
+                                Text("Parsha: \(parsha)")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                            }
+                            if let shabbatTime {
+                                Text("Candle Lighting: \(formatTime(shabbatTime.candleLighting))")
+                                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                                Text("Havdalah: \(formatTime(shabbatTime.havdalah))")
+                                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.blue.opacity(0.08))
+                        )
+                    }
+
+                    if let sponsorship {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Kiddush Sponsorship")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                            Text("Sponsored By: \(sponsorDisplayName)")
+                                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                            Text(sponsorship.occasion)
+                                .font(.system(size: 14, weight: .medium, design: .rounded))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.red.opacity(0.08))
+                        )
+                    }
+
+                    if canReserveKiddush {
+                        Button(action: onReserveKiddush) {
+                            Label("Reserve Kiddush", systemImage: "calendar.badge.plus")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
+                    }
+
+                    if let dailyCalendarDay, !dailyCalendarDay.scheduleLines.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Schedule")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                            ForEach(Array(dailyCalendarDay.scheduleLines.enumerated()), id: \.offset) { _, line in
+                                HStack(alignment: .top, spacing: 10) {
+                                    if let timeText = line.timeText, !timeText.isEmpty {
+                                        Text(timeText)
+                                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 74, alignment: .leading)
+                                    }
+                                    Text(line.title)
+                                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.secondarySystemBackground))
+                        )
+                    }
+
+                    if let dailyCalendarDay, dailyCalendarDay.zmanim.hasAnyValue {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Zmanim")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                            ZmanRow(title: "Alos", value: dailyCalendarDay.zmanim.alos)
+                            ZmanRow(title: "Netz", value: dailyCalendarDay.zmanim.netz)
+                            ZmanRow(title: "Chatzos", value: dailyCalendarDay.zmanim.chatzos)
+                            ZmanRow(title: "Shkia", value: dailyCalendarDay.zmanim.shkia)
+                            ZmanRow(title: "Tzes", value: dailyCalendarDay.zmanim.tzes)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.secondarySystemBackground))
+                        )
+                    }
+
+                    if let dailyCalendarDay, !dailyCalendarDay.events.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Events")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+
+                            ForEach(dailyCalendarDay.events) { event in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(event.categoryLabel.uppercased())
+                                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                    Text(event.title)
+                                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                    if let details = event.detailsText, !details.isEmpty {
+                                        Text(details)
+                                            .font(.system(size: 13, weight: .regular, design: .rounded))
+                                            .foregroundStyle(.secondary)
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.62))
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.secondarySystemBackground))
+                        )
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            }
+            }
+            .navigationTitle("Day Details")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        DateFormatter.detailTimeFormatter.string(from: date)
+    }
+}
+
+private struct ZmanRow: View {
+    let title: String
+    let value: String?
+
+    var body: some View {
+        if let value, !value.isEmpty {
+            HStack {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                Spacer()
+                Text(value)
+                    .font(.system(size: 14, weight: .regular, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private extension DateFormatter {
+    static let detailDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .full
+        formatter.timeStyle = .none
+        return formatter
+    }()
+
+    static let detailTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        formatter.dateStyle = .none
+        return formatter
+    }()
 }
 
 #Preview {

@@ -44,6 +44,7 @@ struct ContentView: View {
                             await firestoreManager.initializeHonorsInFirestore()
                             await firestoreManager.fetchKiddushSponsorships()
                             await firestoreManager.fetchCommunityOccasions()
+                            await firestoreManager.prefetchDailyCalendarDefaultWindow()
                             
                             // Preload calendar data (90 days)
                             let hebrewCalendarService = HebrewCalendarService()
