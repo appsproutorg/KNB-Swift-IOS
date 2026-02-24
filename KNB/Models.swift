@@ -467,6 +467,26 @@ struct SocialPost: Identifiable, Codable, Equatable {
 }
 
 
+// MARK: - Rabbi Chat Model
+struct RabbiChatMessageRecord: Identifiable, Equatable {
+    let id: String
+    let threadOwnerEmail: String
+    let senderEmail: String
+    let senderName: String
+    let recipientEmails: [String]
+    let content: String
+    let timestamp: Date
+}
+
+struct RabbiChatThreadSummary: Identifiable, Equatable {
+    let id: String
+    let threadOwnerEmail: String
+    let threadOwnerName: String
+    let lastMessage: String
+    let lastMessageTimestamp: Date
+}
+
+
 
 // MARK: - Notification Model
 struct AppNotification: Identifiable, Codable, Equatable {

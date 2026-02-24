@@ -35,11 +35,23 @@ class FirestoreManager: ObservableObject {
     private var communityOccasionsListener: ListenerRegistration?
     private var socialPostsListener: ListenerRegistration?
     private var seatReservationsListener: ListenerRegistration?
+    private var rabbiMessagesListener: ListenerRegistration?
+    private var rabbiInboxListener: ListenerRegistration?
 
     private let scrapedKiddushCollection = "kiddushCalendar"
     private let communityOccasionsCollection = "communityOccasions"
     private let dailyCalendarCollection = "dailyCalendar"
     private let scrapedSponsorEmailPlaceholder = "website@heritagecongregation.com"
+    private let rabbiRecipientEmails: [String] = [
+        "acagishtein@gmail.com",
+        "ethangoizman16@gmail.com"
+    ]
+    private let rabbiEmailAliasesToCanonical: [String: String] = [
+        "acagishtein@gmail.com": "acagishtein@gmail.com",
+        "acagishtein@googlemail.com": "acagishtein@gmail.com",
+        "ethangoizman16@gmail.com": "ethangoizman16@gmail.com",
+        "ethangoizman16@googlemail.com": "ethangoizman16@gmail.com"
+    ]
     
 
     
@@ -1868,6 +1880,233 @@ class FirestoreManager: ObservableObject {
         }
         
         return paths
+    }
+
+    // MARK: - Rabbi Chat
+
+    func isRabbiAccount(email: String) -> Bool {
+        canonicalRabbiEmail(for: normalizeEmail(email)) != nil
+    }
+
+    func startListeningToRabbiMessages(
+        threadOwnerEmail: String,
+        onChange: @escaping ([RabbiChatMessageRecord]) -> Void,
+        onError: ((String) -> Void)? = nil
+    ) {
+        rabbiMessagesListener?.remove()
+        rabbiMessagesListener = nil
+
+        let normalizedThreadOwnerEmail = normalizeEmail(threadOwnerEmail)
+        guard !normalizedThreadOwnerEmail.isEmpty else {
+            onChange([])
+            return
+        }
+
+        rabbiMessagesListener = db.collection("rabbi_messages")
+            .whereField("threadOwnerEmail", isEqualTo: normalizedThreadOwnerEmail)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    print("❌ Error listening to Rabbi chat messages: \(error.localizedDescription)")
+                    self.errorMessage = "Failed to load Rabbi messages: \(error.localizedDescription)"
+                    DispatchQueue.main.async {
+                        onChange([])
+                        onError?(error.localizedDescription)
+                    }
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    DispatchQueue.main.async {
+                        onChange([])
+                    }
+                    return
+                }
+
+                let messages = documents
+                    .compactMap { self.parseRabbiChatMessage(from: $0) }
+                    .sorted { $0.timestamp < $1.timestamp }
+
+                DispatchQueue.main.async {
+                    onChange(messages)
+                }
+            }
+    }
+
+    func stopListeningToRabbiMessages() {
+        rabbiMessagesListener?.remove()
+        rabbiMessagesListener = nil
+    }
+
+    func startListeningToRabbiInbox(
+        rabbiEmail: String,
+        onChange: @escaping ([RabbiChatThreadSummary]) -> Void,
+        onError: ((String) -> Void)? = nil
+    ) {
+        rabbiInboxListener?.remove()
+        rabbiInboxListener = nil
+
+        let normalizedRabbiEmail = normalizeEmail(rabbiEmail)
+        guard let canonicalRabbiEmail = canonicalRabbiEmail(for: normalizedRabbiEmail) else {
+            onChange([])
+            return
+        }
+
+        rabbiInboxListener = db.collection("rabbi_messages")
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    print("❌ Error listening to Rabbi inbox: \(error.localizedDescription)")
+                    self.errorMessage = "Failed to load Rabbi inbox: \(error.localizedDescription)"
+                    DispatchQueue.main.async {
+                        onChange([])
+                        onError?(error.localizedDescription)
+                    }
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    DispatchQueue.main.async {
+                        onChange([])
+                    }
+                    return
+                }
+
+                let records = documents
+                    .compactMap { self.parseRabbiChatMessage(from: $0) }
+                    .filter { record in
+                        // Keep compatibility with any older rows that may have been saved
+                        // before canonical recipient handling.
+                        record.recipientEmails.isEmpty
+                            || record.recipientEmails.contains(canonicalRabbiEmail)
+                            || record.recipientEmails.contains(normalizedRabbiEmail)
+                    }
+                let grouped = Dictionary(grouping: records, by: \.threadOwnerEmail)
+                let summaries: [RabbiChatThreadSummary] = grouped.compactMap { threadEmail, threadMessages in
+                    guard let latestMessage = threadMessages.max(by: { $0.timestamp < $1.timestamp }) else {
+                        return nil
+                    }
+
+                    let latestUserMessage = threadMessages
+                        .filter { $0.senderEmail == threadEmail }
+                        .max(by: { $0.timestamp < $1.timestamp })
+
+                    let threadNameCandidate = latestUserMessage?.senderName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let threadName: String
+                    if let threadNameCandidate, !threadNameCandidate.isEmpty {
+                        threadName = threadNameCandidate
+                    } else {
+                        threadName = threadEmail
+                    }
+
+                    return RabbiChatThreadSummary(
+                        id: threadEmail,
+                        threadOwnerEmail: threadEmail,
+                        threadOwnerName: threadName,
+                        lastMessage: latestMessage.content,
+                        lastMessageTimestamp: latestMessage.timestamp
+                    )
+                }
+                .sorted { $0.lastMessageTimestamp > $1.lastMessageTimestamp }
+
+                DispatchQueue.main.async {
+                    onChange(summaries)
+                }
+            }
+    }
+
+    func stopListeningToRabbiInbox() {
+        rabbiInboxListener?.remove()
+        rabbiInboxListener = nil
+    }
+
+    func sendRabbiMessage(content: String, sender: User, threadOwnerEmail: String? = nil) async -> Bool {
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else {
+            errorMessage = "Message cannot be empty."
+            return false
+        }
+
+        let normalizedSenderEmail = normalizeEmail(sender.email)
+        guard !normalizedSenderEmail.isEmpty else {
+            errorMessage = "Invalid sender email."
+            return false
+        }
+
+        let ownerEmail = normalizeEmail(threadOwnerEmail ?? sender.email)
+        guard !ownerEmail.isEmpty else {
+            errorMessage = "Invalid chat thread."
+            return false
+        }
+
+        let normalizedSenderName = sender.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let senderName = normalizedSenderName.isEmpty ? "Member" : normalizedSenderName
+        let recipientEmails = Array(Set(rabbiRecipientEmails.map { normalizeEmail($0) })).sorted()
+
+        if isRabbiAccount(email: normalizedSenderEmail) && ownerEmail == normalizedSenderEmail {
+            errorMessage = "Select a user conversation first."
+            return false
+        }
+
+        let payload: [String: Any] = [
+            "threadOwnerEmail": ownerEmail,
+            "senderEmail": normalizedSenderEmail,
+            "senderName": senderName,
+            "recipientEmails": recipientEmails,
+            "content": trimmedContent,
+            "timestamp": Timestamp(date: Date())
+        ]
+
+        do {
+            try await db.collection("rabbi_messages").document().setData(payload)
+            return true
+        } catch {
+            print("❌ Error sending Rabbi chat message: \(error.localizedDescription)")
+            errorMessage = "Failed to send message: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    private func parseRabbiChatMessage(from document: QueryDocumentSnapshot) -> RabbiChatMessageRecord? {
+        let data = document.data()
+
+        guard let threadOwnerEmail = data["threadOwnerEmail"] as? String,
+              let senderEmail = data["senderEmail"] as? String,
+              let content = data["content"] as? String,
+              let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+            return nil
+        }
+
+        let senderName = (data["senderName"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedSenderName: String
+        if let senderName, !senderName.isEmpty {
+            resolvedSenderName = senderName
+        } else {
+            resolvedSenderName = "Member"
+        }
+        let recipientEmails = (data["recipientEmails"] as? [String] ?? [])
+            .map { normalizeEmail($0) }
+            .filter { !$0.isEmpty }
+
+        return RabbiChatMessageRecord(
+            id: document.documentID,
+            threadOwnerEmail: normalizeEmail(threadOwnerEmail),
+            senderEmail: normalizeEmail(senderEmail),
+            senderName: resolvedSenderName,
+            recipientEmails: recipientEmails,
+            content: content,
+            timestamp: timestamp
+        )
+    }
+
+    private func normalizeEmail(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func canonicalRabbiEmail(for normalizedEmail: String) -> String? {
+        rabbiEmailAliasesToCanonical[normalizedEmail]
     }
     
     // MARK: - User Management

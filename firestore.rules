@@ -74,6 +74,29 @@ service cloud.firestore {
              && (canAddOwnLike() || canRemoveOwnLike());
     }
 
+    function isRabbiEmail(email) {
+      return email is string
+             && (email.lower() == 'acagishtein@gmail.com'
+                 || email.lower() == 'acagishtein@googlemail.com'
+                 || email.lower() == 'ethangoizman16@googlemail.com'
+                 || email.lower() == 'ethangoizman16@gmail.com');
+    }
+
+    function isCurrentUserRabbi() {
+      return isAuthenticated() && isRabbiEmail(request.auth.token.email);
+    }
+
+    function validRabbiRecipients(recipients) {
+      return recipients is list
+             && recipients.size() == 2
+             && recipients[0] is string
+             && recipients[1] is string
+             && (
+               (recipients[0].lower() == 'acagishtein@gmail.com' && recipients[1].lower() == 'ethangoizman16@gmail.com')
+               || (recipients[0].lower() == 'ethangoizman16@gmail.com' && recipients[1].lower() == 'acagishtein@gmail.com')
+             );
+    }
+
     // Shared Kiddush calendar (public read-only)
     match /kiddushCalendar/{isoDate} {
       allow read: if true;
@@ -187,6 +210,52 @@ service cloud.firestore {
       allow delete: if isAuthenticated() 
                     && (resource.data.authorEmail == request.auth.token.email 
                         || isAdmin());
+    }
+
+    // Rabbi chat messages
+    match /rabbi_messages/{messageId} {
+      allow read: if isAuthenticated()
+                  && (
+                    (resource.data.threadOwnerEmail is string
+                     && resource.data.threadOwnerEmail.lower() == request.auth.token.email.lower())
+                    || isCurrentUserRabbi()
+                  );
+      allow create: if isAuthenticated()
+                    && request.resource.data.keys().hasOnly([
+                      'threadOwnerEmail',
+                      'content',
+                      'timestamp',
+                      'recipientEmails',
+                      'senderEmail',
+                      'senderName'
+                    ])
+                    && request.resource.data.threadOwnerEmail is string
+                    && request.resource.data.threadOwnerEmail.size() > 0
+                    && request.resource.data.content is string
+                    && request.resource.data.content.size() > 0
+                    && request.resource.data.content.size() <= 1000
+                    && request.resource.data.timestamp is timestamp
+                    && validRabbiRecipients(request.resource.data.recipientEmails)
+                    && (
+                      !request.resource.data.keys().hasAny(['senderEmail'])
+                      || (
+                        request.resource.data.senderEmail is string
+                        && request.resource.data.senderEmail.lower() == request.auth.token.email.lower()
+                      )
+                    )
+                    && (
+                      !request.resource.data.keys().hasAny(['senderName'])
+                      || (
+                        request.resource.data.senderName is string
+                        && request.resource.data.senderName.size() > 0
+                        && request.resource.data.senderName.size() <= 120
+                      )
+                    )
+                    && (
+                      isCurrentUserRabbi()
+                      || request.resource.data.threadOwnerEmail.lower() == request.auth.token.email.lower()
+                    );
+      allow update, delete: if false;
     }
     
     // Seat Reservations
