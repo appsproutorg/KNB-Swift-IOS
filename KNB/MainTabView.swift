@@ -35,14 +35,17 @@ struct MainTabView: View {
                     currentUser: $currentUser
                 )
                 .tabItem {
-                    Label("Social", systemImage: "bubble.left.and.bubble.right")
+                    Label("Social", systemImage: "person.2.fill")
                 }
                 .tag(1)
                 
-                // Siddur Tab
-                SiddurView()
+                // Chat Tab
+                ChatTabView(
+                    firestoreManager: firestoreManager,
+                    currentUser: $currentUser
+                )
                 .tabItem {
-                    Label("Siddur", systemImage: "book.closed.fill")
+                    Label("Chat", systemImage: "message.fill")
                 }
                 .tag(2)
                 

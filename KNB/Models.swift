@@ -486,6 +486,33 @@ struct RabbiChatThreadSummary: Identifiable, Equatable {
     let lastMessageTimestamp: Date
 }
 
+// MARK: - Direct Chat Models
+struct DirectChatMessageRecord: Identifiable, Equatable {
+    let id: String
+    let threadId: String
+    let participants: [String]
+    let senderEmail: String
+    let senderName: String
+    let recipientEmail: String
+    let recipientName: String
+    let content: String
+    let timestamp: Date
+}
+
+struct DirectChatThreadSummary: Identifiable, Equatable {
+    let id: String
+    let otherParticipantEmail: String
+    let otherParticipantName: String
+    let lastMessage: String
+    let lastMessageTimestamp: Date
+}
+
+struct ChatDirectoryUser: Identifiable, Equatable {
+    var id: String { email }
+    let email: String
+    let name: String
+}
+
 
 
 // MARK: - Notification Model

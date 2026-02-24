@@ -33,6 +33,8 @@ struct RabbiChatView: View {
     let currentUser: User
     let threadOwnerEmail: String
     let threadDisplayName: String?
+    let directRecipientEmail: String?
+    let directRecipientName: String?
 
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isComposerFocused: Bool
@@ -49,12 +51,45 @@ struct RabbiChatView: View {
     @State private var messages: [RabbiChatMessage] = []
     @State private var showListenerError = false
     @State private var listenerErrorMessage = ""
+    @State private var bottomMarkerMinY: CGFloat = 0
+    @State private var scrollViewportHeight: CGFloat = 0
+    private let bottomAnchorId = "rabbi-chat-bottom-anchor"
+
+    init(
+        firestoreManager: FirestoreManager,
+        currentUser: User,
+        threadOwnerEmail: String,
+        threadDisplayName: String?,
+        directRecipientEmail: String? = nil,
+        directRecipientName: String? = nil
+    ) {
+        self.firestoreManager = firestoreManager
+        self.currentUser = currentUser
+        self.threadOwnerEmail = threadOwnerEmail
+        self.threadDisplayName = threadDisplayName
+        self.directRecipientEmail = directRecipientEmail
+        self.directRecipientName = directRecipientName
+    }
 
     private var isRabbiViewer: Bool {
         firestoreManager.isRabbiAccount(email: currentUser.email)
     }
 
+    private var isDirectChatMode: Bool {
+        guard let directRecipientEmail else { return false }
+        return !directRecipientEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     private var chatTitle: String {
+        if isDirectChatMode {
+            let provided = (threadDisplayName ?? directRecipientName ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if !provided.isEmpty {
+                return provided
+            }
+            return directRecipientEmail ?? "Chat"
+        }
+
         if isRabbiViewer {
             let cleaned = threadDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return cleaned.isEmpty ? threadOwnerEmail : cleaned
@@ -63,6 +98,10 @@ struct RabbiChatView: View {
     }
 
     private var chatSubtitle: String {
+        if isDirectChatMode {
+            return directRecipientEmail ?? "Direct message"
+        }
+
         if isRabbiViewer {
             return threadOwnerEmail
         }
@@ -71,6 +110,12 @@ struct RabbiChatView: View {
 
     private var canSend: Bool {
         !draftMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
+    }
+
+    private var shouldShowJumpToPresentButton: Bool {
+        guard messages.count > 2, scrollViewportHeight > 0 else { return false }
+        let distanceFromBottom = abs(bottomMarkerMinY - scrollViewportHeight)
+        return distanceFromBottom > 40
     }
 
     private var chatRows: [RabbiChatRow] {
@@ -103,53 +148,133 @@ struct RabbiChatView: View {
 
                 VStack(spacing: 0) {
                     ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(spacing: 8) {
-                                ForEach(Array(chatRows.enumerated()), id: \.offset) { index, row in
-                                    switch row {
-                                    case .separator(let label):
-                                        RabbiDateChip(text: label)
-                                            .padding(.vertical, 6)
-                                            .transition(.opacity)
+                        ZStack(alignment: .bottomTrailing) {
+                            ScrollView {
+                                VStack(spacing: 4) {
+                                    ForEach(Array(chatRows.enumerated()), id: \.offset) { index, row in
+                                        switch row {
+                                        case .separator(let label):
+                                            RabbiDateChip(text: label)
+                                                .padding(.vertical, 3)
+                                                .transition(.opacity)
 
-                                    case .message(let message):
-                                        TelegramChatBubble(
-                                            message: message,
-                                            entryDelay: min(0.18, Double(index) * 0.03)
+                                        case .message(let message):
+                                            TelegramChatBubble(
+                                                message: message,
+                                                entryDelay: min(0.18, Double(index) * 0.03)
+                                            )
+                                        }
+                                    }
+
+                                    if isRabbiTyping {
+                                        HStack {
+                                            TelegramTypingBubble()
+                                            Spacer(minLength: 44)
+                                        }
+                                        .transition(.move(edge: .leading).combined(with: .opacity))
+                                    }
+
+                                    Color.clear
+                                        .frame(height: 1)
+                                        .id(bottomAnchorId)
+                                        .background(
+                                            GeometryReader { geo in
+                                                Color.clear.preference(
+                                                    key: RabbiBottomMarkerMinYPreferenceKey.self,
+                                                    value: geo.frame(in: .named("rabbiChatScroll")).minY
+                                                )
+                                            }
                                         )
-                                    }
                                 }
-
-                                if isRabbiTyping {
-                                    HStack {
-                                        TelegramTypingBubble()
-                                        Spacer(minLength: 44)
-                                    }
-                                    .transition(.move(edge: .leading).combined(with: .opacity))
-                                }
+                                .padding(.horizontal, 12)
+                                .padding(.top, 8)
+                                .padding(.bottom, 12)
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.top, 12)
-                            .padding(.bottom, 14)
-                        }
-                        .scrollIndicators(.hidden)
-                        .scrollDismissesKeyboard(.interactively)
-                        .onAppear {
-                            scrollToBottom(proxy, animated: false)
-                        }
-                        .onChange(of: messages.count) { _, _ in
-                            scrollToBottom(proxy, animated: true)
-                        }
-                        .onChange(of: isRabbiTyping) { _, typing in
-                            guard typing else { return }
-                            scrollToBottom(proxy, animated: true)
+                            .coordinateSpace(name: "rabbiChatScroll")
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(
+                                        key: RabbiScrollViewportHeightPreferenceKey.self,
+                                        value: geo.size.height
+                                    )
+                                }
+                            )
+                            .scrollIndicators(.hidden)
+                            .scrollDismissesKeyboard(.interactively)
+                            .onPreferenceChange(RabbiBottomMarkerMinYPreferenceKey.self) { value in
+                                bottomMarkerMinY = value
+                            }
+                            .onPreferenceChange(RabbiScrollViewportHeightPreferenceKey.self) { value in
+                                scrollViewportHeight = value
+                            }
+                            .onAppear {
+                                scrollToBottom(proxy, animated: false)
+                            }
+                            .onChange(of: messages.count) { _, _ in
+                                scrollToBottom(proxy, animated: true)
+                            }
+                            .onChange(of: isRabbiTyping) { _, typing in
+                                guard typing else { return }
+                                scrollToBottom(proxy, animated: true)
+                            }
+
+                            if shouldShowJumpToPresentButton {
+                                Button {
+                                    scrollToBottom(proxy, animated: true)
+                                } label: {
+                                    ZStack {
+                                        Circle()
+                                            .fill(.ultraThinMaterial)
+                                            .overlay(
+                                                Circle()
+                                                    .stroke(
+                                                        LinearGradient(
+                                                            colors: [Color.white.opacity(0.38), Color.white.opacity(0.12)],
+                                                            startPoint: .topLeading,
+                                                            endPoint: .bottomTrailing
+                                                        ),
+                                                        lineWidth: 1.1
+                                                    )
+                                            )
+
+                                        Circle()
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [Color.white.opacity(0.16), Color.black.opacity(0.12)],
+                                                    startPoint: .topLeading,
+                                                    endPoint: .bottomTrailing
+                                                )
+                                            )
+                                            .padding(3.5)
+
+                                        Image(systemName: "arrow.down")
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundStyle(Color.white.opacity(0.95))
+                                    }
+                                    .frame(width: 46, height: 46)
+                                    .shadow(color: Color.black.opacity(0.32), radius: 8, x: 0, y: 4)
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.trailing, 12)
+                                .padding(.bottom, 14)
+                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                            }
                         }
                     }
-
+                }
+                .safeAreaInset(edge: .bottom, spacing: 0) {
                     composerBar
                         .padding(.horizontal, 8)
-                        .padding(.top, 8)
-                        .padding(.bottom, 8)
+                        .padding(.top, 6)
+                        .padding(.bottom, 6)
+                        .background(
+                            LinearGradient(
+                                colors: [Color.black.opacity(0.0), Color.black.opacity(0.26)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                            .ignoresSafeArea(edges: .bottom)
+                        )
                 }
                 .opacity(showContent ? 1 : 0)
                 .offset(y: showContent ? 0 : 14)
@@ -225,6 +350,7 @@ struct RabbiChatView: View {
             }
             .onDisappear {
                 firestoreManager.stopListeningToRabbiMessages()
+                firestoreManager.stopListeningToDirectMessages()
             }
             .alert("Chat Connection Issue", isPresented: $showListenerError) {
                 Button("OK", role: .cancel) {}
@@ -235,33 +361,48 @@ struct RabbiChatView: View {
     }
 
     private var composerBar: some View {
-        return HStack(spacing: 8) {
-            TextField("Message Rabbi...", text: $draftMessage, axis: .vertical)
+        return HStack(alignment: .bottom, spacing: 10) {
+            TextField("Message...", text: $draftMessage, axis: .vertical)
                 .focused($isComposerFocused)
                 .lineLimit(1...4)
                 .textFieldStyle(.plain)
-                .font(.system(size: 20, weight: .regular, design: .rounded))
+                .font(.system(size: 17, weight: .regular, design: .rounded))
                 .foregroundStyle(.white)
                 .tint(Color.white)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, 18)
                 .padding(.vertical, 11)
                 .background(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(Color.black.opacity(0.24))
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .fill(.ultraThinMaterial)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                                .fill(Color.white.opacity(0.035))
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 28, style: .continuous)
                                 .stroke(
                                     LinearGradient(
                                         colors: [
-                                            Color.white.opacity(isComposerFocused ? 0.32 : 0.14),
-                                            Color.white.opacity(0.05)
+                                            Color.white.opacity(isComposerFocused ? 0.35 : 0.2),
+                                            Color.white.opacity(0.08)
                                         ],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     ),
-                                    lineWidth: 1.2
+                                    lineWidth: 1.1
                                 )
-                    )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [Color.black.opacity(0.03), Color.black.opacity(0.11)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                        )
+                        .shadow(color: Color.white.opacity(0.08), radius: 1.2, x: 0, y: -0.5)
                 )
                 .animation(.easeInOut(duration: 0.2), value: isComposerFocused)
 
@@ -274,63 +415,39 @@ struct RabbiChatView: View {
                         .fill(.ultraThinMaterial)
                         .overlay(
                             Circle()
-                                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                                .stroke(Color.white.opacity(0.24), lineWidth: 1.1)
                         )
 
                     Circle()
                         .fill(
                             LinearGradient(
                                 colors: canSend
-                                    ? [Color(red: 0.3, green: 0.2, blue: 0.96), Color(red: 0.35, green: 0.54, blue: 1.0)]
-                                    : [Color.white.opacity(0.14), Color.white.opacity(0.08)],
+                                    ? [Color(red: 0.2, green: 0.46, blue: 0.98), Color(red: 0.39, green: 0.42, blue: 1.0)]
+                                    : [Color.white.opacity(0.12), Color.white.opacity(0.08)],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .padding(4)
+                        .padding(4.8)
 
                     Image(systemName: "paperplane.fill")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 16, weight: .bold))
                         .foregroundStyle(canSend ? Color.white : Color.white.opacity(0.65))
                         .offset(x: 0.5, y: -0.5)
                 }
-                .frame(width: 42, height: 42)
+                .frame(width: 50, height: 50)
+                .shadow(color: Color.white.opacity(canSend ? 0.13 : 0.05), radius: 2, x: 0, y: -0.5)
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
-            .scaleEffect(sendPress ? 0.82 : (canSend ? 1 : 0.96))
-            .rotationEffect(.degrees(sendPress ? -14 : 0))
+            .scaleEffect(sendPress ? 0.86 : (canSend ? 1 : 0.96))
+            .rotationEffect(.degrees(sendPress ? -10 : 0))
             .animation(.spring(response: 0.24, dampingFraction: 0.66), value: sendPress)
             .animation(.spring(response: 0.28, dampingFraction: 0.84), value: canSend)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 25, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 25, style: .continuous)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.28), Color.white.opacity(0.08)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 1.1
-                        )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 25, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.black.opacity(0.06), Color.black.opacity(0.16)],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                )
-        )
-        .shadow(color: Color.black.opacity(0.28), radius: 14, x: 0, y: 8)
+        .padding(.vertical, 4)
+        .shadow(color: Color.black.opacity(0.22), radius: 10, x: 0, y: 5)
     }
 
     private func sendMessage() {
@@ -352,11 +469,21 @@ struct RabbiChatView: View {
         isSending = true
 
         Task {
-            let didSend = await firestoreManager.sendRabbiMessage(
-                content: trimmed,
-                sender: currentUser,
-                threadOwnerEmail: threadOwnerEmail
-            )
+            let didSend: Bool
+            if isDirectChatMode, let directRecipientEmail {
+                didSend = await firestoreManager.sendDirectMessage(
+                    content: trimmed,
+                    sender: currentUser,
+                    recipientEmail: directRecipientEmail,
+                    recipientName: directRecipientName ?? threadDisplayName
+                )
+            } else {
+                didSend = await firestoreManager.sendRabbiMessage(
+                    content: trimmed,
+                    sender: currentUser,
+                    threadOwnerEmail: threadOwnerEmail
+                )
+            }
 
             await MainActor.run {
                 isSending = false
@@ -370,25 +497,49 @@ struct RabbiChatView: View {
     }
 
     private func startListeningToMessages() {
-        firestoreManager.startListeningToRabbiMessages(
-            threadOwnerEmail: threadOwnerEmail
-        ) { records in
-            let currentViewerEmail = normalizedIdentityEmail(currentUser.email)
-            let mapped = records.map { record in
-                RabbiChatMessage(
-                    id: record.id,
-                    text: record.content,
-                    isOutgoing: normalizedIdentityEmail(record.senderEmail) == currentViewerEmail,
-                    timestamp: record.timestamp
-                )
-            }
+        if isDirectChatMode, let directRecipientEmail {
+            firestoreManager.startListeningToDirectMessages(
+                currentUserEmail: currentUser.email,
+                otherUserEmail: directRecipientEmail
+            ) { records in
+                let currentViewerEmail = normalizedIdentityEmail(currentUser.email)
+                let mapped = records.map { record in
+                    RabbiChatMessage(
+                        id: record.id,
+                        text: record.content,
+                        isOutgoing: normalizedIdentityEmail(record.senderEmail) == currentViewerEmail,
+                        timestamp: record.timestamp
+                    )
+                }
 
-            withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
-                messages = mapped
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                    messages = mapped
+                }
+            } onError: { errorDescription in
+                listenerErrorMessage = "Messages failed to load: \(errorDescription)"
+                showListenerError = true
             }
-        } onError: { errorDescription in
-            listenerErrorMessage = "Messages failed to load: \(errorDescription)"
-            showListenerError = true
+        } else {
+            firestoreManager.startListeningToRabbiMessages(
+                threadOwnerEmail: threadOwnerEmail
+            ) { records in
+                let currentViewerEmail = normalizedIdentityEmail(currentUser.email)
+                let mapped = records.map { record in
+                    RabbiChatMessage(
+                        id: record.id,
+                        text: record.content,
+                        isOutgoing: normalizedIdentityEmail(record.senderEmail) == currentViewerEmail,
+                        timestamp: record.timestamp
+                    )
+                }
+
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                    messages = mapped
+                }
+            } onError: { errorDescription in
+                listenerErrorMessage = "Messages failed to load: \(errorDescription)"
+                showListenerError = true
+            }
         }
     }
 
@@ -400,13 +551,12 @@ struct RabbiChatView: View {
     }
 
     private func scrollToBottom(_ proxy: ScrollViewProxy, animated: Bool) {
-        guard let lastMessage = messages.last else { return }
         if animated {
             withAnimation(.spring(response: 0.32, dampingFraction: 0.9)) {
-                proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                proxy.scrollTo(bottomAnchorId, anchor: .bottom)
             }
         } else {
-            proxy.scrollTo(lastMessage.id, anchor: .bottom)
+            proxy.scrollTo(bottomAnchorId, anchor: .bottom)
         }
     }
 
@@ -453,74 +603,103 @@ private struct TelegramChatBubble: View {
     @State private var isVisible = false
     @State private var isPressed = false
 
+    private var maxBubbleWidth: CGFloat {
+        UIScreen.main.bounds.width * 0.7
+    }
+
+    private var metadataReservedWidth: CGFloat {
+        let timeText = RabbiChatFormatters.time.string(from: message.timestamp) as NSString
+        let timeWidth = timeText.size(
+            withAttributes: [.font: UIFont.systemFont(ofSize: 11, weight: .regular)]
+        ).width
+        let checkWidth: CGFloat = message.isOutgoing ? 12 : 0
+        return max(34, ceil(timeWidth + checkWidth + 8))
+    }
+    
+    private var outgoingGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(red: 0.42, green: 0.35, blue: 1.0),
+                Color(red: 0.55, green: 0.45, blue: 1.0)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var incomingGradient: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(red: 0.15, green: 0.15, blue: 0.15),
+                Color(red: 0.2, green: 0.2, blue: 0.2)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
     var body: some View {
-        HStack(alignment: .bottom) {
+        HStack(alignment: .bottom, spacing: 0) {
             if message.isOutgoing {
-                Spacer(minLength: 42)
+                Spacer(minLength: 0)
                 bubbleContent
             } else {
                 bubbleContent
-                Spacer(minLength: 42)
+                Spacer(minLength: 0)
             }
         }
         .id(message.id)
         .opacity(isVisible ? 1 : 0)
         .offset(
-            x: isVisible ? 0 : (message.isOutgoing ? 18 : -18),
-            y: isVisible ? 0 : 9
+            x: isVisible ? 0 : (message.isOutgoing ? 8 : -8),
+            y: isVisible ? 0 : 4
         )
-        .scaleEffect(isVisible ? 1 : 0.94, anchor: message.isOutgoing ? .trailing : .leading)
+        .scaleEffect(isVisible ? 1 : 0.97, anchor: message.isOutgoing ? .trailing : .leading)
         .onAppear {
-            withAnimation(.spring(response: 0.36, dampingFraction: 0.86).delay(entryDelay)) {
+            withAnimation(.easeOut(duration: 0.2).delay(entryDelay)) {
                 isVisible = true
             }
         }
     }
 
     private var bubbleContent: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        ZStack(alignment: .bottomTrailing) {
             Text(message.text)
-                .font(.system(size: 16))
+                .font(.system(size: 15, weight: .regular, design: .rounded))
                 .foregroundStyle(.white)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.trailing, metadataReservedWidth)
+                .padding(.bottom, 1)
 
             HStack(spacing: 2) {
-                Spacer(minLength: 0)
                 Text(RabbiChatFormatters.time.string(from: message.timestamp))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .font(.system(size: 11, weight: .regular, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.62))
 
                 if message.isOutgoing {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.62))
                 }
             }
+            .padding(.bottom, 1)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal, 11)
         .padding(.vertical, 6)
-        .frame(maxWidth: 286, alignment: .leading)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(
-                    message.isOutgoing
-                        ? AnyShapeStyle(
-                            LinearGradient(
-                                colors: [Color(red: 0.42, green: 0.35, blue: 1.0), Color(red: 0.55, green: 0.45, blue: 1.0)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        : AnyShapeStyle(
-                            LinearGradient(
-                                colors: [Color(red: 0.15, green: 0.15, blue: 0.15), Color(red: 0.2, green: 0.2, blue: 0.2)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+            (message.isOutgoing ? outgoingGradient : incomingGradient)
+                .clipShape(SproutBubbleShape(myMessage: message.isOutgoing))
+                .overlay(
+                    SproutBubbleShape(myMessage: message.isOutgoing)
+                        .stroke(Color.white.opacity(message.isOutgoing ? 0.1 : 0.08), lineWidth: 0.8)
                 )
         )
-        .clipShape(TelegramBubbleShape(myMessage: message.isOutgoing))
-        .shadow(color: Color.black.opacity(0.2), radius: 2, x: 0, y: 1)
+        .compositingGroup()
+        .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+        .frame(maxWidth: maxBubbleWidth, alignment: message.isOutgoing ? .trailing : .leading)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
         .scaleEffect(isPressed ? 0.98 : 1)
         .animation(.spring(response: 0.2, dampingFraction: 0.7), value: isPressed)
         .onLongPressGesture(minimumDuration: 0, pressing: { pressing in
@@ -529,8 +708,8 @@ private struct TelegramChatBubble: View {
     }
 }
 
-private struct TelegramBubbleShape: Shape {
-    var myMessage: Bool
+private struct SproutBubbleShape: Shape {
+    let myMessage: Bool
 
     func path(in rect: CGRect) -> Path {
         let path = UIBezierPath(
@@ -674,6 +853,20 @@ private struct TelegramDoodleBackground: View {
                 )
             }
         }
+    }
+}
+
+private struct RabbiBottomMarkerMinYPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+private struct RabbiScrollViewportHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

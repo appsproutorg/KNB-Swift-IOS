@@ -37,6 +37,8 @@ class FirestoreManager: ObservableObject {
     private var seatReservationsListener: ListenerRegistration?
     private var rabbiMessagesListener: ListenerRegistration?
     private var rabbiInboxListener: ListenerRegistration?
+    private var directMessagesListener: ListenerRegistration?
+    private var directInboxListener: ListenerRegistration?
 
     private let scrapedKiddushCollection = "kiddushCalendar"
     private let communityOccasionsCollection = "communityOccasions"
@@ -203,6 +205,10 @@ class FirestoreManager: ObservableObject {
         stopListeningToCommunityOccasions()
         stopListeningToSocialPosts()
         stopListeningToSeatReservations()
+        stopListeningToRabbiMessages()
+        stopListeningToRabbiInbox()
+        stopListeningToDirectMessages()
+        stopListeningToDirectInbox()
         stopListeningToUser()
     }
 
@@ -212,6 +218,10 @@ class FirestoreManager: ObservableObject {
         communityOccasionsListener?.remove()
         socialPostsListener?.remove()
         seatReservationsListener?.remove()
+        rabbiMessagesListener?.remove()
+        rabbiInboxListener?.remove()
+        directMessagesListener?.remove()
+        directInboxListener?.remove()
         userListener?.remove()
     }
     
@@ -2069,6 +2079,244 @@ class FirestoreManager: ObservableObject {
         }
     }
 
+    // MARK: - Direct Messages (Any User)
+
+    func startListeningToDirectMessages(
+        currentUserEmail: String,
+        otherUserEmail: String,
+        onChange: @escaping ([DirectChatMessageRecord]) -> Void,
+        onError: ((String) -> Void)? = nil
+    ) {
+        directMessagesListener?.remove()
+        directMessagesListener = nil
+
+        let normalizedCurrentEmail = normalizeEmail(currentUserEmail)
+        let normalizedOtherEmail = normalizeEmail(otherUserEmail)
+        guard !normalizedCurrentEmail.isEmpty, !normalizedOtherEmail.isEmpty else {
+            onChange([])
+            return
+        }
+
+        let threadId = directThreadId(emailA: normalizedCurrentEmail, emailB: normalizedOtherEmail)
+
+        directMessagesListener = db.collection("direct_messages")
+            .whereField("participants", arrayContains: normalizedCurrentEmail)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    print("❌ Error listening to direct messages: \(error.localizedDescription)")
+                    self.errorMessage = "Failed to load messages: \(error.localizedDescription)"
+                    DispatchQueue.main.async {
+                        onChange([])
+                        onError?(error.localizedDescription)
+                    }
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    DispatchQueue.main.async {
+                        onChange([])
+                    }
+                    return
+                }
+
+                let messages = documents
+                    .compactMap { self.parseDirectChatMessage(from: $0) }
+                    .filter { $0.threadId == threadId }
+                    .sorted { $0.timestamp < $1.timestamp }
+
+                DispatchQueue.main.async {
+                    onChange(messages)
+                }
+            }
+    }
+
+    func stopListeningToDirectMessages() {
+        directMessagesListener?.remove()
+        directMessagesListener = nil
+    }
+
+    func startListeningToDirectInbox(
+        currentUserEmail: String,
+        onChange: @escaping ([DirectChatThreadSummary]) -> Void,
+        onError: ((String) -> Void)? = nil
+    ) {
+        directInboxListener?.remove()
+        directInboxListener = nil
+
+        let normalizedCurrentEmail = normalizeEmail(currentUserEmail)
+        guard !normalizedCurrentEmail.isEmpty else {
+            onChange([])
+            return
+        }
+
+        directInboxListener = db.collection("direct_messages")
+            .whereField("participants", arrayContains: normalizedCurrentEmail)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+
+                if let error = error {
+                    print("❌ Error listening to direct inbox: \(error.localizedDescription)")
+                    self.errorMessage = "Failed to load chats: \(error.localizedDescription)"
+                    DispatchQueue.main.async {
+                        onChange([])
+                        onError?(error.localizedDescription)
+                    }
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    DispatchQueue.main.async {
+                        onChange([])
+                    }
+                    return
+                }
+
+                let records = documents.compactMap { self.parseDirectChatMessage(from: $0) }
+                let grouped = Dictionary(grouping: records, by: \.threadId)
+                let summaries = grouped.compactMap { _, threadMessages -> DirectChatThreadSummary? in
+                    guard let latestMessage = threadMessages.max(by: { $0.timestamp < $1.timestamp }) else {
+                        return nil
+                    }
+
+                    let resolvedOtherEmail: String
+                    if latestMessage.senderEmail == normalizedCurrentEmail {
+                        resolvedOtherEmail = latestMessage.recipientEmail
+                    } else {
+                        resolvedOtherEmail = latestMessage.senderEmail
+                    }
+
+                    let fallbackOtherEmail = latestMessage.participants.first { $0 != normalizedCurrentEmail } ?? resolvedOtherEmail
+                    let otherEmail = self.normalizeEmail(fallbackOtherEmail)
+                    guard !otherEmail.isEmpty else { return nil }
+
+                    let nameCandidate: String
+                    if latestMessage.senderEmail == normalizedCurrentEmail {
+                        nameCandidate = latestMessage.recipientName
+                    } else {
+                        nameCandidate = latestMessage.senderName
+                    }
+                    let trimmedName = nameCandidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let otherName = trimmedName.isEmpty ? otherEmail : trimmedName
+
+                    return DirectChatThreadSummary(
+                        id: latestMessage.threadId,
+                        otherParticipantEmail: otherEmail,
+                        otherParticipantName: otherName,
+                        lastMessage: latestMessage.content,
+                        lastMessageTimestamp: latestMessage.timestamp
+                    )
+                }
+                .sorted { $0.lastMessageTimestamp > $1.lastMessageTimestamp }
+
+                DispatchQueue.main.async {
+                    onChange(summaries)
+                }
+            }
+    }
+
+    func stopListeningToDirectInbox() {
+        directInboxListener?.remove()
+        directInboxListener = nil
+    }
+
+    func sendDirectMessage(
+        content: String,
+        sender: User,
+        recipientEmail: String,
+        recipientName: String? = nil
+    ) async -> Bool {
+        let trimmedContent = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty else {
+            errorMessage = "Message cannot be empty."
+            return false
+        }
+
+        let normalizedSenderEmail = normalizeEmail(sender.email)
+        let normalizedRecipientEmail = normalizeEmail(recipientEmail)
+        guard !normalizedSenderEmail.isEmpty, !normalizedRecipientEmail.isEmpty else {
+            errorMessage = "Invalid chat participants."
+            return false
+        }
+
+        guard normalizedSenderEmail != normalizedRecipientEmail else {
+            errorMessage = "You cannot message yourself."
+            return false
+        }
+
+        let senderName = sender.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? "Member"
+            : sender.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let recipientResolvedName = (recipientName ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let recipientDisplayName = recipientResolvedName.isEmpty ? normalizedRecipientEmail : recipientResolvedName
+        let participants = [normalizedSenderEmail, normalizedRecipientEmail].sorted()
+        let threadId = directThreadId(emailA: normalizedSenderEmail, emailB: normalizedRecipientEmail)
+
+        let payload: [String: Any] = [
+            "threadId": threadId,
+            "participants": participants,
+            "senderEmail": normalizedSenderEmail,
+            "senderName": senderName,
+            "recipientEmail": normalizedRecipientEmail,
+            "recipientName": recipientDisplayName,
+            "content": trimmedContent,
+            "timestamp": Timestamp(date: Date())
+        ]
+
+        do {
+            try await db.collection("direct_messages").document().setData(payload)
+            return true
+        } catch {
+            print("❌ Error sending direct message: \(error.localizedDescription)")
+            errorMessage = "Failed to send message: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func fetchChatDirectoryUsers(excludingEmail: String? = nil) async -> [ChatDirectoryUser] {
+        let normalizedExcludedEmail = normalizeEmail(excludingEmail ?? "")
+
+        do {
+            let snapshot = try await db.collection("chat_directory")
+                .order(by: "name")
+                .getDocuments()
+            var directoryUsers: [ChatDirectoryUser] = []
+            for document in snapshot.documents {
+                let data = document.data()
+                let email = normalizeEmail((data["email"] as? String) ?? document.documentID)
+                let name = ((data["name"] as? String) ?? email).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !email.isEmpty else { continue }
+                guard email != normalizedExcludedEmail else { continue }
+                directoryUsers.append(ChatDirectoryUser(email: email, name: name.isEmpty ? email : name))
+            }
+
+            if !directoryUsers.isEmpty {
+                return directoryUsers
+            }
+
+            // Fallback for legacy accounts before chat_directory was introduced.
+            let usersSnapshot = try await db.collection("users")
+                .order(by: "name")
+                .getDocuments()
+
+            var fallbackUsers: [ChatDirectoryUser] = []
+            for document in usersSnapshot.documents {
+                let data = document.data()
+                let email = normalizeEmail((data["email"] as? String) ?? document.documentID)
+                let name = ((data["name"] as? String) ?? email).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !email.isEmpty else { continue }
+                guard email != normalizedExcludedEmail else { continue }
+                fallbackUsers.append(ChatDirectoryUser(email: email, name: name.isEmpty ? email : name))
+            }
+            return fallbackUsers
+        } catch {
+            print("❌ Error fetching chat directory users: \(error.localizedDescription)")
+            return []
+        }
+    }
+
     private func parseRabbiChatMessage(from document: QueryDocumentSnapshot) -> RabbiChatMessageRecord? {
         let data = document.data()
 
@@ -2101,6 +2349,50 @@ class FirestoreManager: ObservableObject {
         )
     }
 
+    private func parseDirectChatMessage(from document: QueryDocumentSnapshot) -> DirectChatMessageRecord? {
+        let data = document.data()
+
+        guard let threadId = data["threadId"] as? String,
+              let senderEmail = data["senderEmail"] as? String,
+              let content = data["content"] as? String,
+              let timestamp = (data["timestamp"] as? Timestamp)?.dateValue() else {
+            return nil
+        }
+
+        let participants = (data["participants"] as? [String] ?? [])
+            .map { normalizeEmail($0) }
+            .filter { !$0.isEmpty }
+        let normalizedSenderEmail = normalizeEmail(senderEmail)
+        let senderName = ((data["senderName"] as? String) ?? "Member")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedSenderName = senderName.isEmpty ? "Member" : senderName
+
+        let recipientEmailRaw = (data["recipientEmail"] as? String) ?? (participants.first { $0 != normalizedSenderEmail } ?? "")
+        let normalizedRecipientEmail = normalizeEmail(recipientEmailRaw)
+        let recipientName = ((data["recipientName"] as? String) ?? normalizedRecipientEmail)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedRecipientName = recipientName.isEmpty ? normalizedRecipientEmail : recipientName
+
+        return DirectChatMessageRecord(
+            id: document.documentID,
+            threadId: threadId,
+            participants: participants,
+            senderEmail: normalizedSenderEmail,
+            senderName: resolvedSenderName,
+            recipientEmail: normalizedRecipientEmail,
+            recipientName: resolvedRecipientName,
+            content: content,
+            timestamp: timestamp
+        )
+    }
+
+    private func directThreadId(emailA: String, emailB: String) -> String {
+        [normalizeEmail(emailA), normalizeEmail(emailB)]
+            .filter { !$0.isEmpty }
+            .sorted()
+            .joined(separator: "__")
+    }
+
     private func normalizeEmail(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
@@ -2131,6 +2423,7 @@ class FirestoreManager: ObservableObject {
             }
             
             try await userRef.setData(userData, merge: true)
+            try? await upsertChatDirectoryEntry(email: user.email, name: user.name)
             
             print("✅ User document synced: \(user.email)")
             self.currentUser = user
@@ -2140,6 +2433,66 @@ class FirestoreManager: ObservableObject {
             errorMessage = "Failed to sync user data: \(error.localizedDescription)"
             return false
         }
+    }
+
+    private func upsertChatDirectoryEntry(email: String, name: String) async throws {
+        let normalizedEmail = normalizeEmail(email)
+        guard !normalizedEmail.isEmpty else { return }
+
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedName = trimmedName.isEmpty ? normalizedEmail : trimmedName
+
+        try await db.collection("chat_directory").document(normalizedEmail).setData([
+            "email": normalizedEmail,
+            "name": resolvedName,
+            "lastUpdated": Timestamp(date: Date())
+        ], merge: true)
+    }
+
+    func ensureChatDirectoryEntry(for user: User) async {
+        do {
+            try await upsertChatDirectoryEntry(email: user.email, name: user.name)
+        } catch {
+            print("❌ Error syncing chat directory entry for \(user.email): \(error.localizedDescription)")
+        }
+    }
+
+    func backfillChatDirectoryFromUsersIfAdmin() async {
+        guard currentUser?.isAdmin == true else { return }
+
+        let users = await fetchAllUsers()
+        guard !users.isEmpty else { return }
+
+        let maxBatchSize = 450
+        for start in stride(from: 0, to: users.count, by: maxBatchSize) {
+            let end = min(start + maxBatchSize, users.count)
+            let chunk = users[start..<end]
+
+            let batch = db.batch()
+            for user in chunk {
+                let normalizedEmail = normalizeEmail(user.email)
+                guard !normalizedEmail.isEmpty else { continue }
+
+                let trimmedName = user.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                let resolvedName = trimmedName.isEmpty ? normalizedEmail : trimmedName
+                let ref = db.collection("chat_directory").document(normalizedEmail)
+
+                batch.setData([
+                    "email": normalizedEmail,
+                    "name": resolvedName,
+                    "lastUpdated": Timestamp(date: Date())
+                ], forDocument: ref, merge: true)
+            }
+
+            do {
+                try await batch.commit()
+            } catch {
+                print("❌ Error backfilling chat directory chunk: \(error.localizedDescription)")
+                return
+            }
+        }
+
+        print("✅ Backfilled chat_directory for \(users.count) users")
     }
     
     // Fetch user data from Firestore
@@ -2309,6 +2662,8 @@ class FirestoreManager: ObservableObject {
                 "name": trimmedName,
                 "lastUpdated": Timestamp(date: Date())
             ])
+
+            try? await upsertChatDirectoryEntry(email: email, name: trimmedName)
             
             print("✅ Updated name for \(email): \(trimmedName)")
             return true

@@ -32,6 +32,7 @@ struct MoreMenuView: View {
         case account = "Account"
         case auction = "Auction"
         case seating = "Seating"
+        case siddur = "Siddur"
         
         var id: String { rawValue }
         
@@ -40,6 +41,7 @@ struct MoreMenuView: View {
             case .account: return "person.crop.circle.fill"
             case .auction: return "hammer.fill"
             case .seating: return "chair.fill"
+            case .siddur: return "book.closed.fill"
             }
         }
         
@@ -48,6 +50,7 @@ struct MoreMenuView: View {
             case .account: return .blue
             case .auction: return .orange
             case .seating: return .purple
+            case .siddur: return .green
             }
         }
         
@@ -56,6 +59,7 @@ struct MoreMenuView: View {
             case .account: return "View your profile and activity"
             case .auction: return "Browse and bid on honors"
             case .seating: return "Reserve your seat"
+            case .siddur: return "Prayers and daily davening"
             }
         }
     }
@@ -143,6 +147,13 @@ struct MoreMenuView: View {
                                     selectedOption = .seating
                                 }
                             )
+
+                            MenuOptionCard(
+                                option: .siddur,
+                                action: {
+                                    selectedOption = .siddur
+                                }
+                            )
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 40)
@@ -171,6 +182,8 @@ struct MoreMenuView: View {
                                 firestoreManager: firestoreManager,
                                 currentUser: $currentUser
                             )
+                        case .siddur:
+                            SiddurView()
                         }
                     }
                     .toolbar {

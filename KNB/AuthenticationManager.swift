@@ -185,6 +185,11 @@ class AuthenticationManager: ObservableObject {
                     user = firestoreUser
                     // Cache the updated user data
                     cacheUser(user: firestoreUser)
+                    await firestoreManager.ensureChatDirectoryEntry(for: firestoreUser)
+
+                    if firestoreUser.isAdmin {
+                        await firestoreManager.backfillChatDirectoryFromUsersIfAdmin()
+                    }
                 } else {
                     // User doesn't exist in Firestore yet, create with defaults
                     let newUser = User(
@@ -199,6 +204,10 @@ class AuthenticationManager: ObservableObject {
                     // Cache and create user document in Firestore
                     cacheUser(user: newUser)
                     _ = await firestoreManager.createOrUpdateUser(user: newUser)
+
+                    if newUser.isAdmin {
+                        await firestoreManager.backfillChatDirectoryFromUsersIfAdmin()
+                    }
                 }
             } else {
                 // FirestoreManager not set yet, use defaults

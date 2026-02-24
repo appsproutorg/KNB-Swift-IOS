@@ -257,6 +257,69 @@ service cloud.firestore {
                     );
       allow update, delete: if false;
     }
+
+    // Public chat directory (authenticated read)
+    match /chat_directory/{emailDoc} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated()
+                            && request.auth.token.email is string
+                            && (
+                              emailDoc.lower() == request.auth.token.email.lower()
+                              || isAdmin()
+                            )
+                            && request.resource.data.keys().hasOnly(['email', 'name', 'lastUpdated'])
+                            && request.resource.data.email is string
+                            && request.resource.data.email.lower() == emailDoc.lower()
+                            && request.resource.data.name is string
+                            && request.resource.data.name.size() > 0
+                            && request.resource.data.name.size() <= 120
+                            && request.resource.data.lastUpdated is timestamp;
+      allow delete: if false;
+    }
+
+    // Direct messages between any two authenticated users
+    match /direct_messages/{messageId} {
+      allow read: if isAuthenticated()
+                  && request.auth.token.email is string
+                  && resource.data.participants.hasAny([request.auth.token.email.lower()]);
+      allow create: if isAuthenticated()
+                    && request.resource.data.keys().hasOnly([
+                      'threadId',
+                      'participants',
+                      'senderEmail',
+                      'senderName',
+                      'recipientEmail',
+                      'recipientName',
+                      'content',
+                      'timestamp'
+                    ])
+                    && request.resource.data.threadId is string
+                    && request.resource.data.threadId.size() > 0
+                    && request.resource.data.participants is list
+                    && request.resource.data.participants.size() == 2
+                    && request.resource.data.participants[0] is string
+                    && request.resource.data.participants[1] is string
+                    && request.resource.data.participants.hasAny([request.auth.token.email.lower()])
+                    && request.resource.data.senderEmail is string
+                    && request.resource.data.senderEmail.lower() == request.auth.token.email.lower()
+                    && request.resource.data.senderName is string
+                    && request.resource.data.senderName.size() > 0
+                    && request.resource.data.senderName.size() <= 120
+                    && request.resource.data.recipientEmail is string
+                    && request.resource.data.recipientName is string
+                    && request.resource.data.recipientName.size() > 0
+                    && request.resource.data.recipientName.size() <= 120
+                    && request.resource.data.senderEmail.lower() != request.resource.data.recipientEmail.lower()
+                    && request.resource.data.participants.hasAll([
+                      request.resource.data.senderEmail.lower(),
+                      request.resource.data.recipientEmail.lower()
+                    ])
+                    && request.resource.data.content is string
+                    && request.resource.data.content.size() > 0
+                    && request.resource.data.content.size() <= 1000
+                    && request.resource.data.timestamp is timestamp;
+      allow update, delete: if false;
+    }
     
     // Seat Reservations
     match /seat_reservations/{seatId} {
@@ -275,7 +338,7 @@ service cloud.firestore {
     
     // Users collection
     match /users/{userId} {
-      allow read: if isAuthenticated() && (userId == request.auth.token.email || isAdmin());
+      allow read: if isAuthenticated();
       allow create: if isAuthenticated() 
                     && userId == request.auth.token.email
                     && request.resource.data.email == request.auth.token.email
