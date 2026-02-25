@@ -37,6 +37,7 @@ struct RabbiChatView: View {
     let directRecipientName: String?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @FocusState private var isComposerFocused: Bool
 
     @State private var draftMessage = ""
@@ -46,7 +47,6 @@ struct RabbiChatView: View {
     @State private var driftX: CGFloat = 0
     @State private var driftY: CGFloat = 0
     @State private var shimmerPhase: CGFloat = 0
-    @State private var avatarPulse = false
     @State private var sendPress = false
     @State private var messages: [RabbiChatMessage] = []
     @State private var showListenerError = false
@@ -112,6 +112,10 @@ struct RabbiChatView: View {
         !draftMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
     }
 
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
     private var shouldShowJumpToPresentButton: Bool {
         guard messages.count > 2, scrollViewportHeight > 0 else { return false }
         let distanceFromBottom = abs(bottomMarkerMinY - scrollViewportHeight)
@@ -142,7 +146,8 @@ struct RabbiChatView: View {
                 TelegramDoodleBackground(
                     driftX: driftX,
                     driftY: driftY,
-                    shimmerPhase: shimmerPhase
+                    shimmerPhase: shimmerPhase,
+                    isLightMode: isLightMode
                 )
                 .ignoresSafeArea()
 
@@ -154,21 +159,22 @@ struct RabbiChatView: View {
                                     ForEach(Array(chatRows.enumerated()), id: \.offset) { index, row in
                                         switch row {
                                         case .separator(let label):
-                                            RabbiDateChip(text: label)
+                                            RabbiDateChip(text: label, isLightMode: isLightMode)
                                                 .padding(.vertical, 3)
                                                 .transition(.opacity)
 
                                         case .message(let message):
                                             TelegramChatBubble(
                                                 message: message,
-                                                entryDelay: min(0.18, Double(index) * 0.03)
+                                                entryDelay: min(0.18, Double(index) * 0.03),
+                                                isLightMode: isLightMode
                                             )
                                         }
                                     }
 
                                     if isRabbiTyping {
                                         HStack {
-                                            TelegramTypingBubble()
+                                            TelegramTypingBubble(isLightMode: isLightMode)
                                             Spacer(minLength: 44)
                                         }
                                         .transition(.move(edge: .leading).combined(with: .opacity))
@@ -240,7 +246,9 @@ struct RabbiChatView: View {
                                         Circle()
                                             .fill(
                                                 LinearGradient(
-                                                    colors: [Color.white.opacity(0.16), Color.black.opacity(0.12)],
+                                                    colors: isLightMode
+                                                        ? [Color.white.opacity(0.86), Color.black.opacity(0.08)]
+                                                        : [Color.white.opacity(0.16), Color.black.opacity(0.12)],
                                                     startPoint: .topLeading,
                                                     endPoint: .bottomTrailing
                                                 )
@@ -249,10 +257,10 @@ struct RabbiChatView: View {
 
                                         Image(systemName: "arrow.down")
                                             .font(.system(size: 16, weight: .bold))
-                                            .foregroundStyle(Color.white.opacity(0.95))
+                                            .foregroundStyle(isLightMode ? Color.black.opacity(0.76) : Color.white.opacity(0.95))
                                     }
                                     .frame(width: 46, height: 46)
-                                    .shadow(color: Color.black.opacity(0.32), radius: 8, x: 0, y: 4)
+                                    .shadow(color: Color.black.opacity(isLightMode ? 0.14 : 0.32), radius: 8, x: 0, y: 4)
                                 }
                                 .buttonStyle(.plain)
                                 .padding(.trailing, 12)
@@ -269,7 +277,9 @@ struct RabbiChatView: View {
                         .padding(.bottom, 6)
                         .background(
                             LinearGradient(
-                                colors: [Color.black.opacity(0.0), Color.black.opacity(0.26)],
+                                colors: isLightMode
+                                    ? [Color.white.opacity(0.0), Color.white.opacity(0.84)]
+                                    : [Color.black.opacity(0.0), Color.black.opacity(0.26)],
                                 startPoint: .top,
                                 endPoint: .bottom
                             )
@@ -288,47 +298,20 @@ struct RabbiChatView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.95))
-                            .frame(width: 38, height: 38)
-                            .background(
-                                Circle()
-                                    .fill(Color.white.opacity(0.06))
-                                    .overlay(Circle().stroke(Color.white.opacity(0.16), lineWidth: 1))
-                            )
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(isLightMode ? Color.black.opacity(0.86) : .white)
+                            .padding(8)
                     }
                 }
 
                 ToolbarItem(placement: .principal) {
-                    HStack(spacing: 10) {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.12, green: 0.56, blue: 0.98),
-                                        Color(red: 0.2, green: 0.78, blue: 1.0)
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 36, height: 36)
-                            .overlay(
-                                Text("R")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundStyle(.white)
-                            )
-                            .shadow(color: Color.cyan.opacity(avatarPulse ? 0.44 : 0.14), radius: avatarPulse ? 16 : 7)
-                            .scaleEffect(avatarPulse ? 1.05 : 0.98)
-
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(chatTitle)
-                                .font(.system(size: 17, weight: .bold, design: .rounded))
-                                .foregroundStyle(.white)
-                            Text(chatSubtitle)
-                                .font(.system(size: 11, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.6))
-                        }
+                    VStack(alignment: .center, spacing: 1) {
+                        Text(chatTitle)
+                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .foregroundStyle(isLightMode ? Color.black.opacity(0.86) : .white)
+                        Text(chatSubtitle)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(isLightMode ? Color.black.opacity(0.48) : .white.opacity(0.6))
                     }
                 }
             }
@@ -344,9 +327,6 @@ struct RabbiChatView: View {
                 withAnimation(.linear(duration: 7).repeatForever(autoreverses: false)) {
                     shimmerPhase = 1
                 }
-                withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: true)) {
-                    avatarPulse = true
-                }
             }
             .onDisappear {
                 firestoreManager.stopListeningToRabbiMessages()
@@ -361,14 +341,38 @@ struct RabbiChatView: View {
     }
 
     private var composerBar: some View {
+        let composerTextColor: Color = isLightMode ? Color.black.opacity(0.8) : .white
+        let composerTintColor: Color = isLightMode ? .blue : .white
+        let composerFillColor: Color = isLightMode ? Color.white.opacity(0.74) : Color.white.opacity(0.035)
+        let composerStrokeColors: [Color] = isLightMode
+            ? [Color.black.opacity(isComposerFocused ? 0.14 : 0.09), Color.white.opacity(0.45)]
+            : [Color.white.opacity(isComposerFocused ? 0.35 : 0.2), Color.white.opacity(0.08)]
+        let composerOverlayColors: [Color] = isLightMode
+            ? [Color.white.opacity(0.02), Color.black.opacity(0.04)]
+            : [Color.black.opacity(0.03), Color.black.opacity(0.11)]
+        let composerHighlightShadow: Color = isLightMode ? Color.black.opacity(0.05) : Color.white.opacity(0.08)
+
+        let sendRingColor: Color = isLightMode ? Color.black.opacity(0.16) : Color.white.opacity(0.24)
+        let sendFillColors: [Color] = canSend
+            ? [Color(red: 0.2, green: 0.46, blue: 0.98), Color(red: 0.39, green: 0.42, blue: 1.0)]
+            : (isLightMode
+                ? [Color.black.opacity(0.06), Color.black.opacity(0.02)]
+                : [Color.white.opacity(0.12), Color.white.opacity(0.08)])
+        let sendIconColor: Color = canSend
+            ? .white
+            : (isLightMode ? Color.black.opacity(0.42) : Color.white.opacity(0.65))
+        let sendOuterShadowColor: Color = isLightMode
+            ? Color.black.opacity(canSend ? 0.12 : 0.05)
+            : Color.white.opacity(canSend ? 0.13 : 0.05)
+
         return HStack(alignment: .bottom, spacing: 10) {
             TextField("Message...", text: $draftMessage, axis: .vertical)
                 .focused($isComposerFocused)
                 .lineLimit(1...4)
                 .textFieldStyle(.plain)
                 .font(.system(size: 17, weight: .regular, design: .rounded))
-                .foregroundStyle(.white)
-                .tint(Color.white)
+                .foregroundStyle(composerTextColor)
+                .tint(composerTintColor)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 11)
                 .background(
@@ -376,16 +380,13 @@ struct RabbiChatView: View {
                         .fill(.ultraThinMaterial)
                         .overlay(
                             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                                .fill(Color.white.opacity(0.035))
+                                .fill(composerFillColor)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 28, style: .continuous)
                                 .stroke(
                                     LinearGradient(
-                                        colors: [
-                                            Color.white.opacity(isComposerFocused ? 0.35 : 0.2),
-                                            Color.white.opacity(0.08)
-                                        ],
+                                        colors: composerStrokeColors,
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     ),
@@ -396,13 +397,13 @@ struct RabbiChatView: View {
                             RoundedRectangle(cornerRadius: 28, style: .continuous)
                                 .fill(
                                     LinearGradient(
-                                        colors: [Color.black.opacity(0.03), Color.black.opacity(0.11)],
+                                        colors: composerOverlayColors,
                                         startPoint: .top,
                                         endPoint: .bottom
                                     )
                                 )
                         )
-                        .shadow(color: Color.white.opacity(0.08), radius: 1.2, x: 0, y: -0.5)
+                        .shadow(color: composerHighlightShadow, radius: 1.2, x: 0, y: -0.5)
                 )
                 .animation(.easeInOut(duration: 0.2), value: isComposerFocused)
 
@@ -415,15 +416,13 @@ struct RabbiChatView: View {
                         .fill(.ultraThinMaterial)
                         .overlay(
                             Circle()
-                                .stroke(Color.white.opacity(0.24), lineWidth: 1.1)
+                                .stroke(sendRingColor, lineWidth: 1.1)
                         )
 
                     Circle()
                         .fill(
                             LinearGradient(
-                                colors: canSend
-                                    ? [Color(red: 0.2, green: 0.46, blue: 0.98), Color(red: 0.39, green: 0.42, blue: 1.0)]
-                                    : [Color.white.opacity(0.12), Color.white.opacity(0.08)],
+                                colors: sendFillColors,
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
@@ -432,11 +431,11 @@ struct RabbiChatView: View {
 
                     Image(systemName: "paperplane.fill")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(canSend ? Color.white : Color.white.opacity(0.65))
+                        .foregroundStyle(sendIconColor)
                         .offset(x: 0.5, y: -0.5)
                 }
                 .frame(width: 50, height: 50)
-                .shadow(color: Color.white.opacity(canSend ? 0.13 : 0.05), radius: 2, x: 0, y: -0.5)
+                .shadow(color: sendOuterShadowColor, radius: 2, x: 0, y: -0.5)
             }
             .buttonStyle(.plain)
             .disabled(!canSend)
@@ -447,7 +446,7 @@ struct RabbiChatView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
-        .shadow(color: Color.black.opacity(0.22), radius: 10, x: 0, y: 5)
+        .shadow(color: Color.black.opacity(isLightMode ? 0.12 : 0.22), radius: 10, x: 0, y: 5)
     }
 
     private func sendMessage() {
@@ -578,28 +577,33 @@ struct RabbiChatView: View {
 
 private struct RabbiDateChip: View {
     let text: String
+    let isLightMode: Bool
 
     var body: some View {
         Text(text)
             .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.88))
+            .foregroundStyle(isLightMode ? Color.black.opacity(0.74) : .white.opacity(0.88))
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
             .background(
                 Capsule(style: .continuous)
-                    .fill(Color.black.opacity(0.45))
+                    .fill(isLightMode ? Color.white.opacity(0.78) : Color.black.opacity(0.45))
                     .overlay(
                         Capsule(style: .continuous)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                            .stroke(
+                                isLightMode ? Color.black.opacity(0.08) : Color.white.opacity(0.2),
+                                lineWidth: 1
+                            )
                     )
             )
-            .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 2)
+            .shadow(color: Color.black.opacity(isLightMode ? 0.1 : 0.2), radius: 6, x: 0, y: 2)
     }
 }
 
 private struct TelegramChatBubble: View {
     let message: RabbiChatMessage
     let entryDelay: Double
+    let isLightMode: Bool
     @State private var isVisible = false
     @State private var isPressed = false
 
@@ -619,8 +623,12 @@ private struct TelegramChatBubble: View {
     private var outgoingGradient: LinearGradient {
         LinearGradient(
             colors: [
-                Color(red: 0.42, green: 0.35, blue: 1.0),
-                Color(red: 0.55, green: 0.45, blue: 1.0)
+                isLightMode
+                    ? Color(red: 0.18, green: 0.46, blue: 0.98)
+                    : Color(red: 0.42, green: 0.35, blue: 1.0),
+                isLightMode
+                    ? Color(red: 0.31, green: 0.58, blue: 1.0)
+                    : Color(red: 0.55, green: 0.45, blue: 1.0)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
@@ -630,12 +638,30 @@ private struct TelegramChatBubble: View {
     private var incomingGradient: LinearGradient {
         LinearGradient(
             colors: [
-                Color(red: 0.15, green: 0.15, blue: 0.15),
-                Color(red: 0.2, green: 0.2, blue: 0.2)
+                isLightMode
+                    ? Color.white.opacity(0.95)
+                    : Color(red: 0.15, green: 0.15, blue: 0.15),
+                isLightMode
+                    ? Color(red: 0.93, green: 0.94, blue: 0.97)
+                    : Color(red: 0.2, green: 0.2, blue: 0.2)
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+
+    private var bodyTextColor: Color {
+        if message.isOutgoing {
+            return .white
+        }
+        return isLightMode ? Color.black.opacity(0.82) : .white
+    }
+
+    private var metadataColor: Color {
+        if message.isOutgoing {
+            return .white.opacity(0.62)
+        }
+        return isLightMode ? Color.black.opacity(0.46) : .white.opacity(0.62)
     }
 
     var body: some View {
@@ -666,7 +692,7 @@ private struct TelegramChatBubble: View {
         ZStack(alignment: .bottomTrailing) {
             Text(message.text)
                 .font(.system(size: 15, weight: .regular, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(bodyTextColor)
                 .multilineTextAlignment(.leading)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.trailing, metadataReservedWidth)
@@ -675,12 +701,12 @@ private struct TelegramChatBubble: View {
             HStack(spacing: 2) {
                 Text(RabbiChatFormatters.time.string(from: message.timestamp))
                     .font(.system(size: 11, weight: .regular, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.62))
+                    .foregroundStyle(metadataColor)
 
                 if message.isOutgoing {
                     Image(systemName: "checkmark")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.62))
+                        .foregroundStyle(metadataColor)
                 }
             }
             .padding(.bottom, 1)
@@ -692,11 +718,16 @@ private struct TelegramChatBubble: View {
                 .clipShape(SproutBubbleShape(myMessage: message.isOutgoing))
                 .overlay(
                     SproutBubbleShape(myMessage: message.isOutgoing)
-                        .stroke(Color.white.opacity(message.isOutgoing ? 0.1 : 0.08), lineWidth: 0.8)
+                        .stroke(
+                            message.isOutgoing
+                                ? Color.white.opacity(0.1)
+                                : (isLightMode ? Color.black.opacity(0.08) : Color.white.opacity(0.08)),
+                            lineWidth: 0.8
+                        )
                 )
         )
         .compositingGroup()
-        .shadow(color: Color.black.opacity(0.22), radius: 2, x: 0, y: 1)
+        .shadow(color: Color.black.opacity(isLightMode ? 0.1 : 0.22), radius: 2, x: 0, y: 1)
         .frame(maxWidth: maxBubbleWidth, alignment: message.isOutgoing ? .trailing : .leading)
         .padding(.horizontal, 8)
         .padding(.vertical, 2)
@@ -726,13 +757,14 @@ private struct SproutBubbleShape: Shape {
 }
 
 private struct TelegramTypingBubble: View {
+    let isLightMode: Bool
     @State private var animate = false
 
     var body: some View {
         HStack(spacing: 6) {
             ForEach(0..<3, id: \.self) { index in
                 Circle()
-                    .fill(Color.white.opacity(0.84))
+                    .fill(isLightMode ? Color.black.opacity(0.65) : Color.white.opacity(0.84))
                     .frame(width: 6, height: 6)
                     .scaleEffect(animate ? 1.12 : 0.7)
                     .opacity(animate ? 1 : 0.32)
@@ -748,10 +780,13 @@ private struct TelegramTypingBubble: View {
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(Color.white.opacity(0.12))
+                .fill(isLightMode ? Color.white.opacity(0.9) : Color.white.opacity(0.12))
                 .overlay(
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                        .stroke(
+                            isLightMode ? Color.black.opacity(0.08) : Color.white.opacity(0.16),
+                            lineWidth: 1
+                        )
                 )
         )
         .onAppear { animate = true }
@@ -762,10 +797,10 @@ private struct TelegramDoodleBackground: View {
     let driftX: CGFloat
     let driftY: CGFloat
     let shimmerPhase: CGFloat
+    let isLightMode: Bool
 
-    // If you add a real wallpaper image in Assets with this exact name,
-    // it will be used automatically.
-    private let wallpaperAssetName = "RabbiChatWallpaper"
+    private let darkWallpaperAssetName = "RabbiChatWallpaper"
+    private let lightWallpaperAssetName = "RabbiChatWallpaperLight"
 
     private let symbols = [
         "paperplane", "paperclip", "gamecontroller", "camera", "envelope", "star",
@@ -774,21 +809,41 @@ private struct TelegramDoodleBackground: View {
         "sun.max", "face.smiling", "wifi", "bolt", "gift", "cloud"
     ]
 
+    private var resolvedWallpaperAssetName: String? {
+        if isLightMode {
+            if UIImage(named: lightWallpaperAssetName) != nil {
+                return lightWallpaperAssetName
+            }
+        }
+        if UIImage(named: darkWallpaperAssetName) != nil {
+            return darkWallpaperAssetName
+        }
+        return nil
+    }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack {
                 LinearGradient(
-                    colors: [Color.black, Color(red: 0.02, green: 0.03, blue: 0.08)],
+                    colors: isLightMode
+                        ? [Color(red: 0.95, green: 0.95, blue: 0.96), Color(red: 0.91, green: 0.92, blue: 0.94)]
+                        : [Color.black, Color(red: 0.02, green: 0.03, blue: 0.08)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
 
-                if UIImage(named: wallpaperAssetName) != nil {
-                    Color.black
+                if let wallpaperAssetName = resolvedWallpaperAssetName {
+                    Color(
+                        red: isLightMode ? 0.94 : 0.02,
+                        green: isLightMode ? 0.94 : 0.03,
+                        blue: isLightMode ? 0.95 : 0.08
+                    )
                     Image(wallpaperAssetName)
-                        .resizable(resizingMode: .tile)
-                        .opacity(0.4)
-                        .scaleEffect(1.01)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width * 1.06, height: geometry.size.height * 1.06)
+                        .clipped()
+                        .opacity(isLightMode ? 0.86 : 0.4)
                         .offset(x: driftX * 0.18, y: driftY * 0.18)
                 } else {
                     ForEach(0..<220, id: \.self) { idx in
@@ -805,8 +860,10 @@ private struct TelegramDoodleBackground: View {
                             .font(.system(size: size, weight: .regular))
                             .foregroundStyle(
                                 tintBoost
-                                    ? Color(red: 0.74, green: 0.4, blue: 1.0).opacity(0.16)
-                                    : Color.white.opacity(0.08)
+                                    ? (isLightMode
+                                        ? Color(red: 0.3, green: 0.45, blue: 0.95).opacity(0.12)
+                                        : Color(red: 0.74, green: 0.4, blue: 1.0).opacity(0.16))
+                                    : (isLightMode ? Color.black.opacity(0.08) : Color.white.opacity(0.08))
                             )
                             .rotationEffect(.degrees(Double((idx * 19) % 360)))
                             .position(
@@ -831,7 +888,7 @@ private struct TelegramDoodleBackground: View {
                 )
                 .offset(x: 35 + (shimmerPhase * 35), y: -40)
                 .blendMode(.screen)
-                .opacity(UIImage(named: wallpaperAssetName) != nil ? 0 : 1)
+                .opacity(resolvedWallpaperAssetName == nil && !isLightMode ? 1 : 0)
 
                 RadialGradient(
                     colors: [
@@ -844,10 +901,12 @@ private struct TelegramDoodleBackground: View {
                 )
                 .offset(x: -28 - (shimmerPhase * 28), y: 20)
                 .blendMode(.screen)
-                .opacity(UIImage(named: wallpaperAssetName) != nil ? 0 : 1)
+                .opacity(resolvedWallpaperAssetName == nil && !isLightMode ? 1 : 0)
 
                 LinearGradient(
-                    colors: [Color.black.opacity(0.18), Color.black.opacity(0.42)],
+                    colors: isLightMode
+                        ? [Color.white.opacity(0.14), Color.black.opacity(0.08)]
+                        : [Color.black.opacity(0.18), Color.black.opacity(0.42)],
                     startPoint: .top,
                     endPoint: .bottom
                 )

@@ -13,6 +13,7 @@ struct MemberChatListView: View {
     var showsCloseButton: Bool = false
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var directThreadSummaries: [DirectChatThreadSummary] = []
     @State private var directoryUsers: [ChatDirectoryUser] = []
@@ -21,6 +22,8 @@ struct MemberChatListView: View {
     @State private var listenerErrorMessage = ""
     @State private var showComposeSheet = false
     @State private var searchText = ""
+    @State private var pendingDeleteEntry: MemberChatEntry?
+    @State private var deletingChatEmail: String?
 
     private var isRabbiUser: Bool {
         firestoreManager.isRabbiAccount(email: currentUser.email)
@@ -98,11 +101,17 @@ struct MemberChatListView: View {
         }
     }
 
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 LinearGradient(
-                    colors: [Color(red: 0.04, green: 0.06, blue: 0.12), Color.black],
+                    colors: isLightMode
+                        ? [Color(red: 0.94, green: 0.95, blue: 0.98), Color(red: 0.98, green: 0.98, blue: 0.99)]
+                        : [Color(red: 0.04, green: 0.06, blue: 0.12), Color.black],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -140,18 +149,23 @@ struct MemberChatListView: View {
                                 : "No chats match your search."
                             )
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.62))
+                                .foregroundStyle(isLightMode ? Color.black.opacity(0.52) : .white.opacity(0.62))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                         } else {
                             ForEach(filteredChatEntries) { entry in
-                                Button {
-                                    selectedDestination = .direct(entry)
-                                } label: {
-                                    MemberChatRow(entry: entry)
-                                }
-                                .buttonStyle(.plain)
+                                SwipeToDeleteChatRow(
+                                    entry: entry,
+                                    isDeleting: deletingChatEmail == entry.email,
+                                    isInteractionDisabled: deletingChatEmail != nil,
+                                    onTap: {
+                                        selectedDestination = .direct(entry)
+                                    },
+                                    onDeleteTap: {
+                                        pendingDeleteEntry = entry
+                                    }
+                                )
                             }
                         }
                     }
@@ -169,7 +183,7 @@ struct MemberChatListView: View {
                         Button("Close") {
                             dismiss()
                         }
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isLightMode ? Color.black.opacity(0.8) : .white)
                     }
                 }
 
@@ -177,10 +191,10 @@ struct MemberChatListView: View {
                     VStack(spacing: 1) {
                         Text("Chats")
                             .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(isLightMode ? Color.black.opacity(0.86) : .white)
                         Text("Messages")
                             .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(isLightMode ? Color.black.opacity(0.48) : .white.opacity(0.6))
                     }
                 }
 
@@ -190,11 +204,12 @@ struct MemberChatListView: View {
                     } label: {
                         Image(systemName: "square.and.pencil")
                             .font(.system(size: 17, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(isLightMode ? Color.black.opacity(0.82) : .white)
                     }
                     .accessibilityLabel("Compose message")
                 }
             }
+            .tint(isLightMode ? .blue : .white)
             .onAppear {
                 firestoreManager.startListeningToDirectInbox(currentUserEmail: currentUser.email) { summaries in
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
@@ -219,6 +234,26 @@ struct MemberChatListView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(listenerErrorMessage)
+            }
+            .confirmationDialog(
+                "Delete Chat",
+                isPresented: Binding(
+                    get: { pendingDeleteEntry != nil },
+                    set: { isPresented in
+                        if !isPresented { pendingDeleteEntry = nil }
+                    }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingDeleteEntry
+            ) { entry in
+                Button("Delete Chat", role: .destructive) {
+                    deleteChat(entry)
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingDeleteEntry = nil
+                }
+            } message: { entry in
+                Text("This permanently deletes all messages with \(entry.name) for everyone.")
             }
             .sheet(isPresented: $showComposeSheet) {
                 MemberComposeChatSheet(entries: composeEntries) { selectedEntry in
@@ -255,6 +290,193 @@ struct MemberChatListView: View {
             }
         }
     }
+
+    private func deleteChat(_ entry: MemberChatEntry) {
+        guard deletingChatEmail == nil else { return }
+
+        deletingChatEmail = entry.email
+        pendingDeleteEntry = nil
+
+        Task {
+            let didDelete = await firestoreManager.deleteDirectChatThread(
+                currentUserEmail: currentUser.email,
+                otherUserEmail: entry.email
+            )
+
+            await MainActor.run {
+                deletingChatEmail = nil
+
+                guard didDelete else {
+                    listenerErrorMessage = firestoreManager.errorMessage ?? "Failed to delete chat."
+                    showListenerError = true
+                    return
+                }
+
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                    directThreadSummaries.removeAll { summary in
+                        summary.otherParticipantEmail == entry.email
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SwipeToDeleteChatRow: View {
+    let entry: MemberChatEntry
+    let isDeleting: Bool
+    let isInteractionDisabled: Bool
+    let onTap: () -> Void
+    let onDeleteTap: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var offsetX: CGFloat = 0
+    @State private var dragOffset: CGFloat = 0
+    @State private var revealPulse = false
+
+    private let revealWidth: CGFloat = 92
+
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
+    private var effectiveOffset: CGFloat {
+        max(-revealWidth, min(0, offsetX + dragOffset))
+    }
+
+    private var revealAmount: CGFloat {
+        max(0, min(revealWidth, -effectiveOffset))
+    }
+
+    private var revealProgress: CGFloat {
+        revealWidth > 0 ? revealAmount / revealWidth : 0
+    }
+
+    private var actionScale: CGFloat {
+        let base = 0.84 + (0.16 * revealProgress)
+        return revealPulse ? base * 1.05 : base
+    }
+
+    private var actionOffsetX: CGFloat {
+        12 * (1 - revealProgress)
+    }
+
+    private var actionRotation: Double {
+        Double(10 * (1 - revealProgress))
+    }
+
+    private var actionBlur: CGFloat {
+        1.8 * (1 - revealProgress)
+    }
+
+    var body: some View {
+        ZStack(alignment: .trailing) {
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+
+                Button {
+                    guard !isInteractionDisabled else { return }
+                    withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
+                        offsetX = 0
+                        dragOffset = 0
+                    }
+                    onDeleteTap()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(isLightMode ? 0.16 : 0.1))
+                            .blur(radius: 10)
+                            .scaleEffect(0.9 + (0.25 * revealProgress))
+                            .opacity(Double(revealProgress))
+
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color(red: 1.0, green: 0.28, blue: 0.34), Color(red: 0.94, green: 0.2, blue: 0.24)],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.white.opacity(isLightMode ? 0.32 : 0.2), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(isLightMode ? 0.22 : 0.36), radius: 8, x: 0, y: 4)
+
+                        Image(systemName: "trash")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundStyle(.white)
+                            .offset(x: actionOffsetX)
+                            .rotationEffect(.degrees(actionRotation))
+                            .blur(radius: actionBlur)
+                    }
+                    .frame(width: 54, height: 54)
+                    .scaleEffect(actionScale)
+                    .opacity(Double(revealProgress))
+                    .padding(.trailing, 10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isInteractionDisabled || revealProgress < 0.72)
+                .frame(width: revealAmount)
+                .frame(maxHeight: .infinity)
+            }
+            .opacity(revealProgress > 0.001 ? 1 : 0)
+
+            MemberChatRow(entry: entry, isDeleting: isDeleting)
+                .offset(x: effectiveOffset)
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 8)
+                .onChanged { value in
+                    guard !isInteractionDisabled else { return }
+                    dragOffset = value.translation.width
+                }
+                .onEnded { value in
+                    guard !isInteractionDisabled else { return }
+                    let total = offsetX + value.translation.width
+                    let projected = offsetX + value.predictedEndTranslation.width
+                    let shouldReveal = total <= -(revealWidth * 0.45) || projected <= -(revealWidth * 0.75)
+                    withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.84, blendDuration: 0.1)) {
+                        if shouldReveal {
+                            offsetX = -revealWidth
+                        } else {
+                            offsetX = 0
+                        }
+                        dragOffset = 0
+                    }
+                }
+        )
+        .onTapGesture {
+            guard !isInteractionDisabled else { return }
+            if effectiveOffset < -5 || offsetX < -5 {
+                withAnimation(.interactiveSpring(response: 0.25, dampingFraction: 0.86, blendDuration: 0.1)) {
+                    offsetX = 0
+                    dragOffset = 0
+                }
+                return
+            }
+            onTap()
+        }
+        .onChange(of: offsetX) { _, newValue in
+            guard newValue <= -(revealWidth - 0.5) else {
+                revealPulse = false
+                return
+            }
+
+            revealPulse = false
+            withAnimation(.easeOut(duration: 0.12)) {
+                revealPulse = true
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+                withAnimation(.easeInOut(duration: 0.14)) {
+                    revealPulse = false
+                }
+            }
+        }
+    }
 }
 
 private struct MemberComposeChatSheet: View {
@@ -262,6 +484,7 @@ private struct MemberComposeChatSheet: View {
     let onSelect: (MemberChatEntry) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var searchText = ""
 
     private var filteredEntries: [MemberChatEntry] {
@@ -272,11 +495,17 @@ private struct MemberComposeChatSheet: View {
         }
     }
 
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
                 LinearGradient(
-                    colors: [Color(red: 0.04, green: 0.06, blue: 0.12), Color.black],
+                    colors: isLightMode
+                        ? [Color(red: 0.95, green: 0.96, blue: 0.99), Color(red: 0.99, green: 0.99, blue: 1.0)]
+                        : [Color(red: 0.04, green: 0.06, blue: 0.12), Color.black],
                     startPoint: .top,
                     endPoint: .bottom
                 )
@@ -287,7 +516,7 @@ private struct MemberComposeChatSheet: View {
                         if filteredEntries.isEmpty {
                             Text("No people found.")
                                 .font(.system(size: 14, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.62))
+                                .foregroundStyle(isLightMode ? Color.black.opacity(0.52) : .white.opacity(0.62))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
@@ -316,9 +545,10 @@ private struct MemberComposeChatSheet: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .foregroundStyle(.white)
+                    .foregroundStyle(isLightMode ? Color.black.opacity(0.8) : .white)
                 }
             }
+            .tint(isLightMode ? .blue : .white)
         }
     }
 }
@@ -350,17 +580,28 @@ private struct MemberChatEntry: Identifiable, Equatable {
 
 private struct MemberSectionHeader: View {
     let title: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
 
     var body: some View {
         Text(title)
             .font(.system(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white.opacity(0.58))
+            .foregroundStyle(isLightMode ? Color.black.opacity(0.5) : .white.opacity(0.58))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 4)
     }
 }
 
 private struct MemberPinnedRabbiRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Circle()
@@ -382,7 +623,7 @@ private struct MemberPinnedRabbiRow: View {
                 HStack(spacing: 7) {
                     Text("Ask Rabbi")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isLightMode ? Color.black.opacity(0.85) : .white)
                     Text("Pinned")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(red: 0.46, green: 0.68, blue: 1.0))
@@ -390,12 +631,16 @@ private struct MemberPinnedRabbiRow: View {
                         .padding(.vertical, 2)
                         .background(
                             Capsule(style: .continuous)
-                                .fill(Color(red: 0.2, green: 0.36, blue: 0.74).opacity(0.2))
+                                .fill(
+                                    isLightMode
+                                        ? Color(red: 0.2, green: 0.36, blue: 0.74).opacity(0.12)
+                                        : Color(red: 0.2, green: 0.36, blue: 0.74).opacity(0.2)
+                                )
                         )
                 }
                 Text("Typically replies quickly")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.65))
+                    .foregroundStyle(isLightMode ? Color.black.opacity(0.58) : .white.opacity(0.65))
                     .lineLimit(1)
             }
 
@@ -403,7 +648,7 @@ private struct MemberPinnedRabbiRow: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.42))
+                .foregroundStyle(isLightMode ? Color.black.opacity(0.36) : .white.opacity(0.42))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -412,13 +657,19 @@ private struct MemberPinnedRabbiRow: View {
                 .fill(.ultraThinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                        .stroke(isLightMode ? Color.black.opacity(0.08) : Color.white.opacity(0.16), lineWidth: 1)
                 )
         )
     }
 }
 
 private struct MemberPinnedInboxRow: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             Circle()
@@ -440,7 +691,7 @@ private struct MemberPinnedInboxRow: View {
                 HStack(spacing: 7) {
                     Text("Rabbi Inbox")
                         .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isLightMode ? Color.black.opacity(0.85) : .white)
                     Text("Pinned")
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(Color(red: 0.46, green: 0.68, blue: 1.0))
@@ -448,12 +699,16 @@ private struct MemberPinnedInboxRow: View {
                         .padding(.vertical, 2)
                         .background(
                             Capsule(style: .continuous)
-                                .fill(Color(red: 0.2, green: 0.36, blue: 0.74).opacity(0.2))
+                                .fill(
+                                    isLightMode
+                                        ? Color(red: 0.2, green: 0.36, blue: 0.74).opacity(0.12)
+                                        : Color(red: 0.2, green: 0.36, blue: 0.74).opacity(0.2)
+                                )
                         )
                 }
                 Text("Open Ask-Rabbi conversations")
                     .font(.system(size: 12, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.65))
+                    .foregroundStyle(isLightMode ? Color.black.opacity(0.58) : .white.opacity(0.65))
                     .lineLimit(1)
             }
 
@@ -461,7 +716,7 @@ private struct MemberPinnedInboxRow: View {
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.42))
+                .foregroundStyle(isLightMode ? Color.black.opacity(0.36) : .white.opacity(0.42))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -470,7 +725,7 @@ private struct MemberPinnedInboxRow: View {
                 .fill(.ultraThinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                        .stroke(isLightMode ? Color.black.opacity(0.08) : Color.white.opacity(0.16), lineWidth: 1)
                 )
         )
     }
@@ -478,6 +733,12 @@ private struct MemberPinnedInboxRow: View {
 
 private struct MemberChatRow: View {
     let entry: MemberChatEntry
+    var isDeleting: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
 
     private var relativeTime: String {
         guard let timestamp = entry.lastMessageTimestamp else { return "" }
@@ -512,33 +773,37 @@ private struct MemberChatRow: View {
                 HStack(alignment: .top, spacing: 8) {
                     Text(entry.name)
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isLightMode ? Color.black.opacity(0.84) : .white)
                         .lineLimit(1)
 
                     Spacer(minLength: 6)
 
-                    if !relativeTime.isEmpty {
+                    if isDeleting {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(isLightMode ? .black.opacity(0.55) : .white.opacity(0.72))
+                    } else if !relativeTime.isEmpty {
                         Text(relativeTime)
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.6))
+                            .foregroundStyle(isLightMode ? Color.black.opacity(0.48) : .white.opacity(0.6))
                     }
                 }
 
                 Text(entry.email)
                     .font(.system(size: 12, weight: .regular, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.58))
+                    .foregroundStyle(isLightMode ? Color.black.opacity(0.48) : .white.opacity(0.58))
                     .lineLimit(1)
 
                 if let lastMessage = entry.lastMessage, !lastMessage.isEmpty {
                     Text(lastMessage)
                         .font(.system(size: 14, weight: .regular))
-                        .foregroundStyle(.white.opacity(0.82))
+                        .foregroundStyle(isLightMode ? Color.black.opacity(0.74) : .white.opacity(0.82))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
                 } else {
                     Text("Start a new message")
                         .font(.system(size: 14, weight: .regular, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.52))
+                        .foregroundStyle(isLightMode ? Color.black.opacity(0.44) : .white.opacity(0.52))
                 }
             }
         }
@@ -549,7 +814,7 @@ private struct MemberChatRow: View {
                 .fill(.ultraThinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                        .stroke(isLightMode ? Color.black.opacity(0.08) : Color.white.opacity(0.14), lineWidth: 1)
                 )
         )
     }

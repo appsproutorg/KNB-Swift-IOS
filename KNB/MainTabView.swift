@@ -45,7 +45,7 @@ struct MainTabView: View {
                     currentUser: $currentUser
                 )
                 .tabItem {
-                    Label("Chat", systemImage: "message.fill")
+                    Label("Messages", systemImage: "message.fill")
                 }
                 .tag(2)
                 

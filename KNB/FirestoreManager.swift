@@ -2275,6 +2275,59 @@ class FirestoreManager: ObservableObject {
         }
     }
 
+    func deleteDirectChatThread(
+        currentUserEmail: String,
+        otherUserEmail: String
+    ) async -> Bool {
+        let normalizedCurrentEmail = normalizeEmail(currentUserEmail)
+        let normalizedOtherEmail = normalizeEmail(otherUserEmail)
+        guard !normalizedCurrentEmail.isEmpty, !normalizedOtherEmail.isEmpty else {
+            errorMessage = "Invalid chat participants."
+            return false
+        }
+
+        guard normalizedCurrentEmail != normalizedOtherEmail else {
+            errorMessage = "You cannot delete a self chat."
+            return false
+        }
+
+        let threadId = directThreadId(emailA: normalizedCurrentEmail, emailB: normalizedOtherEmail)
+
+        do {
+            // Query by participant first to avoid requiring a composite index.
+            let snapshot = try await db.collection("direct_messages")
+                .whereField("participants", arrayContains: normalizedCurrentEmail)
+                .getDocuments()
+
+            let threadDocuments = snapshot.documents.filter { document in
+                let data = document.data()
+                return (data["threadId"] as? String) == threadId
+            }
+
+            guard !threadDocuments.isEmpty else {
+                return true
+            }
+
+            let maxBatchSize = 450
+            for start in stride(from: 0, to: threadDocuments.count, by: maxBatchSize) {
+                let end = min(start + maxBatchSize, threadDocuments.count)
+                let chunk = threadDocuments[start..<end]
+                let batch = db.batch()
+                for document in chunk {
+                    batch.deleteDocument(document.reference)
+                }
+                try await batch.commit()
+            }
+
+            print("✅ Deleted direct chat thread: \(threadId) (\(threadDocuments.count) messages)")
+            return true
+        } catch {
+            print("❌ Error deleting direct chat thread: \(error.localizedDescription)")
+            errorMessage = "Failed to delete chat: \(error.localizedDescription)"
+            return false
+        }
+    }
+
     func fetchChatDirectoryUsers(excludingEmail: String? = nil) async -> [ChatDirectoryUser] {
         let normalizedExcludedEmail = normalizeEmail(excludingEmail ?? "")
 

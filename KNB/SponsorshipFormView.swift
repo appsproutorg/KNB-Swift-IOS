@@ -48,17 +48,34 @@ private enum SponsorshipTier: String, CaseIterable, Identifiable {
 }
 
 private enum SponsorshipPalette {
-    static let backgroundTop = Color(red: 0.95, green: 0.97, blue: 1.0)
-    static let backgroundBottom = Color(red: 0.99, green: 0.95, blue: 0.93)
-    static let cardFill = Color.white.opacity(0.62)
-    static let cardStroke = Color.white.opacity(0.88)
     static let headerBlue = Color(red: 0.12, green: 0.49, blue: 0.9)
     static let headerCyan = Color(red: 0.2, green: 0.67, blue: 0.87)
+
+    static func backgroundTop(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.06, green: 0.08, blue: 0.14)
+            : Color(red: 0.95, green: 0.97, blue: 1.0)
+    }
+
+    static func backgroundBottom(for scheme: ColorScheme) -> Color {
+        scheme == .dark
+            ? Color(red: 0.02, green: 0.03, blue: 0.07)
+            : Color(red: 0.99, green: 0.95, blue: 0.93)
+    }
+
+    static func cardFill(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.62)
+    }
+
+    static func cardStroke(for scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color.white.opacity(0.18) : Color.white.opacity(0.88)
+    }
 }
 
 struct SponsorshipFormView: View {
     @Environment(\.dismiss) var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var firestoreManager: FirestoreManager
     
     let shabbatDate: Date
@@ -278,7 +295,7 @@ struct SponsorshipFormView: View {
                 .padding(.vertical, 10)
                 .background(
                     Capsule()
-                        .fill(Color.white.opacity(0.7))
+                        .fill(colorScheme == .dark ? Color.white.opacity(0.14) : Color.white.opacity(0.7))
                 )
                 .overlay(
                     Capsule()
@@ -331,18 +348,18 @@ struct SponsorshipFormView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 6)
-                                .background(Color.white.opacity(0.72))
+                                .background(colorScheme == .dark ? Color.white.opacity(0.12) : Color.white.opacity(0.72))
                                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                             }
                         }
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 10)
-                    .background(Color.white.opacity(0.46))
+                    .background(colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.46))
                     .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 13, style: .continuous)
-                            .stroke(Color.white.opacity(0.88), lineWidth: 1)
+                            .stroke(colorScheme == .dark ? Color.white.opacity(0.18) : Color.white.opacity(0.88), lineWidth: 1)
                     )
                     .padding(.horizontal, 24)
                     .padding(.top, 4)
@@ -366,8 +383,8 @@ struct SponsorshipFormView: View {
                 ZStack {
                     LinearGradient(
                         colors: [
-                            SponsorshipPalette.backgroundTop,
-                            SponsorshipPalette.backgroundBottom
+                            SponsorshipPalette.backgroundTop(for: colorScheme),
+                            SponsorshipPalette.backgroundBottom(for: colorScheme)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -562,9 +579,11 @@ struct SponsorshipFormView: View {
                             .background(
                                 ZStack {
                                     RoundedRectangle(cornerRadius: 22)
-                                        .fill(Color(red: 0.97, green: 1.0, blue: 0.98))
+                                        .fill(colorScheme == .dark
+                                              ? Color(red: 0.08, green: 0.14, blue: 0.11)
+                                              : Color(red: 0.97, green: 1.0, blue: 0.98))
                                     RoundedRectangle(cornerRadius: 22)
-                                        .fill(.white.opacity(0.5))
+                                        .fill(colorScheme == .dark ? .white.opacity(0.08) : .white.opacity(0.5))
                                     RoundedRectangle(cornerRadius: 22)
                                         .stroke(
                                             LinearGradient(
@@ -609,11 +628,11 @@ struct SponsorshipFormView: View {
                         .padding(18)
                         .background(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(SponsorshipPalette.cardFill)
+                                .fill(SponsorshipPalette.cardFill(for: colorScheme))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .stroke(SponsorshipPalette.cardStroke, lineWidth: 1)
+                                .stroke(SponsorshipPalette.cardStroke(for: colorScheme), lineWidth: 1)
                         )
                         .padding(.horizontal)
                         
@@ -876,6 +895,7 @@ struct SponsorshipFormView: View {
 }
 
 private struct SponsorshipTierOptionCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let tier: SponsorshipTier
     let isSelected: Bool
     
@@ -883,7 +903,13 @@ private struct SponsorshipTierOptionCard: View {
         HStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(isSelected ? tier.accentColor.opacity(0.16) : Color(red: 0.94, green: 0.95, blue: 0.98))
+                    .fill(
+                        isSelected
+                            ? tier.accentColor.opacity(0.16)
+                            : (colorScheme == .dark
+                                ? Color.white.opacity(0.08)
+                                : Color(red: 0.94, green: 0.95, blue: 0.98))
+                    )
                     .frame(width: 30, height: 30)
                 
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -917,11 +943,20 @@ private struct SponsorshipTierOptionCard: View {
         .padding(.vertical, 11)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? tier.accentColor.opacity(0.08) : Color.white.opacity(0.56))
+                .fill(
+                    isSelected
+                        ? tier.accentColor.opacity(0.08)
+                        : (colorScheme == .dark ? Color.white.opacity(0.08) : Color.white.opacity(0.56))
+                )
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(isSelected ? tier.accentColor.opacity(0.55) : Color(red: 0.9, green: 0.91, blue: 0.94), lineWidth: isSelected ? 1.6 : 1)
+                .stroke(
+                    isSelected
+                        ? tier.accentColor.opacity(0.55)
+                        : (colorScheme == .dark ? Color.white.opacity(0.18) : Color(red: 0.9, green: 0.91, blue: 0.94)),
+                    lineWidth: isSelected ? 1.6 : 1
+                )
         )
         .shadow(color: isSelected ? tier.accentColor.opacity(0.2) : .clear, radius: 8, x: 0, y: 3)
         .scaleEffect(isSelected ? 1.01 : 1.0)
@@ -929,6 +964,7 @@ private struct SponsorshipTierOptionCard: View {
 }
 
 private struct SponsorshipTimeCard: View {
+    @Environment(\.colorScheme) private var colorScheme
     let icon: String
     let title: String
     let timeText: String
@@ -956,7 +992,7 @@ private struct SponsorshipTimeCard: View {
         .frame(maxWidth: .infinity)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.white.opacity(0.67))
+                .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white.opacity(0.67))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)

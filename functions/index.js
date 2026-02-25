@@ -62,6 +62,7 @@ async function sendNotification(userId, notification, userDataOverride = null) {
         if (notification.type === "POST_REPLY" && prefs.postReplies === false) return;
         if (notification.type === "REPLY_LIKE" && prefs.replyLikes === false) return;
         if (notification.type === "OUTBID" && prefs.outbid === false) return;
+        if (notification.type === "CHAT_MESSAGE" && prefs.chatMessages === false) return;
 
         // 1. Write to Firestore Inbox
         const notificationRef = db.collection("users").doc(userId).collection("notifications").doc();
@@ -79,12 +80,17 @@ async function sendNotification(userId, notification, userDataOverride = null) {
             return;
         }
 
+        const dataPayload = sanitizeNotificationData({
+            ...(notification.data || {}),
+            type: notification.type,
+        });
+
         const message = {
             notification: {
                 title: notification.title,
                 body: notification.body,
             },
-            data: sanitizeNotificationData(notification.data),
+            data: dataPayload,
             apns: {
                 payload: {
                     aps: {
@@ -141,6 +147,22 @@ function chunkArray(items, chunkSize) {
         chunks.push(items.slice(i, i + chunkSize));
     }
     return chunks;
+}
+
+function normalizeEmail(email) {
+    return normalizeWhitespace(email).toLowerCase();
+}
+
+function buildMessagePreview(content) {
+    const normalized = normalizeWhitespace(String(content || ""));
+    if (!normalized) {
+        return "You have a new message.";
+    }
+
+    const maxLength = 120;
+    return normalized.length > maxLength ?
+        `${normalized.slice(0, maxLength - 3)}...` :
+        normalized;
 }
 
 function extractSocialMediaPaths(data) {
@@ -416,7 +438,113 @@ exports.onOutbid = functions.firestore
         }
     });
 
-// 6. Propagate Name Changes
+// 6. Direct Message Notification
+exports.onDirectMessageCreate = functions.firestore
+    .document("direct_messages/{messageId}")
+    .onCreate(async (snap, context) => {
+        try {
+            if (await shouldSkipDuplicateEvent("onDirectMessageCreate", context.eventId)) {
+                return;
+            }
+
+            const message = snap.data() || {};
+            const senderEmail = normalizeEmail(message.senderEmail || "");
+            const senderName = normalizeWhitespace(message.senderName || "") || "Someone";
+            const threadId = normalizeWhitespace(message.threadId || context.params.messageId);
+
+            const participants = Array.isArray(message.participants) ?
+                message.participants.map((email) => normalizeEmail(email)) :
+                [];
+            const fallbackRecipientEmail = participants.find((email) =>
+                email && email !== senderEmail
+            ) || "";
+            const recipientEmail = normalizeEmail(message.recipientEmail || fallbackRecipientEmail);
+
+            if (!senderEmail || !recipientEmail || senderEmail === recipientEmail) {
+                return;
+            }
+
+            const notification = {
+                type: "CHAT_MESSAGE",
+                title: `New message from ${senderName}`,
+                body: buildMessagePreview(message.content),
+                data: {
+                    chatKind: "direct",
+                    chatThreadId: threadId,
+                    senderEmail,
+                },
+            };
+
+            await sendNotification(recipientEmail, notification);
+        } catch (error) {
+            logger.error("onDirectMessageCreate failed.", {
+                messageId: context.params.messageId,
+                error: error.message,
+            });
+        }
+    });
+
+// 7. Rabbi Message Notification
+exports.onRabbiMessageCreate = functions.firestore
+    .document("rabbi_messages/{messageId}")
+    .onCreate(async (snap, context) => {
+        try {
+            if (await shouldSkipDuplicateEvent("onRabbiMessageCreate", context.eventId)) {
+                return;
+            }
+
+            const message = snap.data() || {};
+            const senderEmail = normalizeEmail(message.senderEmail || "");
+            const threadOwnerEmail = normalizeEmail(message.threadOwnerEmail || "");
+            const senderName = normalizeWhitespace(message.senderName || "") || "Someone";
+
+            if (!senderEmail || !threadOwnerEmail) {
+                return;
+            }
+
+            let recipientEmails = [];
+            if (senderEmail !== threadOwnerEmail) {
+                recipientEmails = [threadOwnerEmail];
+            } else {
+                const rawRecipientEmails = Array.isArray(message.recipientEmails) ?
+                    message.recipientEmails :
+                    [];
+                recipientEmails = rawRecipientEmails.map((email) => normalizeEmail(email));
+            }
+
+            recipientEmails = Array.from(new Set(
+                recipientEmails.filter((email) => email && email !== senderEmail)
+            ));
+
+            if (recipientEmails.length === 0) {
+                return;
+            }
+
+            const notification = {
+                type: "CHAT_MESSAGE",
+                title: `New message from ${senderName}`,
+                body: buildMessagePreview(message.content),
+                data: {
+                    chatKind: "rabbi",
+                    chatThreadOwnerEmail: threadOwnerEmail,
+                    senderEmail,
+                },
+            };
+
+            await Promise.all(
+                recipientEmails.map((recipientEmail) =>
+                    sendNotification(recipientEmail, notification)
+                )
+            );
+        } catch (error) {
+            logger.error("onRabbiMessageCreate failed.", {
+                messageId: context.params.messageId,
+                error: error.message,
+            });
+        }
+    });
+
+// 8. Propagate Name Changes
 exports.onUserUpdate = functions.firestore
     .document("users/{userEmail}")
     .onUpdate(async (change, context) => {

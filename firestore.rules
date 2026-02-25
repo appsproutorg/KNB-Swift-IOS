@@ -318,7 +318,17 @@ service cloud.firestore {
                     && request.resource.data.content.size() > 0
                     && request.resource.data.content.size() <= 1000
                     && request.resource.data.timestamp is timestamp;
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAuthenticated()
+                    && request.auth.token.email is string
+                    && (
+                      (resource.data.participants is list
+                       && resource.data.participants.hasAny([request.auth.token.email.lower()]))
+                      || (resource.data.senderEmail is string
+                          && resource.data.senderEmail.lower() == request.auth.token.email.lower())
+                      || (resource.data.recipientEmail is string
+                          && resource.data.recipientEmail.lower() == request.auth.token.email.lower())
+                    );
     }
     
     // Seat Reservations

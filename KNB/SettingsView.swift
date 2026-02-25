@@ -81,6 +81,16 @@ struct SettingsView: View {
                             icon: "gavel.fill",
                             color: .orange
                         )
+                        
+                        NotificationToggleRow(
+                            isOn: Binding(
+                                get: { user.notificationPrefs?.chatMessages ?? true },
+                                set: { newValue in updatePref { $0.chatMessages = newValue } }
+                            ),
+                            title: "Chat Messages",
+                            icon: "message.fill",
+                            color: .green
+                        )
                     } header: {
                         Text("Notifications")
                     }

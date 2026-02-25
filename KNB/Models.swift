@@ -91,6 +91,7 @@ struct NotificationPreferences: Codable, Equatable {
     var postReplies: Bool = true
     var replyLikes: Bool = true
     var outbid: Bool = true
+    var chatMessages: Bool = true
     
     init() {}
     
@@ -100,6 +101,7 @@ struct NotificationPreferences: Codable, Equatable {
         self.postReplies = data["postReplies"] as? Bool ?? true
         self.replyLikes = data["replyLikes"] as? Bool ?? true
         self.outbid = data["outbid"] as? Bool ?? true
+        self.chatMessages = data["chatMessages"] as? Bool ?? true
     }
 }
 
@@ -576,6 +578,7 @@ enum NotificationType: String, Codable {
     case postReply = "POST_REPLY"
     case replyLike = "REPLY_LIKE"
     case outbid = "OUTBID"
+    case chatMessage = "CHAT_MESSAGE"
     
     // Custom decoding to handle legacy lowercase values
     init(from decoder: Decoder) throws {
@@ -595,6 +598,8 @@ enum NotificationType: String, Codable {
         case "POST_REPLY", "POSTREPLY": self = .postReply
         case "REPLY_LIKE", "REPLYLIKE": self = .replyLike
         case "OUTBID": self = .outbid
+        case "CHAT_MESSAGE", "CHATMESSAGE", "DIRECT_MESSAGE", "DIRECTMESSAGE", "RABBI_MESSAGE", "RABBIMESSAGE":
+            self = .chatMessage
         default:
             throw DecodingError.dataCorruptedError(
                 in: container,

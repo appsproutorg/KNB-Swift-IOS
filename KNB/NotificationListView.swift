@@ -185,6 +185,7 @@ struct NotificationRow: View {
         case .postReply: return "bubble.left.fill"
         case .replyLike: return "heart.fill"
         case .outbid: return "gavel.fill"
+        case .chatMessage: return "message.fill"
         }
     }
     
@@ -195,6 +196,7 @@ struct NotificationRow: View {
         case .postReply: return .blue
         case .replyLike: return .pink
         case .outbid: return .orange
+        case .chatMessage: return .green
         }
     }
     
