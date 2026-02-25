@@ -51,8 +51,10 @@ struct RabbiChatView: View {
     @State private var messages: [RabbiChatMessage] = []
     @State private var showListenerError = false
     @State private var listenerErrorMessage = ""
-    @State private var bottomMarkerMinY: CGFloat = 0
-    @State private var scrollViewportHeight: CGFloat = 0
+    @State private var scrollDistanceFromBottom: CGFloat = 0
+    @State private var hasSeenReliableDistanceSample = false
+    @State private var didScrollAwayFromBottomFallback = false
+    @State private var hasCompletedInitialScroll = false
     private let bottomAnchorId = "rabbi-chat-bottom-anchor"
 
     init(
@@ -117,9 +119,13 @@ struct RabbiChatView: View {
     }
 
     private var shouldShowJumpToPresentButton: Bool {
-        guard messages.count > 2, scrollViewportHeight > 0 else { return false }
-        let distanceFromBottom = abs(bottomMarkerMinY - scrollViewportHeight)
-        return distanceFromBottom > 40
+        guard hasCompletedInitialScroll, !messages.isEmpty else { return false }
+
+        if hasSeenReliableDistanceSample {
+            return scrollDistanceFromBottom > 24
+        }
+
+        return didScrollAwayFromBottomFallback
     }
 
     private var chatRows: [RabbiChatRow] {
@@ -183,49 +189,59 @@ struct RabbiChatView: View {
                                     Color.clear
                                         .frame(height: 1)
                                         .id(bottomAnchorId)
-                                        .background(
-                                            GeometryReader { geo in
-                                                Color.clear.preference(
-                                                    key: RabbiBottomMarkerMinYPreferenceKey.self,
-                                                    value: geo.frame(in: .named("rabbiChatScroll")).minY
-                                                )
-                                            }
-                                        )
                                 }
                                 .padding(.horizontal, 12)
                                 .padding(.top, 8)
                                 .padding(.bottom, 12)
                             }
-                            .coordinateSpace(name: "rabbiChatScroll")
                             .background(
-                                GeometryReader { geo in
-                                    Color.clear.preference(
-                                        key: RabbiScrollViewportHeightPreferenceKey.self,
-                                        value: geo.size.height
-                                    )
+                                ScrollViewDistanceToBottomObserver { distance in
+                                    scrollDistanceFromBottom = distance
+                                    if distance > 2 {
+                                        hasSeenReliableDistanceSample = true
+                                    }
+                                    if hasSeenReliableDistanceSample && distance <= 8 {
+                                        didScrollAwayFromBottomFallback = false
+                                    }
                                 }
                             )
                             .scrollIndicators(.hidden)
                             .scrollDismissesKeyboard(.interactively)
-                            .onPreferenceChange(RabbiBottomMarkerMinYPreferenceKey.self) { value in
-                                bottomMarkerMinY = value
-                            }
-                            .onPreferenceChange(RabbiScrollViewportHeightPreferenceKey.self) { value in
-                                scrollViewportHeight = value
-                            }
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 6)
+                                    .onChanged { value in
+                                        guard hasCompletedInitialScroll else { return }
+                                        if abs(value.translation.height) > 4 {
+                                            didScrollAwayFromBottomFallback = true
+                                        }
+                                    }
+                                    .onEnded { _ in
+                                        if hasSeenReliableDistanceSample && scrollDistanceFromBottom <= 8 {
+                                            didScrollAwayFromBottomFallback = false
+                                        }
+                                    }
+                            )
                             .onAppear {
-                                scrollToBottom(proxy, animated: false)
+                                hasCompletedInitialScroll = !messages.isEmpty
+                                scrollToBottomAfterLayout(proxy, animated: false)
                             }
-                            .onChange(of: messages.count) { _, _ in
-                                scrollToBottom(proxy, animated: true)
+                            .onChange(of: messages) { _, newMessages in
+                                guard !newMessages.isEmpty else { return }
+                                if !hasCompletedInitialScroll {
+                                    hasCompletedInitialScroll = true
+                                    scrollToBottomAfterLayout(proxy, animated: false)
+                                } else {
+                                    scrollToBottomAfterLayout(proxy, animated: true)
+                                }
                             }
                             .onChange(of: isRabbiTyping) { _, typing in
                                 guard typing else { return }
-                                scrollToBottom(proxy, animated: true)
+                                scrollToBottomAfterLayout(proxy, animated: true)
                             }
 
                             if shouldShowJumpToPresentButton {
                                 Button {
+                                    didScrollAwayFromBottomFallback = false
                                     scrollToBottom(proxy, animated: true)
                                 } label: {
                                     ZStack {
@@ -265,9 +281,17 @@ struct RabbiChatView: View {
                                 .buttonStyle(.plain)
                                 .padding(.trailing, 12)
                                 .padding(.bottom, 14)
-                                .transition(.move(edge: .trailing).combined(with: .opacity))
+                                .transition(
+                                    .asymmetric(
+                                        insertion: .offset(y: 8)
+                                            .combined(with: .scale(scale: 0.9))
+                                            .combined(with: .opacity),
+                                        removal: .scale(scale: 0.96).combined(with: .opacity)
+                                    )
+                                )
                             }
                         }
+                        .animation(.spring(response: 0.28, dampingFraction: 0.84), value: shouldShowJumpToPresentButton)
                     }
                 }
                 .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -556,6 +580,18 @@ struct RabbiChatView: View {
             }
         } else {
             proxy.scrollTo(bottomAnchorId, anchor: .bottom)
+        }
+    }
+
+    private func scrollToBottomAfterLayout(_ proxy: ScrollViewProxy, animated: Bool) {
+        scrollDistanceFromBottom = 0
+        didScrollAwayFromBottomFallback = false
+        let delays: [Double] = [0.0, 0.06, 0.16]
+        for (index, delay) in delays.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                // Use animation only for the first jump when requested.
+                scrollToBottom(proxy, animated: animated && index == 0)
+            }
         }
     }
 
@@ -915,17 +951,96 @@ private struct TelegramDoodleBackground: View {
     }
 }
 
-private struct RabbiBottomMarkerMinYPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
+private struct ScrollViewDistanceToBottomObserver: UIViewRepresentable {
+    let onChange: (CGFloat) -> Void
 
-private struct RabbiScrollViewportHeightPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onChange: onChange)
+    }
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView(frame: .zero)
+        view.isUserInteractionEnabled = false
+        DispatchQueue.main.async {
+            context.coordinator.attachIfNeeded(from: view)
+        }
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.onChange = onChange
+        DispatchQueue.main.async {
+            context.coordinator.attachIfNeeded(from: uiView)
+            context.coordinator.reportDistance()
+        }
+    }
+
+    static func dismantleUIView(_ uiView: UIView, coordinator: Coordinator) {
+        coordinator.detach()
+    }
+
+    final class Coordinator: NSObject {
+        var onChange: (CGFloat) -> Void
+        weak var scrollView: UIScrollView?
+        private var contentOffsetObservation: NSKeyValueObservation?
+        private var contentSizeObservation: NSKeyValueObservation?
+        private var boundsObservation: NSKeyValueObservation?
+
+        init(onChange: @escaping (CGFloat) -> Void) {
+            self.onChange = onChange
+        }
+
+        func attachIfNeeded(from view: UIView) {
+            guard let candidateScrollView = findEnclosingScrollView(from: view) else {
+                return
+            }
+
+            guard scrollView !== candidateScrollView else {
+                return
+            }
+
+            detach()
+            scrollView = candidateScrollView
+
+            contentOffsetObservation = candidateScrollView.observe(\.contentOffset, options: [.initial, .new]) { [weak self] _, _ in
+                self?.reportDistance()
+            }
+            contentSizeObservation = candidateScrollView.observe(\.contentSize, options: [.new]) { [weak self] _, _ in
+                self?.reportDistance()
+            }
+            boundsObservation = candidateScrollView.observe(\.bounds, options: [.new]) { [weak self] _, _ in
+                self?.reportDistance()
+            }
+        }
+
+        func reportDistance() {
+            guard let scrollView else { return }
+
+            let visibleBottomY = scrollView.contentOffset.y
+                + scrollView.bounds.height
+                - scrollView.adjustedContentInset.bottom
+            let contentBottomY = scrollView.contentSize.height
+            let distance = max(0, contentBottomY - visibleBottomY)
+            onChange(distance)
+        }
+
+        func detach() {
+            contentOffsetObservation = nil
+            contentSizeObservation = nil
+            boundsObservation = nil
+            scrollView = nil
+        }
+
+        private func findEnclosingScrollView(from view: UIView) -> UIScrollView? {
+            var current: UIView? = view
+            while let node = current {
+                if let scrollView = node as? UIScrollView {
+                    return scrollView
+                }
+                current = node.superview
+            }
+            return nil
+        }
     }
 }
 

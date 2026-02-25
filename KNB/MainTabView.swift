@@ -35,7 +35,7 @@ struct MainTabView: View {
                     currentUser: $currentUser
                 )
                 .tabItem {
-                    Label("Social", systemImage: "person.2.fill")
+                    Label("Updates", systemImage: "person.2.fill")
                 }
                 .tag(1)
                 
