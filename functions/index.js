@@ -1059,6 +1059,19 @@ function parseScheduleLine(rawLine) {
     };
 }
 
+function isMinyanScheduleLine(line) {
+    const candidate = normalizeWhitespace(
+        `${line?.title || ""} ${line?.rawLine || ""}`
+    ).toLowerCase();
+
+    if (!candidate) {
+        return false;
+    }
+
+    // Covers weekday and Shabbos prayer labels used on the source calendar.
+    return /(shacharis|shacharit|shachris|mincha|maariv|ma'ariv|arvit|musaf|mussaf|kabbalat|kabbalas|kabbolas|selichos|slichos)/.test(candidate);
+}
+
 function parseDailyScheduleAndZmanim(messageHtml) {
     const raw = String(messageHtml || "");
     const sections = raw.split(/<hr\s*\/?>/i);
@@ -1097,6 +1110,7 @@ function parseDailyScheduleAndZmanim(messageHtml) {
 
     return {
         scheduleLines,
+        minyanLines: scheduleLines.filter((line) => isMinyanScheduleLine(line)),
         zmanim,
     };
 }
@@ -1199,6 +1213,7 @@ function parseDailyCalendarMonth(html, year, month) {
 
         const scheduleAnchor = cell.find("div.day-schedule a").first();
         let scheduleLines = [];
+        let minyanLines = [];
         let zmanim = emptyDailyZmanim();
 
         if (scheduleAnchor.length) {
@@ -1207,6 +1222,7 @@ function parseDailyCalendarMonth(html, year, month) {
             if (parsedSchedulePopup && parsedSchedulePopup.category.toLowerCase() === "schedule") {
                 const parsedSchedule = parseDailyScheduleAndZmanim(parsedSchedulePopup.messageHtml);
                 scheduleLines = parsedSchedule.scheduleLines;
+                minyanLines = parsedSchedule.minyanLines;
                 zmanim = parsedSchedule.zmanim;
             }
         }
@@ -1260,6 +1276,7 @@ function parseDailyCalendarMonth(html, year, month) {
             weekdayLabel,
             hebrewDate: hebrewDate || "",
             scheduleLines,
+            minyanLines,
             zmanim,
             events,
             source: "website",
@@ -1276,6 +1293,14 @@ function canonicalizeDailyCalendarDoc(row) {
     const normalizedRow = row || {};
     const scheduleLines = Array.isArray(normalizedRow.scheduleLines)
         ? normalizedRow.scheduleLines.map((line) => ({
+            title: normalizeWhitespace(String(line?.title || "")),
+            timeText: normalizeWhitespace(String(line?.timeText || "")) || null,
+            rawLine: normalizeWhitespace(String(line?.rawLine || "")),
+        }))
+        : [];
+
+    const minyanLines = Array.isArray(normalizedRow.minyanLines)
+        ? normalizedRow.minyanLines.map((line) => ({
             title: normalizeWhitespace(String(line?.title || "")),
             timeText: normalizeWhitespace(String(line?.timeText || "")) || null,
             rawLine: normalizeWhitespace(String(line?.rawLine || "")),
@@ -1312,6 +1337,7 @@ function canonicalizeDailyCalendarDoc(row) {
         weekdayLabel: normalizeWhitespace(String(normalizedRow.weekdayLabel || "")),
         hebrewDate: normalizeWhitespace(String(normalizedRow.hebrewDate || "")),
         scheduleLines,
+        minyanLines,
         zmanim,
         events,
         source: normalizeWhitespace(String(normalizedRow.source || "website")) || "website",
@@ -1776,6 +1802,17 @@ function isValidKiddushSponsorshipPayload(data) {
     );
 }
 
+function formatShabbatDateForEmailToken(isoDate) {
+    const normalized = normalizeWhitespace(String(isoDate || ""));
+    const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) {
+        return normalized || "Unknown";
+    }
+
+    const [, year, month, day] = match;
+    return `${year}-${month}${day}`;
+}
+
 async function sendKiddushBookingEmail(sponsorshipId, data) {
     const apiKey = process.env.SENDGRID_API_KEY;
     const notifyToRaw = process.env.KIDDUSH_BOOKING_NOTIFY_TO;
@@ -1794,10 +1831,11 @@ async function sendKiddushBookingEmail(sponsorshipId, data) {
         return false;
     }
 
-    const shabbatDate =
+    const shabbatDateIso =
         data.date && typeof data.date.toDate === "function"
             ? toIsoDateFromDateInChicago(data.date.toDate())
             : "Unknown date";
+    const shabbatDateToken = formatShabbatDateForEmailToken(shabbatDateIso);
 
     const sponsorName = normalizeWhitespace(data.sponsorName || "Unknown");
     const sponsorEmail = normalizeWhitespace(data.sponsorEmail || "Unknown");
@@ -1806,35 +1844,19 @@ async function sendKiddushBookingEmail(sponsorshipId, data) {
     const tierAmount = data.tierAmount !== undefined ? String(data.tierAmount) : "Not provided";
     const anonymousLabel = data.isAnonymous ? "Yes" : "No";
 
-    const subject = `New Kiddush Booking - ${shabbatDate}`;
-    const textBody = [
-        "A new Kiddush booking was made in the app.",
-        "",
-        `Sponsorship ID: ${sponsorshipId}`,
-        `Shabbat Date: ${shabbatDate}`,
-        `Sponsor Name: ${sponsorName}`,
-        `Sponsor Email: ${sponsorEmail}`,
-        `Anonymous: ${anonymousLabel}`,
-        `Tier: ${tierName}`,
-        `Tier Amount: ${tierAmount}`,
-        `Occasion: ${occasion}`,
-    ].join("\n");
+    const subject = `New Kiddush Booking - ${shabbatDateIso}`;
+    const keyedLines = [
+        ["sponsorship_id", sponsorshipId],
+        ["date", shabbatDateToken],
+        ["name", sponsorName],
+        ["email", sponsorEmail],
+        ["amount", tierAmount],
+        ["tier", tierName],
+        ["anonymous", anonymousLabel],
+        ["occasion", occasion],
+    ].map(([key, value]) => `${key}_${normalizeWhitespace(String(value || "")) || "Unknown"}`);
 
-    const rows = [
-        ["Sponsorship ID", sponsorshipId],
-        ["Shabbat Date", shabbatDate],
-        ["Sponsor Name", sponsorName],
-        ["Sponsor Email", sponsorEmail],
-        ["Anonymous", anonymousLabel],
-        ["Tier", tierName],
-        ["Tier Amount", tierAmount],
-        ["Occasion", occasion],
-    ].map(([label, value]) => `
-        <tr>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#4b5563;font-weight:600;width:180px;">${escapeHtml(label)}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#111827;">${escapeHtml(value)}</td>
-        </tr>
-    `).join("");
+    const textBody = keyedLines.join("\n");
 
     const htmlBody = `
       <div style="font-family:Arial,Helvetica,sans-serif;background:#f8fafc;padding:24px;">
@@ -1844,9 +1866,7 @@ async function sendKiddushBookingEmail(sponsorshipId, data) {
             <div style="font-size:13px;opacity:0.9;margin-top:4px;">Submitted from the KNB app</div>
           </div>
           <div style="padding:18px 20px;">
-            <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;font-size:14px;">
-              ${rows}
-            </table>
+            <pre style="margin:0;font-family:Menlo,Consolas,monospace;font-size:14px;line-height:1.6;color:#111827;white-space:pre-wrap;">${escapeHtml(textBody)}</pre>
           </div>
         </div>
       </div>
@@ -2805,7 +2825,7 @@ exports.syncKiddushCalendar = onSchedule(
 
 exports.syncDailyCalendar = onSchedule(
     {
-        schedule: "every 48 hours",
+        schedule: "every 24 hours",
         region: "us-central1",
         timeZone: DAILY_CALENDAR_TIMEZONE,
         memory: "256MiB",

@@ -834,6 +834,33 @@ struct CalendarDayDetailView: View {
                         .tint(.blue)
                     }
 
+                    if let dailyCalendarDay, !dailyCalendarDay.effectiveMinyanLines.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("Minyan Times")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                            ForEach(Array(dailyCalendarDay.effectiveMinyanLines.enumerated()), id: \.offset) { _, line in
+                                HStack(alignment: .top, spacing: 10) {
+                                    if let timeText = line.timeText, !timeText.isEmpty {
+                                        Text(timeText)
+                                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                                            .foregroundStyle(.secondary)
+                                            .frame(width: 74, alignment: .leading)
+                                    }
+                                    Text(line.title)
+                                        .font(.system(size: 14, weight: .medium, design: .rounded))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 0)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color(.secondarySystemBackground))
+                        )
+                    }
+
                     if let dailyCalendarDay, !dailyCalendarDay.scheduleLines.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
                             Text("Schedule")

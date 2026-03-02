@@ -309,6 +309,24 @@ struct DailyScheduleLine: Codable, Equatable {
     var title: String
     var timeText: String?
     var rawLine: String
+
+    var isMinyanLine: Bool {
+        let candidate = "\(title) \(rawLine)".lowercased()
+        return candidate.contains("shacharis")
+            || candidate.contains("shacharit")
+            || candidate.contains("shachris")
+            || candidate.contains("mincha")
+            || candidate.contains("maariv")
+            || candidate.contains("ma'ariv")
+            || candidate.contains("arvit")
+            || candidate.contains("musaf")
+            || candidate.contains("mussaf")
+            || candidate.contains("kabbalat")
+            || candidate.contains("kabbalas")
+            || candidate.contains("kabbolas")
+            || candidate.contains("selichos")
+            || candidate.contains("slichos")
+    }
 }
 
 struct DailyZmanim: Codable, Equatable {
@@ -346,6 +364,7 @@ struct DailyCalendarDay: Identifiable, Codable, Equatable {
     var weekdayLabel: String
     var hebrewDate: String
     var scheduleLines: [DailyScheduleLine]
+    var minyanLines: [DailyScheduleLine]
     var zmanim: DailyZmanim
     var events: [DailyCalendarEvent]
     var source: String
@@ -353,6 +372,13 @@ struct DailyCalendarDay: Identifiable, Codable, Equatable {
 
     var eventCount: Int {
         events.count
+    }
+
+    var effectiveMinyanLines: [DailyScheduleLine] {
+        if !minyanLines.isEmpty {
+            return minyanLines
+        }
+        return scheduleLines.filter { $0.isMinyanLine }
     }
 }
 

@@ -830,6 +830,7 @@ class FirestoreManager: ObservableObject {
             weekdayLabel: weekdayLabel?.isEmpty == false ? weekdayLabel! : fallbackWeekdayLabel,
             hebrewDate: hebrewDate,
             scheduleLines: parseDailyScheduleLines(data["scheduleLines"]),
+            minyanLines: parseDailyScheduleLines(data["minyanLines"]),
             zmanim: parseDailyZmanim(data["zmanim"]),
             events: parseDailyEvents(data["events"], isoDate: isoDate),
             source: source,
