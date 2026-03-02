@@ -39,13 +39,13 @@ struct MainTabView: View {
                 }
                 .tag(1)
                 
-                // Chat Tab
-                ChatTabView(
+                // Rabbi Tab
+                RabbiTabView(
                     firestoreManager: firestoreManager,
                     currentUser: $currentUser
                 )
                 .tabItem {
-                    Label("Messages", systemImage: "message.fill")
+                    Label("Shailos", systemImage: "message.fill")
                 }
                 .tag(2)
                 

@@ -43,6 +43,11 @@ struct ProfileTabView: View {
         // Count sponsorships from real-time data
         return firestoreManager.kiddushSponsorships.filter { $0.sponsorEmail == email }.count
     }
+
+    private var canManageAdmins: Bool {
+        guard let email = user?.email.lowercased() else { return false }
+        return email == "admin@knb.com" || email == "ethangoizman16@gmail.com"
+    }
     
     func loadUserSponsorships() {
         guard let email = user?.email else {
@@ -433,8 +438,8 @@ struct ProfileTabView: View {
                                 .padding(.horizontal)
                                 
                                 VStack(spacing: 12) {
-                                    // Super Admin Only: Manage Admins
-                                    if user?.email.lowercased() == "admin@knb.com" {
+                                    // Admin Management Access
+                                    if canManageAdmins {
                                         Button(action: {
                                             showAdminManagement = true
                                         }) {

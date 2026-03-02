@@ -9,7 +9,12 @@ service cloud.firestore {
     
     // Helper function to check if user is the Super Admin
     function isSuperAdmin() {
-      return isAuthenticated() && request.auth.token.email.lower() == 'admin@knb.com';
+      return isAuthenticated()
+             && (
+               request.auth.token.email.lower() == 'admin@knb.com'
+               || request.auth.token.email.lower() == 'ethangoizman16@gmail.com'
+               || request.auth.token.email.lower() == 'ethangoizman16@googlemail.com'
+             );
     }
 
     // Helper function to check if user is an Admin

@@ -20,6 +20,18 @@ struct ReplyThreadView: View {
     @FocusState private var isFocused: Bool
     
     private let maxCharacters = 140
+
+    private var canCurrentUserReply: Bool {
+        currentUser?.isAdmin == true
+    }
+
+    private var normalizedAdminEmails: Set<String> {
+        Set(firestoreManager.adminEmails.map { $0.lowercased() })
+    }
+
+    private func canLikePost(_ candidate: SocialPost) -> Bool {
+        canCurrentUserReply || normalizedAdminEmails.contains(candidate.authorEmail.lowercased())
+    }
     
     var body: some View {
         NavigationStack {
@@ -33,7 +45,10 @@ struct ReplyThreadView: View {
                             currentUserEmail: currentUser?.email,
                             currentUserName: currentUser?.name,
                             firestoreManager: firestoreManager,
+                            allowsReply: canCurrentUserReply,
+                            allowsLike: canLikePost(post),
                             onReply: {
+                                guard canCurrentUserReply else { return }
                                 // Auto-focus when reply button is clicked
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                     isFocused = true
@@ -80,7 +95,7 @@ struct ReplyThreadView: View {
                                     .font(.system(size: 18, weight: .medium))
                                     .foregroundStyle(.secondary)
                                 
-                                Text("Be the first to reply!")
+                                Text(canCurrentUserReply ? "Be the first to reply!" : "Only admins can reply.")
                                     .font(.system(size: 14))
                                     .foregroundStyle(.secondary)
                             }
@@ -93,6 +108,7 @@ struct ReplyThreadView: View {
                                         reply: reply,
                                         currentUserEmail: currentUser?.email,
                                         firestoreManager: firestoreManager,
+                                        allowsLike: canLikePost(reply),
                                         onDelete: {
                                             loadReplies()
                                         }
@@ -109,27 +125,31 @@ struct ReplyThreadView: View {
                 }
                 
                 // Reply composer always visible at bottom (Twitter-style)
-                ReplyComposerView(
-                    content: $replyContent,
-                    isPosting: $isPostingReply,
-                    maxCharacters: maxCharacters,
-                    shouldFocus: isFocused,
-                    onPost: handlePostReply,
-                    onCancel: {
-                        replyContent = ""
-                        isFocused = false
-                        dismiss()
-                    }
-                )
+                if canCurrentUserReply {
+                    ReplyComposerView(
+                        content: $replyContent,
+                        isPosting: $isPostingReply,
+                        maxCharacters: maxCharacters,
+                        shouldFocus: isFocused,
+                        onPost: handlePostReply,
+                        onCancel: {
+                            replyContent = ""
+                            isFocused = false
+                            dismiss()
+                        }
+                    )
+                }
             }
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Replies")
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {
                 loadReplies()
-                // Auto-focus reply field when thread opens
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    isFocused = true
+                if canCurrentUserReply {
+                    // Auto-focus reply field when thread opens
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        isFocused = true
+                    }
                 }
             }
             .refreshable {
@@ -148,7 +168,7 @@ struct ReplyThreadView: View {
                 replies = fetchedReplies
                 isLoadingReplies = false
                 // Refresh focus after loading replies
-                if !replies.isEmpty {
+                if !replies.isEmpty && canCurrentUserReply {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         isFocused = true
                     }
@@ -159,6 +179,7 @@ struct ReplyThreadView: View {
     
     private func handlePostReply() {
         guard let user = currentUser else { return }
+        guard user.isAdmin else { return }
         guard !replyContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         guard replyContent.count <= maxCharacters else { return }
         
@@ -191,6 +212,7 @@ struct ReplyCard: View {
     let reply: SocialPost
     let currentUserEmail: String?
     @ObservedObject var firestoreManager: FirestoreManager
+    var allowsLike: Bool = true
     var onDelete: () -> Void
     
     @State private var authorDisplayName: String = ""
@@ -201,10 +223,17 @@ struct ReplyCard: View {
     @State private var heartScale: CGFloat = 1.0
     @State private var showDeleteConfirmation = false
     
-    init(reply: SocialPost, currentUserEmail: String?, firestoreManager: FirestoreManager, onDelete: @escaping () -> Void) {
+    init(
+        reply: SocialPost,
+        currentUserEmail: String?,
+        firestoreManager: FirestoreManager,
+        allowsLike: Bool = true,
+        onDelete: @escaping () -> Void
+    ) {
         self.reply = reply
         self.currentUserEmail = currentUserEmail
         self.firestoreManager = firestoreManager
+        self.allowsLike = allowsLike
         self.onDelete = onDelete
         _isLiked = State(initialValue: reply.isLikedBy(currentUserEmail ?? ""))
         _likeCount = State(initialValue: reply.likeCount)
@@ -218,6 +247,11 @@ struct ReplyCard: View {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: reply.timestamp, relativeTo: Date())
+    }
+
+    private var isAdminAuthor: Bool {
+        let normalizedAuthor = reply.authorEmail.lowercased()
+        return firestoreManager.adminEmails.contains { $0.lowercased() == normalizedAuthor }
     }
     
     var body: some View {
@@ -277,7 +311,7 @@ struct ReplyCard: View {
                                 .font(.system(size: 15, weight: .semibold))
                             
                             // Verified badge for admin replies
-                            if firestoreManager.adminEmails.contains(reply.authorEmail) {
+                            if isAdminAuthor {
                                 Image(systemName: "checkmark.seal.fill")
                                     .font(.system(size: 12, weight: .semibold))
                                     .foregroundStyle(
@@ -334,17 +368,26 @@ struct ReplyCard: View {
                     HStack(spacing: 6) {
                         Image(systemName: isLiked ? "heart.fill" : "heart")
                             .font(.system(size: 14))
-                            .foregroundStyle(isLiked ? .red : .secondary)
+                            .foregroundStyle(
+                                allowsLike
+                                ? (isLiked ? .red : .secondary)
+                                : .secondary.opacity(0.4)
+                            )
                             .scaleEffect(heartScale)
                         
                         if likeCount > 0 {
                             Text("\(likeCount)")
                                 .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(isLiked ? .red : .secondary)
+                                .foregroundStyle(
+                                    allowsLike
+                                    ? (isLiked ? .red : .secondary)
+                                    : .secondary.opacity(0.4)
+                                )
                         }
                     }
                 }
                 .buttonStyle(.plain)
+                .disabled(!allowsLike)
             }
         }
         .alert("Delete Reply", isPresented: $showDeleteConfirmation) {
@@ -405,7 +448,7 @@ struct ReplyCard: View {
     }
     
     private func handleLike() {
-        guard let userEmail = currentUserEmail else { return }
+        guard allowsLike, let userEmail = currentUserEmail else { return }
         
         let wasLiked = isLiked
         isLiked.toggle()

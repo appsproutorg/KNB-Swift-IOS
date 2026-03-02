@@ -35,6 +35,7 @@ struct RabbiChatView: View {
     let threadDisplayName: String?
     let directRecipientEmail: String?
     let directRecipientName: String?
+    let showsDismissButton: Bool
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -55,6 +56,8 @@ struct RabbiChatView: View {
     @State private var hasSeenReliableDistanceSample = false
     @State private var didScrollAwayFromBottomFallback = false
     @State private var hasCompletedInitialScroll = false
+    @State private var keyboardOverlapHeight: CGFloat = 0
+    @State private var keyboardDismissNudge: CGFloat = 0
     private let bottomAnchorId = "rabbi-chat-bottom-anchor"
 
     init(
@@ -63,7 +66,8 @@ struct RabbiChatView: View {
         threadOwnerEmail: String,
         threadDisplayName: String?,
         directRecipientEmail: String? = nil,
-        directRecipientName: String? = nil
+        directRecipientName: String? = nil,
+        showsDismissButton: Bool = true
     ) {
         self.firestoreManager = firestoreManager
         self.currentUser = currentUser
@@ -71,6 +75,7 @@ struct RabbiChatView: View {
         self.threadDisplayName = threadDisplayName
         self.directRecipientEmail = directRecipientEmail
         self.directRecipientName = directRecipientName
+        self.showsDismissButton = showsDismissButton
     }
 
     private var isRabbiViewer: Bool {
@@ -238,6 +243,25 @@ struct RabbiChatView: View {
                                 guard typing else { return }
                                 scrollToBottomAfterLayout(proxy, animated: true)
                             }
+                            .onChange(of: isComposerFocused) { _, focused in
+                                guard focused else { return }
+                                scrollToBottomForKeyboard(proxy)
+                            }
+                            .onReceive(
+                                NotificationCenter.default.publisher(
+                                    for: UIResponder.keyboardWillChangeFrameNotification
+                                )
+                            ) { notification in
+                                handleKeyboardFrameChange(notification, proxy: proxy)
+                            }
+                            .onReceive(
+                                NotificationCenter.default.publisher(
+                                    for: UIResponder.keyboardWillShowNotification
+                                )
+                            ) { _ in
+                                guard isComposerFocused else { return }
+                                scrollToBottomForKeyboard(proxy)
+                            }
 
                             if shouldShowJumpToPresentButton {
                                 Button {
@@ -310,6 +334,7 @@ struct RabbiChatView: View {
                             .ignoresSafeArea(edges: .bottom)
                         )
                 }
+                .offset(y: keyboardDismissNudge)
                 .opacity(showContent ? 1 : 0)
                 .offset(y: showContent ? 0 : 14)
                 .scaleEffect(showContent ? 1 : 0.99)
@@ -317,14 +342,16 @@ struct RabbiChatView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(isLightMode ? Color.black.opacity(0.86) : .white)
-                            .padding(8)
+                if showsDismissButton {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(isLightMode ? Color.black.opacity(0.86) : .white)
+                                .padding(8)
+                        }
                     }
                 }
 
@@ -593,6 +620,66 @@ struct RabbiChatView: View {
                 scrollToBottom(proxy, animated: animated && index == 0)
             }
         }
+    }
+
+    private func scrollToBottomForKeyboard(_ proxy: ScrollViewProxy) {
+        // Keyboard animation and SwiftUI layout updates can arrive in phases.
+        // Fire a few scheduled scrolls so the newest message reliably stays visible.
+        let delays: [Double] = [0.0, 0.06, 0.16, 0.28]
+        for (index, delay) in delays.enumerated() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+                scrollToBottom(proxy, animated: index > 0)
+            }
+        }
+    }
+
+    private func handleKeyboardFrameChange(_ notification: Notification, proxy: ScrollViewProxy) {
+        let nextOverlap = keyboardOverlap(from: notification)
+        let previousOverlap = keyboardOverlapHeight
+        keyboardOverlapHeight = nextOverlap
+
+        // Keep the last messages visible while keyboard is rising.
+        if isComposerFocused && nextOverlap > previousOverlap + 2 {
+            scrollToBottomForKeyboard(proxy)
+        }
+
+        // Subtle settle animation when the keyboard fully slides away.
+        if previousOverlap > 0 && nextOverlap <= 0.5 {
+            runKeyboardDismissMicroAnimation()
+        }
+    }
+
+    private func runKeyboardDismissMicroAnimation() {
+        withAnimation(.easeOut(duration: 0.08)) {
+            keyboardDismissNudge = 5
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.84)) {
+                keyboardDismissNudge = 0
+            }
+        }
+    }
+
+    private func keyboardOverlap(from notification: Notification) -> CGFloat {
+        guard
+            let endFrameValue = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue
+        else {
+            return 0
+        }
+
+        let endFrame = endFrameValue.cgRectValue
+        let screenMaxY = UIScreen.main.bounds.maxY
+        let rawOverlap = max(0, screenMaxY - endFrame.minY)
+        let bottomInset = currentKeyWindowBottomInset()
+        return max(0, rawOverlap - bottomInset)
+    }
+
+    private func currentKeyWindowBottomInset() -> CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first(where: \.isKeyWindow)?
+            .safeAreaInsets.bottom ?? 0
     }
 
     private func dateLabel(for date: Date) -> String {

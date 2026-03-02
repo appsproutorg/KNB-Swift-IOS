@@ -140,13 +140,6 @@ struct MoreMenuView: View {
                                     selectedOption = .auction
                                 }
                             )
-                            
-                            MenuOptionCard(
-                                option: .seating,
-                                action: {
-                                    selectedOption = .seating
-                                }
-                            )
 
                             MenuOptionCard(
                                 option: .siddur,

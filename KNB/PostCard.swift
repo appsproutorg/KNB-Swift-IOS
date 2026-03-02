@@ -12,6 +12,8 @@ struct PostCard: View {
     let currentUserEmail: String?
     let currentUserName: String?
     @ObservedObject var firestoreManager: FirestoreManager
+    var allowsReply: Bool = true
+    var allowsLike: Bool = true
     var onReply: () -> Void
     var onDelete: () -> Void
     var onEdit: (() -> Void)?
@@ -21,13 +23,26 @@ struct PostCard: View {
     @State private var heartScale: CGFloat = 1.0
     @State private var showDeleteConfirmation = false
     @State private var authorDisplayName: String = ""
+    @Environment(\.colorScheme) private var colorScheme
     private let userCache = UserCacheManager.shared
     
-    init(post: SocialPost, currentUserEmail: String?, currentUserName: String? = nil, firestoreManager: FirestoreManager, onReply: @escaping () -> Void, onDelete: @escaping () -> Void, onEdit: (() -> Void)? = nil) {
+    init(
+        post: SocialPost,
+        currentUserEmail: String?,
+        currentUserName: String? = nil,
+        firestoreManager: FirestoreManager,
+        allowsReply: Bool = true,
+        allowsLike: Bool = true,
+        onReply: @escaping () -> Void,
+        onDelete: @escaping () -> Void,
+        onEdit: (() -> Void)? = nil
+    ) {
         self.post = post
         self.currentUserEmail = currentUserEmail
         self.currentUserName = currentUserName
         self.firestoreManager = firestoreManager
+        self.allowsReply = allowsReply
+        self.allowsLike = allowsLike
         self.onReply = onReply
         self.onDelete = onDelete
         self.onEdit = onEdit
@@ -38,204 +53,249 @@ struct PostCard: View {
     var isOwnPost: Bool {
         currentUserEmail == post.authorEmail
     }
-    
-    var relativeTime: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: post.timestamp, relativeTo: Date())
+
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
+    private var authorNameColor: Color {
+        isLightMode
+            ? Color(red: 0.84, green: 0.34, blue: 0.60)
+            : Color(red: 1.0, green: 0.47, blue: 0.71)
+    }
+
+    private var channelLabelColor: Color {
+        isLightMode ? Color.black.opacity(0.48) : Color.white.opacity(0.62)
+    }
+
+    private var menuIconColor: Color {
+        isLightMode ? Color.black.opacity(0.58) : Color.white.opacity(0.7)
+    }
+
+    private var contentTextColor: Color {
+        isLightMode ? Color.black.opacity(0.86) : Color.white.opacity(0.96)
+    }
+
+    private var metaTextColor: Color {
+        isLightMode ? Color.black.opacity(0.48) : Color.white.opacity(0.68)
+    }
+
+    private var mutedMetaTextColor: Color {
+        isLightMode ? Color.black.opacity(0.38) : Color.white.opacity(0.56)
+    }
+
+    private var actionTextColor: Color {
+        isLightMode ? Color.black.opacity(0.62) : Color.white.opacity(0.72)
+    }
+
+    private var actionDisabledColor: Color {
+        isLightMode ? Color.black.opacity(0.24) : Color.white.opacity(0.34)
+    }
+
+    private var activeLikeColor: Color {
+        Color(red: 0.46, green: 0.90, blue: 0.68)
+    }
+
+    private var cardFillGradient: LinearGradient {
+        if isLightMode {
+            return LinearGradient(
+                colors: [
+                    Color.white.opacity(0.96),
+                    Color(red: 0.94, green: 0.96, blue: 1.0).opacity(0.98)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+        return LinearGradient(
+            colors: [
+                Color(red: 0.19, green: 0.20, blue: 0.23),
+                Color(red: 0.12, green: 0.13, blue: 0.16)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private var cardStrokeColor: Color {
+        isLightMode ? Color.black.opacity(0.08) : Color.white.opacity(0.09)
+    }
+
+    private var cardShadowColor: Color {
+        Color.black.opacity(isLightMode ? 0.10 : 0.22)
+    }
+
+    private var isAdminAuthor: Bool {
+        let normalizedAuthor = post.authorEmail.lowercased()
+        return firestoreManager.adminEmails.contains { $0.lowercased() == normalizedAuthor }
+    }
+
+    private var authorChannelLabel: String {
+        let trimmed = post.authorEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let atIndex = trimmed.firstIndex(of: "@"), atIndex > trimmed.startIndex else {
+            return trimmed.isEmpty ? "updates" : trimmed
+        }
+        return String(trimmed[..<atIndex])
+    }
+
+    private var postTimeLabel: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale.current
+        formatter.dateFormat = Calendar.current.isDateInToday(post.timestamp) ? "h:mm a" : "MMM d, h:mm a"
+        return formatter.string(from: post.timestamp)
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header with author and menu
-            HStack(alignment: .top, spacing: 10) {
-                // Avatar
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.88, green: 0.93, blue: 0.98),
-                                    Color(red: 0.90, green: 0.94, blue: 0.99)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 48, height: 48)
-                    
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 22))
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.25, green: 0.5, blue: 0.92),
-                                    Color(red: 0.3, green: 0.55, blue: 0.96)
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 6) {
-                        Text(authorDisplayName.isEmpty ? "Loading..." : authorDisplayName)
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.primary)
-                        
-                        // Verified badge and Admin label for admin posts
-                        if firestoreManager.adminEmails.contains(post.authorEmail) {
-                            Image(systemName: "checkmark.seal.fill")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 1.0, green: 0.84, blue: 0.0), // Gold
-                                            Color(red: 1.0, green: 0.65, blue: 0.0)  // Darker gold
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                            
-                            Text("Admin")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: [
-                                            Color(red: 1.0, green: 0.84, blue: 0.0), // Gold
-                                            Color(red: 1.0, green: 0.65, blue: 0.0)  // Darker gold
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                        }
-                        
-                        Text("·")
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundStyle(.secondary)
-                        
-                        Text(relativeTime)
-                            .font(.system(size: 14, weight: .regular))
-                            .foregroundStyle(.secondary)
-                        
-                        if post.isEdited {
-                            Text("·")
-                                .font(.system(size: 14, weight: .regular))
-                                .foregroundStyle(.secondary)
-                            Text("Edited")
-                                .font(.system(size: 14, weight: .regular))
-                                .foregroundStyle(.secondary)
-                        }
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(authorDisplayName.isEmpty ? "Loading..." : authorDisplayName)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(authorNameColor)
+
+                    if isAdminAuthor {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color(red: 0.41, green: 0.89, blue: 0.67))
                     }
-                    
-                    if !post.content.isEmpty {
-                        // Post content - Directly below username for fluid flow
-                        Text(post.content)
-                            .font(.system(size: 16, weight: .regular))
-                            .foregroundStyle(.primary)
-                            .lineSpacing(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.top, 2)
-                    }
-                    
-                    if !post.mediaItems.isEmpty {
-                        SocialPostMediaGalleryView(mediaItems: post.mediaItems)
-                            .padding(.top, 8)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                Spacer()
-                
-                // Three-dot menu (for own posts or admin)
-                if isOwnPost || firestoreManager.currentUser?.isAdmin == true {
-                    Menu {
-                        if isOwnPost {
-                            Button(action: {
-                                // Edit action will be handled by parent
-                                onEdit?()
-                            }) {
-                                Label("Edit", systemImage: "pencil")
+
+                    Spacer(minLength: 6)
+
+                    Text(authorChannelLabel)
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(channelLabelColor)
+                        .lineLimit(1)
+
+                    if isOwnPost || firestoreManager.currentUser?.isAdmin == true {
+                        Menu {
+                            if isOwnPost {
+                                Button(action: {
+                                    onEdit?()
+                                }) {
+                                    Label("Edit", systemImage: "pencil")
+                                }
                             }
+
+                            Button(role: .destructive, action: {
+                                showDeleteConfirmation = true
+                            }) {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(menuIconColor)
+                                .padding(.horizontal, 4)
+                                .padding(.vertical, 2)
                         }
-                        
-                        Button(role: .destructive, action: {
-                            showDeleteConfirmation = true
-                        }) {
-                            Label("Delete", systemImage: "trash")
+                    }
+                }
+
+                if !post.content.isEmpty {
+                    Text(post.content)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(contentTextColor)
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if !post.mediaItems.isEmpty {
+                    SocialPostMediaGalleryView(mediaItems: post.mediaItems, maxHeight: 560)
+                        .clipShape(RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        .overlay(alignment: .bottomTrailing) {
+                            HStack(spacing: 4) {
+                                if post.isEdited {
+                                    Text("Edited")
+                                }
+                                Text(postTimeLabel)
+                            }
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.95))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.black.opacity(0.45), in: Capsule())
+                            .padding(8)
                         }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(.secondary.opacity(0.7))
-                            .padding(6)
+                } else {
+                    HStack(spacing: 4) {
+                        Spacer(minLength: 0)
+                        if post.isEdited {
+                            Text("Edited")
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(mutedMetaTextColor)
+                        }
+                        Text(postTimeLabel)
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundStyle(metaTextColor)
                     }
                 }
             }
-            .contentShape(Rectangle()) // Make the whole area tappable
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(cardFillGradient)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(cardStrokeColor, lineWidth: 1)
+            )
+            .shadow(color: cardShadowColor, radius: 12, x: 0, y: 7)
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .onTapGesture {
+                guard allowsReply else { return }
                 onReply()
             }
-            
-            // Action buttons - Better spacing
-            HStack(spacing: 0) {
-                // Reply button
-                Button(action: onReply) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "bubble.right")
-                            .font(.system(size: 15, weight: .medium))
-                        if post.replyCount > 0 {
-                            Text("\(post.replyCount)")
-                                .font(.system(size: 13, weight: .medium))
+
+            HStack(spacing: 8) {
+                if allowsReply {
+                    Button(action: onReply) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "arrowshape.turn.up.left.fill")
+                                .font(.system(size: 13, weight: .semibold))
+                            if post.replyCount > 0 {
+                                Text("\(post.replyCount)")
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            }
                         }
+                        .foregroundStyle(actionTextColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
                     }
-                    .foregroundStyle(.secondary.opacity(0.8))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
-                
-                Spacer()
-                
-                // Like button with animation
+
+                Spacer(minLength: 0)
+
                 Button(action: handleLike) {
-                    HStack(spacing: 4) {
+                    HStack(spacing: 5) {
                         Image(systemName: isLiked ? "heart.fill" : "heart")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(isLiked ? .red : .secondary.opacity(0.8))
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(
+                                allowsLike
+                                ? (isLiked ? activeLikeColor : actionTextColor)
+                                : actionDisabledColor
+                            )
                             .scaleEffect(heartScale)
-                        
+
                         if likeCount > 0 {
                             Text("\(likeCount)")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundStyle(isLiked ? .red : .secondary.opacity(0.8))
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(
+                                    allowsLike
+                                    ? (isLiked ? activeLikeColor : actionTextColor)
+                                    : actionDisabledColor
+                                )
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
                 }
                 .buttonStyle(.plain)
+                .disabled(!allowsLike)
             }
-            .padding(.leading, 58)
-            .padding(.top, 6)
+            .padding(.horizontal, 4)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.04), radius: 8, x: 0, y: 2)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(Color(.systemGray6), lineWidth: 0.5)
-        )
         .alert("Delete Post", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) {
@@ -261,7 +321,7 @@ struct PostCard: View {
     }
     
     private func handleLike() {
-        guard let userEmail = currentUserEmail else { return }
+        guard allowsLike, let userEmail = currentUserEmail else { return }
         
         // Haptic feedback
         let impactFeedback = UIImpactFeedbackGenerator(style: .light)

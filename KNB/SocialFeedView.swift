@@ -11,77 +11,224 @@ struct SocialFeedView: View {
     @ObservedObject var firestoreManager: FirestoreManager
     @Binding var currentUser: User?
     @EnvironmentObject var navigationManager: NavigationManager
+    @Environment(\.colorScheme) private var colorScheme
     
-    @State private var sortOption: FirestoreManager.SocialPostSortOption = .newest
     @State private var showPostComposer = false
     @State private var postToEdit: SocialPost?
     @State private var selectedPost: SocialPost?
     @State private var showReplyThread = false
+
+    private var isAdminUser: Bool {
+        currentUser?.isAdmin == true
+    }
+
+    private var normalizedAdminEmails: Set<String> {
+        Set(firestoreManager.adminEmails.map { $0.lowercased() })
+    }
+
+    private var visiblePosts: [SocialPost] {
+        guard !isAdminUser else { return firestoreManager.socialPosts }
+        return firestoreManager.socialPosts.filter { normalizedAdminEmails.contains($0.authorEmail.lowercased()) }
+    }
+
+    private func canLikePost(_ post: SocialPost) -> Bool {
+        isAdminUser || normalizedAdminEmails.contains(post.authorEmail.lowercased())
+    }
+
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
+    private var backgroundGradientColors: [Color] {
+        if isLightMode {
+            return [
+                Color(red: 0.95, green: 0.97, blue: 1.0),
+                Color(red: 0.91, green: 0.95, blue: 0.99)
+            ]
+        }
+        return [
+            Color(red: 0.04, green: 0.07, blue: 0.11),
+            Color(red: 0.02, green: 0.03, blue: 0.06)
+        ]
+    }
+
+    private var headerTitleColor: Color {
+        isLightMode ? Color.black.opacity(0.86) : Color.white.opacity(0.94)
+    }
+
+    private var headerSubtitleColor: Color {
+        isLightMode ? Color.black.opacity(0.52) : Color.white.opacity(0.58)
+    }
+
+    private var emptyPrimaryTextColor: Color {
+        isLightMode ? Color.black.opacity(0.84) : Color.white.opacity(0.92)
+    }
+
+    private var emptySecondaryTextColor: Color {
+        isLightMode ? Color.black.opacity(0.52) : Color.white.opacity(0.62)
+    }
+
+    private var updateChipTextColor: Color {
+        isLightMode ? Color.black.opacity(0.62) : Color.white.opacity(0.74)
+    }
+
+    private var updateChipFillColor: Color {
+        isLightMode ? Color.black.opacity(0.05) : Color.white.opacity(0.08)
+    }
+
+    private var updateChipStrokeColor: Color {
+        isLightMode ? Color.black.opacity(0.11) : Color.white.opacity(0.12)
+    }
     
-    private func timeAgoString(from date: Date) -> String {
+    private func updateStatusText(from date: Date) -> String {
+        let now = Date()
+        let elapsed = now.timeIntervalSince(date)
+        if elapsed < 15 {
+            return "Updated just now"
+        }
+
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+        let clampedDate = min(date, now)
+        return "Updated \(formatter.localizedString(for: clampedDate, relativeTo: now))"
+    }
+
+    private var topHeader: some View {
+        VStack(spacing: 2) {
+            Text("Updates")
+                .font(.system(size: 28, weight: .bold, design: .rounded))
+                .foregroundStyle(headerTitleColor)
+
+            Text("Community Channel")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(headerSubtitleColor)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(
+            LinearGradient(
+                colors: isLightMode
+                    ? [
+                        Color.white.opacity(0.88),
+                        Color.white.opacity(0.64),
+                        Color.clear
+                    ]
+                    : [
+                        Color.black.opacity(0.24),
+                        Color.black.opacity(0.10),
+                        Color.clear
+                    ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .overlay(alignment: .bottom) {
+            LinearGradient(
+                colors: isLightMode
+                    ? [
+                        Color.black.opacity(0.09),
+                        Color.black.opacity(0.0)
+                    ]
+                    : [
+                        Color.white.opacity(0.06),
+                        Color.white.opacity(0.0)
+                    ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: 8)
+        }
+    }
+
+    private var feedScrollMask: some View {
+        LinearGradient(
+            stops: [
+                .init(color: .clear, location: 0.0),
+                .init(color: .black, location: 0.08),
+                .init(color: .black, location: 1.0)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
     
     var body: some View {
         NavigationStack {
             ZStack {
-                Color(.systemGroupedBackground)
+                LinearGradient(
+                    colors: backgroundGradientColors,
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .overlay(alignment: .topLeading) {
+                    Circle()
+                        .fill(
+                            isLightMode
+                                ? Color(red: 0.27, green: 0.53, blue: 0.91).opacity(0.14)
+                                : Color(red: 0.11, green: 0.36, blue: 0.62).opacity(0.22)
+                        )
+                        .frame(width: 320, height: 320)
+                        .blur(radius: 8)
+                        .offset(x: -70, y: -120)
+                }
+                .overlay(alignment: .bottomTrailing) {
+                    Circle()
+                        .fill(
+                            isLightMode
+                                ? Color(red: 0.13, green: 0.62, blue: 0.77).opacity(0.12)
+                                : Color(red: 0.06, green: 0.24, blue: 0.43).opacity(0.20)
+                        )
+                        .frame(width: 280, height: 280)
+                        .blur(radius: 10)
+                        .offset(x: 90, y: 130)
+                }
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Sort toggle - Glass Switch Design
-                    GlassSwitchView(
-                        selectedOption: $sortOption,
-                        onSelectionChange: { newOption in
-                            firestoreManager.startListeningToSocialPosts(sortBy: newOption)
-                        }
-                    )
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    
-                    Divider()
-                    
+                    topHeader
+
                     // Feed content
-                    if firestoreManager.socialPosts.isEmpty {
+                    if visiblePosts.isEmpty {
                         // Empty state
                         VStack(spacing: 20) {
                             Image(systemName: "bubble.left.and.bubble.right")
                                 .font(.system(size: 60))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(emptySecondaryTextColor)
                             
                             Text("No posts yet")
                                 .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(emptyPrimaryTextColor)
                             
-                            Text("Be the first to share something with the community!")
+                            Text(isAdminUser ? "Be the first to share something with the community!" : "Admins will post updates here.")
                                 .font(.system(size: 16))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(emptySecondaryTextColor)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal, 40)
-                            
-                            Button(action: {
-                                showPostComposer = true
-                            }) {
-                                Text("Create First Post")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 12)
-                                    .background(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(red: 0.25, green: 0.5, blue: 0.92),
-                                                Color(red: 0.3, green: 0.55, blue: 0.96)
-                                            ],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
+
+                            if isAdminUser {
+                                Button(action: {
+                                    showPostComposer = true
+                                }) {
+                                    Text("Create First Post")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 24)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color(red: 0.12, green: 0.67, blue: 0.42),
+                                                    Color(red: 0.07, green: 0.57, blue: 0.35)
+                                                ],
+                                                startPoint: .leading,
+                                                endPoint: .trailing
+                                            )
                                         )
-                                    )
-                                    .cornerRadius(20)
+                                        .cornerRadius(20)
+                                }
+                                .padding(.top, 8)
                             }
-                            .padding(.top, 8)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
@@ -89,23 +236,36 @@ struct SocialFeedView: View {
                         if let lastUpdated = firestoreManager.lastUpdated {
                             HStack {
                                 Spacer()
-                                Text("Updated \(timeAgoString(from: lastUpdated))")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal)
-                                    .padding(.top, 8)
+                                Text(updateStatusText(from: lastUpdated))
+                                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(updateChipTextColor)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(
+                                        Capsule(style: .continuous)
+                                            .fill(updateChipFillColor)
+                                            .overlay(
+                                                Capsule(style: .continuous)
+                                                    .stroke(updateChipStrokeColor, lineWidth: 1)
+                                            )
+                                    )
+                                Spacer()
                             }
+                            .padding(.top, 8)
                         }
                         ScrollViewReader { proxy in
                             ScrollView {
-                                LazyVStack(spacing: 12) {
-                                    ForEach(firestoreManager.socialPosts) { post in
+                                LazyVStack(spacing: 14) {
+                                    ForEach(visiblePosts) { post in
                                         PostCard(
                                             post: post,
                                             currentUserEmail: currentUser?.email,
                                             currentUserName: currentUser?.name,
                                             firestoreManager: firestoreManager,
+                                            allowsReply: isAdminUser,
+                                            allowsLike: canLikePost(post),
                                             onReply: {
+                                                guard isAdminUser else { return }
                                                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                                     selectedPost = post
                                                     showReplyThread = true
@@ -122,28 +282,34 @@ struct SocialFeedView: View {
                                             }
                                         )
                                         .id(post.id) // Important for scrolling
-                                        .padding(.horizontal)
+                                        .padding(.horizontal, 10)
                                         .transition(.asymmetric(
                                             insertion: .move(edge: .top).combined(with: .opacity),
                                             removal: .opacity.combined(with: .move(edge: .bottom))
                                         ))
                                     }
                                 }
-                                .padding(.vertical)
+                                .padding(.top, 20)
+                                .padding(.bottom, 16)
                             }
+                            .mask(feedScrollMask)
                             .refreshable {
-                                await firestoreManager.fetchSocialPosts(sortBy: sortOption)
+                                await firestoreManager.fetchSocialPosts(sortBy: .newest)
                             }
                             .onChange(of: navigationManager.navigateToPostId) { _, postId in
                                 if let postId = postId {
                                     // Find the post
-                                    if let post = firestoreManager.socialPosts.first(where: { $0.id == postId }) {
+                                    if let post = visiblePosts.first(where: { $0.id == postId }) {
                                         withAnimation {
                                             proxy.scrollTo(postId, anchor: .top)
-                                            selectedPost = post
-                                            showReplyThread = true
+                                            if isAdminUser {
+                                                selectedPost = post
+                                                showReplyThread = true
+                                            }
                                         }
                                         // Reset navigation state
+                                        navigationManager.navigateToPostId = nil
+                                    } else {
                                         navigationManager.navigateToPostId = nil
                                     }
                                 }
@@ -157,61 +323,41 @@ struct SocialFeedView: View {
                     Spacer()
                     HStack {
                         Spacer()
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                showPostComposer = true
-                            }
-                        }) {
-                            HStack(spacing: 8) {
-                                Image(systemName: "pencil")
-                                    .font(.system(size: 16, weight: .semibold))
-                                Text("Post")
-                                    .font(.system(size: 16, weight: .semibold))
-                            }
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.25, green: 0.5, blue: 0.92),
-                                        Color(red: 0.3, green: 0.55, blue: 0.96)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
+                        if isAdminUser {
+                            Button(action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    showPostComposer = true
+                                }
+                            }) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "pencil")
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text("Post")
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 12)
+                                .background(
+                                    LinearGradient(
+                                        colors: [
+                                            Color(red: 0.12, green: 0.67, blue: 0.42),
+                                            Color(red: 0.07, green: 0.57, blue: 0.35)
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
                                 )
-                            )
-                            .cornerRadius(30)
-                            .shadow(color: Color(red: 0.25, green: 0.5, blue: 0.92).opacity(0.4), radius: 15, x: 0, y: 8)
+                                .cornerRadius(30)
+                                .shadow(color: Color(red: 0.08, green: 0.53, blue: 0.33).opacity(0.45), radius: 15, x: 0, y: 8)
+                            }
+                            .padding(.trailing, 20)
+                            .padding(.bottom, 24)
                         }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 24)
                     }
                 }
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 2) {
-                        Text("Updates")
-                            .font(.system(size: 28, weight: .bold, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [
-                                        Color(red: 0.25, green: 0.5, blue: 0.92),
-                                        Color(red: 0.3, green: 0.55, blue: 0.96)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                        
-                        Text("Community Feed")
-                            .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showPostComposer) {
                 PostComposerView(
                     firestoreManager: firestoreManager,
@@ -226,7 +372,7 @@ struct SocialFeedView: View {
                 }
             }
             .sheet(isPresented: $showReplyThread) {
-                if let post = selectedPost {
+                if let post = selectedPost, isAdminUser {
                     ReplyThreadView(
                         post: post,
                         firestoreManager: firestoreManager,
@@ -235,7 +381,7 @@ struct SocialFeedView: View {
                 }
             }
             .onAppear {
-                firestoreManager.startListeningToSocialPosts(sortBy: sortOption)
+                firestoreManager.startListeningToSocialPosts(sortBy: .newest)
                 Task {
                     await firestoreManager.fetchAdmins()
                 }

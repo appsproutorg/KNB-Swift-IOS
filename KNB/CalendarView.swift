@@ -528,6 +528,22 @@ struct CalendarDayCell: View {
         let scheduleCount = (dailyCalendarDay?.scheduleLines.isEmpty == false) ? 1 : 0
         return events + scheduleCount
     }
+
+    private var sponsoredPrimaryColor: Color {
+        Color(red: 217.0 / 255.0, green: 119.0 / 255.0, blue: 50.0 / 255.0) // #D97732
+    }
+
+    private var sponsoredSecondaryColor: Color {
+        Color(red: 188.0 / 255.0, green: 99.0 / 255.0, blue: 38.0 / 255.0)
+    }
+
+    private var availablePrimaryColor: Color {
+        Color(red: 30.0 / 255.0, green: 127.0 / 255.0, blue: 92.0 / 255.0) // #1E7F5C
+    }
+
+    private var availableSecondaryColor: Color {
+        Color(red: 25.0 / 255.0, green: 101.0 / 255.0, blue: 73.0 / 255.0)
+    }
     
     var body: some View {
         VStack(spacing: isShabbat ? 4 : 2) {
@@ -544,13 +560,13 @@ struct CalendarDayCell: View {
 
                     if sponsorship != nil {
                         Circle()
-                            .fill(Color(red: 0.9, green: 0.2, blue: 0.2))
+                            .fill(sponsoredPrimaryColor)
                             .frame(width: 8, height: 8)
                             .overlay(
                                 Circle()
-                                    .stroke(Color(red: 0.9, green: 0.2, blue: 0.2).opacity(0.6), lineWidth: 2)
+                                    .stroke(sponsoredPrimaryColor.opacity(0.6), lineWidth: 2)
                             )
-                            .shadow(color: Color(red: 0.9, green: 0.2, blue: 0.2).opacity(0.3), radius: 3, x: 0, y: 1)
+                            .shadow(color: sponsoredPrimaryColor.opacity(0.3), radius: 3, x: 0, y: 1)
                     } else if isPastDate && isShabbat {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 7))
@@ -595,8 +611,8 @@ struct CalendarDayCell: View {
                             isPastDate ? 
                             Color.secondary.opacity(0.5) : 
                             (sponsorship != nil ? 
-                             Color(red: 0.9, green: 0.2, blue: 0.2) : 
-                             (isAvailableForSponsorship ? Color(red: 0.2, green: 0.6, blue: 0.3) : .blue))
+                             sponsoredPrimaryColor : 
+                             (isAvailableForSponsorship ? availablePrimaryColor : .blue))
                         )
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
@@ -614,7 +630,7 @@ struct CalendarDayCell: View {
         .opacity(isCurrentMonth ? (isPastDate ? 0.5 : 1.0) : 0.25)
         .scaleEffect(isToday ? 1.05 : 1.0)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isToday)
-        .shadow(color: (sponsorship != nil ? Color(red: 0.9, green: 0.2, blue: 0.2) : (isShabbat && isAvailableForSponsorship && !isPastDate ? Color(red: 0.2, green: 0.6, blue: 0.3) : (isShabbat && !isPastDate ? .blue : .clear))).opacity(0.15), radius: 4, x: 0, y: 2)
+        .shadow(color: (sponsorship != nil ? sponsoredPrimaryColor : (isShabbat && isAvailableForSponsorship && !isPastDate ? availablePrimaryColor : (isShabbat && !isPastDate ? .blue : .clear))).opacity(0.15), radius: 4, x: 0, y: 2)
     }
     
     // Modern box backgrounds with status colors
@@ -628,26 +644,26 @@ struct CalendarDayCell: View {
             
             // Status-based color overlay with gradients
             if let _ = sponsorship {
-                // Sponsored - red (already booked) with gradient
+                // Sponsored - accent (already booked) with gradient
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.9, green: 0.2, blue: 0.2).opacity(0.2),
-                                Color(red: 0.85, green: 0.15, blue: 0.15).opacity(0.15)
+                                sponsoredPrimaryColor.opacity(0.2),
+                                sponsoredSecondaryColor.opacity(0.15)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
                     )
             } else if isShabbat && isAvailableForSponsorship && isCurrentMonth {
-                // Available Shabbat - green (can book) with gradient
+                // Available Shabbat - accent (can book) with gradient
                 RoundedRectangle(cornerRadius: 12)
                     .fill(
                         LinearGradient(
                             colors: [
-                                Color(red: 0.2, green: 0.6, blue: 0.3).opacity(0.15),
-                                Color(red: 0.15, green: 0.5, blue: 0.25).opacity(0.1)
+                                availablePrimaryColor.opacity(0.15),
+                                availableSecondaryColor.opacity(0.1)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -674,13 +690,13 @@ struct CalendarDayCell: View {
                 .strokeBorder(.blue, lineWidth: 3)
                 .shadow(color: .blue.opacity(0.4), radius: 4, x: 0, y: 2)
         } else if sponsorship != nil {
-            // Sponsored dates get red gradient border
+            // Sponsored dates get accent gradient border
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.9, green: 0.2, blue: 0.2).opacity(0.8),
-                            Color(red: 0.85, green: 0.15, blue: 0.15).opacity(0.6)
+                            sponsoredPrimaryColor.opacity(0.8),
+                            sponsoredSecondaryColor.opacity(0.6)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -688,13 +704,13 @@ struct CalendarDayCell: View {
                     lineWidth: 2.5
                 )
         } else if isShabbat && isAvailableForSponsorship && isCurrentMonth {
-            // Available Shabbats get green gradient border
+            // Available Shabbats get accent gradient border
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
                     LinearGradient(
                         colors: [
-                            Color(red: 0.2, green: 0.6, blue: 0.3).opacity(0.6),
-                            Color(red: 0.15, green: 0.5, blue: 0.25).opacity(0.4)
+                            availablePrimaryColor.opacity(0.6),
+                            availableSecondaryColor.opacity(0.4)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -819,7 +835,7 @@ struct CalendarDayDetailView: View {
                         .padding(14)
                         .background(
                             RoundedRectangle(cornerRadius: 16)
-                                .fill(Color.red.opacity(0.08))
+                                .fill(Color(red: 217.0 / 255.0, green: 119.0 / 255.0, blue: 50.0 / 255.0).opacity(0.08))
                         )
                     }
 

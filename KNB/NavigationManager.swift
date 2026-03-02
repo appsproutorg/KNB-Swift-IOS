@@ -43,12 +43,12 @@ class NavigationManager: ObservableObject {
         } else if let chatThreadId = userInfo["chatThreadId"] as? String {
             print("🔗 Deep Link: Found chatThreadId \(chatThreadId)")
             DispatchQueue.main.async {
-                self.selectedTab = 2 // Messages Tab
+                self.selectedTab = 2 // Rabbi Tab
             }
         } else if let chatThreadOwnerEmail = userInfo["chatThreadOwnerEmail"] as? String {
             print("🔗 Deep Link: Found chatThreadOwnerEmail \(chatThreadOwnerEmail)")
             DispatchQueue.main.async {
-                self.selectedTab = 2 // Messages Tab
+                self.selectedTab = 2 // Rabbi Tab
             }
         } else if let type = userInfo["type"] as? String {
             // Fallback based on type if IDs are missing (though they should be there)
@@ -58,7 +58,7 @@ class NavigationManager: ObservableObject {
             case "OUTBID":
                 DispatchQueue.main.async { self.selectedTab = 3 } // More Tab (Auction is now in More menu)
             case "CHAT_MESSAGE", "DIRECT_MESSAGE", "RABBI_MESSAGE":
-                DispatchQueue.main.async { self.selectedTab = 2 } // Messages Tab
+                DispatchQueue.main.async { self.selectedTab = 2 } // Rabbi Tab
             default:
                 break
             }

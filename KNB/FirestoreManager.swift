@@ -1388,6 +1388,11 @@ class FirestoreManager: ObservableObject {
     
     // Create a new social post
     func createSocialPost(content: String, author: User, mediaUploads: [SocialPostMediaUpload] = []) async -> Bool {
+        guard author.isAdmin else {
+            errorMessage = "Only admins can post updates."
+            return false
+        }
+
         guard content.count <= 140 else {
             errorMessage = "Post must be 140 characters or less"
             return false
@@ -1456,6 +1461,11 @@ class FirestoreManager: ObservableObject {
     
     // Update a social post
     func updateSocialPost(postId: String, content: String) async -> Bool {
+        guard currentUser?.isAdmin == true else {
+            errorMessage = "Only admins can edit updates."
+            return false
+        }
+
         guard content.count <= 140 else {
             errorMessage = "Post must be 140 characters or less"
             return false
@@ -1492,6 +1502,39 @@ class FirestoreManager: ObservableObject {
     func toggleLike(postId: String, userEmail: String) async -> Bool {
         do {
             let postRef = db.collection("social_posts").document(postId)
+
+            let normalizedUserEmail = normalizeEmail(userEmail)
+            let normalizedAdminEmails = Set(adminEmails.map { normalizeEmail($0) })
+            if !(currentUser?.isAdmin ?? false) {
+                let snapshot = try await postRef.getDocument()
+                guard
+                    let data = snapshot.data(),
+                    let authorEmail = data["authorEmail"] as? String
+                else {
+                    errorMessage = "Post not found"
+                    return false
+                }
+
+                let normalizedAuthorEmail = normalizeEmail(authorEmail)
+                var authorIsAdmin = normalizedAdminEmails.contains(normalizedAuthorEmail)
+
+                if !authorIsAdmin {
+                    let authorDocRef = db.collection("users").document(authorEmail)
+                    let authorDoc = try await authorDocRef.getDocument()
+                    authorIsAdmin = (authorDoc.data()?["isAdmin"] as? Bool ?? false)
+
+                    if !authorIsAdmin && authorEmail != normalizedAuthorEmail {
+                        let normalizedAuthorDoc = try await db.collection("users").document(normalizedAuthorEmail).getDocument()
+                        authorIsAdmin = (normalizedAuthorDoc.data()?["isAdmin"] as? Bool ?? false)
+                    }
+                }
+
+                if !authorIsAdmin && normalizedAuthorEmail != "admin@knb.com" {
+                    errorMessage = "You can only like admin posts."
+                    return false
+                }
+            }
+
             let _ = try await db.runTransaction({ (transaction, errorPointer) -> Any? in
                 let postDoc: DocumentSnapshot
                 do {
@@ -1513,10 +1556,10 @@ class FirestoreManager: ObservableObject {
                 }
 
                 var likeSet = Set(likes)
-                if likeSet.contains(userEmail) {
-                    likeSet.remove(userEmail)
+                if likeSet.contains(normalizedUserEmail) {
+                    likeSet.remove(normalizedUserEmail)
                 } else {
-                    likeSet.insert(userEmail)
+                    likeSet.insert(normalizedUserEmail)
                 }
 
                 let normalizedLikes = Array(likeSet).sorted()
@@ -1539,6 +1582,11 @@ class FirestoreManager: ObservableObject {
     
     // Create a reply to a post
     func createReply(parentPostId: String, content: String, author: User, mediaUpload: SocialPostMediaUpload? = nil) async -> Bool {
+        guard author.isAdmin else {
+            errorMessage = "Only admins can reply in updates."
+            return false
+        }
+
         guard content.count <= 140 else {
             errorMessage = "Reply must be 140 characters or less"
             return false
@@ -1680,8 +1728,9 @@ class FirestoreManager: ObservableObject {
     
     private func sortTopLevelSocialPosts(_ posts: [SocialPost], sortBy: SocialPostSortOption) -> [SocialPost] {
         if sortBy == .newest {
-            let adminPosts = posts.filter { adminEmails.contains($0.authorEmail) }
-            let regularPosts = posts.filter { !adminEmails.contains($0.authorEmail) }
+            let normalizedAdminEmails = Set(adminEmails.map { normalizeEmail($0) })
+            let adminPosts = posts.filter { normalizedAdminEmails.contains(normalizeEmail($0.authorEmail)) }
+            let regularPosts = posts.filter { !normalizedAdminEmails.contains(normalizeEmail($0.authorEmail)) }
             let sortedAdminPosts = adminPosts.sorted { $0.timestamp > $1.timestamp }
             let sortedRegularPosts = regularPosts.sorted { $0.timestamp > $1.timestamp }
             return sortedAdminPosts + sortedRegularPosts
@@ -2076,6 +2125,60 @@ class FirestoreManager: ObservableObject {
         } catch {
             print("❌ Error sending Rabbi chat message: \(error.localizedDescription)")
             errorMessage = "Failed to send message: \(error.localizedDescription)"
+            return false
+        }
+    }
+
+    func deleteRabbiChatThread(
+        rabbiEmail: String,
+        threadOwnerEmail: String
+    ) async -> Bool {
+        let normalizedRabbiEmail = normalizeEmail(rabbiEmail)
+        guard let canonicalRabbiEmail = canonicalRabbiEmail(for: normalizedRabbiEmail) else {
+            errorMessage = "Only Rabbi accounts can delete Rabbi chats."
+            return false
+        }
+
+        let normalizedThreadOwnerEmail = normalizeEmail(threadOwnerEmail)
+        guard !normalizedThreadOwnerEmail.isEmpty else {
+            errorMessage = "Invalid chat thread."
+            return false
+        }
+
+        do {
+            let snapshot = try await db.collection("rabbi_messages")
+                .whereField("threadOwnerEmail", isEqualTo: normalizedThreadOwnerEmail)
+                .getDocuments()
+
+            let threadDocuments = snapshot.documents.filter { document in
+                let recipientEmails = (document.data()["recipientEmails"] as? [String] ?? [])
+                    .map { normalizeEmail($0) }
+                    .filter { !$0.isEmpty }
+                return recipientEmails.isEmpty
+                    || recipientEmails.contains(canonicalRabbiEmail)
+                    || recipientEmails.contains(normalizedRabbiEmail)
+            }
+
+            guard !threadDocuments.isEmpty else {
+                return true
+            }
+
+            let maxBatchSize = 450
+            for start in stride(from: 0, to: threadDocuments.count, by: maxBatchSize) {
+                let end = min(start + maxBatchSize, threadDocuments.count)
+                let chunk = threadDocuments[start..<end]
+                let batch = db.batch()
+                for document in chunk {
+                    batch.deleteDocument(document.reference)
+                }
+                try await batch.commit()
+            }
+
+            print("✅ Deleted Rabbi chat thread: \(normalizedThreadOwnerEmail) (\(threadDocuments.count) messages)")
+            return true
+        } catch {
+            print("❌ Error deleting Rabbi chat thread: \(error.localizedDescription)")
+            errorMessage = "Failed to delete Rabbi chat: \(error.localizedDescription)"
             return false
         }
     }
@@ -2762,7 +2865,7 @@ class FirestoreManager: ObservableObject {
                 .whereField("isAdmin", isEqualTo: true)
                 .getDocuments()
             
-            let admins = snapshot.documents.map { $0.documentID } // email is document ID
+            let admins = snapshot.documents.map { normalizeEmail($0.documentID) } // email is document ID
             
             await MainActor.run {
                 // Always keep super admin
